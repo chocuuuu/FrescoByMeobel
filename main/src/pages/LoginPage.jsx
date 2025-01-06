@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import react from '../assets/react.svg'
+import react from '../assets/LoginPage/fresco_logo_black.png'
 
 import leaf_1 from '../assets/LoginPage/leaf-1.png'
 import leaf_2 from '../assets/LoginPage/leaf-2.png'
@@ -39,7 +39,7 @@ function LoginPage() {
         <img
           src={react}
           alt="Fresco Logo"
-          className="w-30 h-10 object-contain"
+          className="w-60 object-contain"
         />
       </div>
 
