@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
-import react from '../assets/LoginPage/fresco_logo_black.png'
 
+import logo from '../assets/LoginPage/fresco_logo_black.png'
 import leaf_1 from '../assets/LoginPage/leaf-1.png'
 import leaf_2 from '../assets/LoginPage/leaf-2.png'
 import leaf_3 from '../assets/LoginPage/leaf-3.png'
@@ -33,13 +33,13 @@ function LoginPage() {
   }, [])
 
   return (
-    <div className="min-h-screen w-full relative bg-white p-6">
+    <div className="min-h-screen w-full relative bg-white p-4 sm:p-6 overflow-hidden">
       {/* Logo */}
-      <div className="absolute top-8 left-8">
+      <div className="absolute top-4 left-4 sm:top-8 sm:left-8">
         <img
-          src={react}
+          src={logo}
           alt="Fresco Logo"
-          className="w-60 object-contain"
+          className="w-40 sm:w-60 object-contain"
         />
       </div>
 
@@ -47,24 +47,24 @@ function LoginPage() {
       <img
         src={leaf_1}
         alt="Decorative Leaf"
-        className="absolute bottom-0 left-10 w-80 opacity-70"
+        className="absolute bottom-0 left-20 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6 max-w-md opacity-70"
       />
       <img
         src={leaf_3}
         alt="Decorative Leaf"
-        className="absolute top-[-6rem] right-20 opacity-70"
+        className="absolute top-[-5rem] right-20 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6 max-w-md opacity-70"
       />
       <img
         src={leaf_2}
         alt="Decorative Leaf"
-        className="absolute bottom-[-8rem] right-10 w-25 opacity-70"
+        className="absolute bottom-[-2rem] right-20 w-1/4 sm:w-1/5 md:w-1/6 lg:w-1/7 max-w-md opacity-70"
       />
 
       {/* Login Form */}
-      <div className="flex justify-center items-center">
+      <div className="flex justify-center items-center min-h-screen">
         <div className="w-full max-w-[384px] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-          <h1 className="text-5xl font-bold text-center text-gray-800 mb-10">Log In</h1>
-          <div className="bg-white shadow-md rounded-lg p-8">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-center text-gray-800 mb-6 sm:mb-10">Log In</h1>
+          <div className="bg-white shadow-md rounded-lg p-6 sm:p-8">
             <form onSubmit={handle_submit} className="space-y-4">
               <div>
                 <label htmlFor="id_number" className="block text-sm font-medium text-gray-700">ID Number</label>
@@ -98,7 +98,7 @@ function LoginPage() {
               >
                 Log In
               </button>
-              <div className="text-sm text">
+              <div className="text-sm underline text-center">
                 <a href="#" className="font-medium text-gray-600 hover:text-gray-900">
                   Forgot password?
                 </a>
@@ -112,3 +112,4 @@ function LoginPage() {
 }
 
 export default LoginPage
+
