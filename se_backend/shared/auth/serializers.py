@@ -14,4 +14,5 @@ class LoginSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         data = super().validate(attrs)
         data.update({"user": str(self.user.id)})
+        data.update({"email": str(self.user.email)})
         return data
