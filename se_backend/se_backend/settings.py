@@ -57,7 +57,6 @@ INSTALLED_APPS = [
     # Apps
     "shared",
     "users",
-    "employee_profile",
 
 ]
 
