@@ -6,28 +6,29 @@ services:
       dockerfile: Dockerfile
     container_name: backend-dev
     command: sh -c "python manage.py makemigrations --no-input &&
-      python manage.py migrate --no-input --settings=se_backend.settings && python manage.py runserver 0.0.0.0:8000 && wait"
+      python manage.py migrate --no-input && python manage.py runserver 0.0.0.0:${APP_PORT} && wait"
     environment:
       DJANGO_SETTINGS_MODULE: se_backend.settings
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_HOST: backend_prototype_db
+      DB_HOST: backend_db  # Updated to match the service name
       DB_PORT: ${DB_PORT}
-      STATIC_URL: static/
-      STATIC_ROOT: os.path.join(BASE_DIR, 'staticfiles')
-      MEDIA_URL: /media/
-      MEDIA_ROOT: os.path.join(BASE_DIR, 'static/images')
+      STATIC_URL: ${STATIC_URL}
+      STATIC_ROOT: ${STATIC_ROOT}
+      MEDIA_URL: ${MEDIA_URL}
+      MEDIA_ROOT: ${MEDIA_ROOT}
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${DEBUG}
     depends_on:
-      - backend_prototype_db
+      backend_db:
+        condition: service_healthy
     ports:
       - "${APP_PORT}:${APP_PORT}"
     volumes:
       - .:/backend
     working_dir: /backend
-  backend_prototype_db:
+  backend_db:
     image: postgres:latest
     volumes:
       - prototype-backend:/var/lib/postgresql/data
@@ -38,6 +39,11 @@ services:
     container_name: backend-db
     ports:
       - "5433:5433"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   pgadmin:
     image: dpage/pgadmin4
     environment:
