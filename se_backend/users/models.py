@@ -8,21 +8,26 @@ from django.utils.timezone import now
 
 
 class CustomUserManager(BaseUserManager):
-    def create_user(self, id=None, password=None, **extra_fields):
-        if id is None:
-            raise ValueError("Please specify a valid ID")
-
-        user = self.model(id=id, **extra_fields)
+    def create_user(self, email=None, password=None, **extra_fields):
+        if not email:
+            raise ValueError("The Email field must be set")
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
 
-    def create_superuser(self, id, password=None):
-        user = self.create_user(id=id, password=password)
-        user.is_staff = True
-        user.is_superuser = True
-        user.save(using=self._db)
-        return user
+    def create_superuser(self, email=None, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff=True.")
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True.")
+
+        return self.create_user(email=email, password=password, **extra_fields)
+
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
@@ -43,8 +48,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     objects = CustomUserManager()
 
-    USERNAME_FIELD = "id"
-    REQUIRED_FIELDS = ["email"]
+    USERNAME_FIELD = "id"  # Login requires `id` and `password`
+    REQUIRED_FIELDS = ["email"]  # Superuser creation requires `email` and `password`
 
     def __str__(self):
         return f"{self.id} - {self.email}"
+
