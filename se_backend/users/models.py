@@ -8,10 +8,24 @@ from django.utils.timezone import now
 
 
 class CustomUserManager(BaseUserManager):
+    def _get_next_available_id(self):
+        """
+        Get the next available ID by finding the maximum existing ID
+        and incrementing it.
+        """
+        last_user = CustomUser.objects.order_by("id").last()
+        if last_user:
+            return last_user.id + 1
+        return 1
+
     def create_user(self, email=None, password=None, **extra_fields):
         if not email:
             raise ValueError("The Email field must be set")
         email = self.normalize_email(email)
+
+        # Assign the next available ID
+        extra_fields.setdefault("id", self._get_next_available_id())
+
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
@@ -27,7 +41,6 @@ class CustomUserManager(BaseUserManager):
             raise ValueError("Superuser must have is_superuser=True.")
 
         return self.create_user(email=email, password=password, **extra_fields)
-
 
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
@@ -53,4 +66,3 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.id} - {self.email}"
-
