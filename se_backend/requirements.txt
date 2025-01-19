@@ -7,3 +7,4 @@ django-filter==23.2  # Filtering for DRF
 psycopg2-binary==2.9.6  # PostgreSQL adapter for Django (optional, if using PostgreSQL)
 python-decouple==3.8
 gunicorn
+setuptools

@@ -1,4 +1,4 @@
-name: Backend_Prototype
+name: se_backend
 services:
   dev:
     build:
@@ -12,7 +12,7 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_HOST: backend_db
+      DB_HOST: backend_prototype_db
       DB_PORT: ${DB_PORT}
       STATIC_URL: static/
       STATIC_ROOT: os.path.join(BASE_DIR, 'staticfiles')
@@ -21,7 +21,7 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${DEBUG}
     depends_on:
-      - backend_db
+      - backend_prototype_db
     ports:
       - "${APP_PORT}:${APP_PORT}"
     volumes:

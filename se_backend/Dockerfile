@@ -1,4 +1,4 @@
-FROM python:3.13.1-slim-bullseye
+FROM python:3.12.0-slim-bullseye
 
 ENV PYTHONBUFFERED=1
 ENV PORT=8080
@@ -14,6 +14,8 @@ COPY . /app/
 
 RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
+RUN pip install --upgrade pip setuptools wheel
+
 
 EXPOSE 8080
 
