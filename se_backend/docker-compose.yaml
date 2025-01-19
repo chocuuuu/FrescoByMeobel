@@ -1,0 +1,49 @@
+name: Backend_Prototype
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: backend-dev
+    command: sh -c "python manage.py makemigrations --no-input &&
+      python manage.py migrate --no-input --settings=se_backend.settings && python manage.py runserver 0.0.0.0:8000 && wait"
+    environment:
+      DJANGO_SETTINGS_MODULE: se_backend.settings
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: backend_db
+      DB_PORT: ${DB_PORT}
+      STATIC_URL: static/
+      STATIC_ROOT: os.path.join(BASE_DIR, 'staticfiles')
+      MEDIA_URL: /media/
+      MEDIA_ROOT: os.path.join(BASE_DIR, 'static/images')
+      SECRET_KEY: ${SECRET_KEY}
+      DEBUG: ${DEBUG}
+    depends_on:
+      - backend_db
+    ports:
+      - "${APP_PORT}:${APP_PORT}"
+    volumes:
+      - .:/backend
+    working_dir: /backend
+  backend_prototype_db:
+    image: postgres:latest
+    volumes:
+      - prototype-backend:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    container_name: backend-db
+    ports:
+      - "5433:5433"
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: "admin@admin.com"
+      PGADMIN_DEFAULT_PASSWORD: "admin"
+    ports:
+      - "8080:80"
+volumes:
+  prototype-backend:
