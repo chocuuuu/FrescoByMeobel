@@ -1,0 +1,10 @@
+Django==4.2.5  # Essential for the Django framework
+djangorestframework==3.15.2  # DRF for building APIs
+djangorestframework-simplejwt==5.3.1  # JWT authentication
+drf-yasg==1.21.5  # DRF Swagger for API documentation
+django-cors-headers==4.2.0  # Handle CORS for frontend-backend connections
+django-filter==23.2  # Filtering for DRF
+psycopg2-binary==2.9.6  # PostgreSQL adapter for Django (optional, if using PostgreSQL)
+python-decouple==3.8
+gunicorn
+setuptools
