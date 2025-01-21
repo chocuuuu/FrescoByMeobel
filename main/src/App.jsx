@@ -9,20 +9,57 @@ import AdminDashboardPage from './pages/Admin_Dashboard_Page'
 
 function LoginPage() {
   const navigate = useNavigate()
-  const [form_data, set_form_data] = useState({
-    id_number: '',
+  const [formData, setFormData] = useState({
+    id: '',
     password: ''
   })
+  const [error, setError] = useState("")
 
-  const handle_submit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    // Redirect to dashboard without validation
-    navigate('/dashboard')
+    setError("")
+
+    try {
+      // Sending the POST request to the API
+      const response = await fetch("http://localhost:8000/api/v1/auth/login/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData), // Send formData with id and password
+      })
+
+      const data = await response.json() // Parse the JSON response
+      console.log(data)  // Log the response to check its structure
+
+      if (response.ok) {
+
+        // Check if response contains tokens and user info
+        if (data.access && data.refresh) {
+          // Store the tokens and user details in localStorage
+          localStorage.setItem("access_token", data.access)
+          localStorage.setItem("refresh_token", data.refresh)
+          localStorage.setItem("user_id", data.user)
+          localStorage.setItem("user_email", data.email)
+
+          // Redirect to the dashboard
+          navigate("/dashboard")
+        } else {
+          // If no tokens are returned, show an error
+          setError("Login failed. Please check your credentials and try again.")
+        }
+      } else {
+        const errorData = await response.json()
+        setError(errorData.message || "Login failed. Please try again.")
+      }
+    } catch (error) {
+      setError("An error occurred. Please try again later.")
+    }
   }
 
-  const handle_change = (e) => {
-    set_form_data({
-      ...form_data,
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
       [e.target.name]: e.target.value
     })
   }
@@ -68,15 +105,15 @@ function LoginPage() {
         <div className="w-full max-w-[384px] absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-center text-gray-800 mb-6 sm:mb-10">Log In</h1>
           <div className="bg-white shadow-md rounded-lg p-6 sm:p-8">
-            <form onSubmit={handle_submit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="id_number" className="block text-sm font-medium text-gray-700">ID Number</label>
+                <label htmlFor="id" className="block text-sm font-medium text-gray-700">ID</label>
                 <input
                   type="text"
-                  id="id_number"
-                  name="id_number"
-                  value={form_data.id_number}
-                  onChange={handle_change}
+                  id="id"
+                  name="id"
+                  value={formData.id}
+                  onChange={handleChange}
                   required
                   className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400
                             focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
@@ -88,13 +125,14 @@ function LoginPage() {
                   type="password"
                   id="password"
                   name="password"
-                  value={form_data.password}
-                  onChange={handle_change}
+                  value={formData.password}
+                  onChange={handleChange}
                   required
                   className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400
                             focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 />
               </div>
+              {error && <div className="text-red-600 text-sm">{error}</div>}
               <button
                 type="submit"
                 className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
