@@ -1,5 +1,6 @@
-from employment_info.models import EmploymentInfo
 from rest_framework import serializers
+from employment_info.models import EmploymentInfo
+
 
 class EmploymentInfoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -7,8 +8,14 @@ class EmploymentInfoSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
     def validate_employee_number(self, value):
+        # Check if employee number is greater than 0
         if value <= 0:
             raise serializers.ValidationError("Employee number must be a positive integer.")
+
+        # Check if the employee number is unique
+        if EmploymentInfo.objects.filter(employee_number=value).exists():
+            raise serializers.ValidationError("Employee number must be unique.")
+
         return value
 
     def validate_first_name(self, value):
