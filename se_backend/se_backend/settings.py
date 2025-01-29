@@ -61,6 +61,8 @@ INSTALLED_APPS = [
     "employment_info",
     "employees",
     'admins',
+    "owner",
+
 
 ]
 
