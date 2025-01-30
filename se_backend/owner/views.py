@@ -33,10 +33,9 @@ class OwnerViewset(GenericViewset, viewsets.ModelViewSet):
 
         return Response(self.get_serializer(owner).data, status=status.HTTP_201_CREATED)
 
-
     def update(self, request, *args, **kwargs):
         """
-        Updates the Owner instance, allowing user changes.
+        Updates the Owner instance, allowing user and permissions changes.
         """
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
@@ -47,6 +46,10 @@ class OwnerViewset(GenericViewset, viewsets.ModelViewSet):
         if "user_id" in serializer.validated_data:
             instance.user = serializer.validated_data.pop("user_id")
 
+        if "permissions" in serializer.validated_data:
+            instance.permissions = serializer.validated_data["permissions"]
+
         instance.save()
 
         return Response(self.get_serializer(instance).data, status=status.HTTP_200_OK)
+
