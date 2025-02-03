@@ -1,0 +1,262 @@
+import React, { useState } from 'react'
+import NavBar from '../components/Nav_Bar'
+import { UserCircle, ChevronDown } from 'lucide-react'
+
+function PayslipPage() {
+  const [isBlurred, setIsBlurred] = useState(true)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [password, setPassword] = useState('')
+  const [selectedPeriod, setSelectedPeriod] = useState('')
+
+  const payrollPeriods = [
+    'Oct 26 - Nov 10',
+    'Sept 9 - Sept 24',
+    'Sept 25 - Oct 11',
+    'View Previous Payroll Periods'
+  ]
+
+  const handleGenerate = () => {
+    setShowPasswordDialog(true)
+  }
+
+  const handlePasswordSubmit = (e) => {
+    e.preventDefault()
+    setIsBlurred(false)
+    setShowPasswordDialog(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-white">
+      <NavBar />
+      
+      <div className="container mx-auto p-6 flex justify-center">
+        {/* Main “Green Card” using Primary (#42573C) and responsive flex direction */}
+        <div
+          className="w-full max-w-5xl rounded-lg p-6 flex flex-col md:flex-row items-start"
+          style={{ backgroundColor: '#42573C' }}
+        >
+          {/* Payslip Preview (Left Side) */}
+          <div className="w-full md:w-2/3 md:pr-6 mb-6 md:mb-0">
+            <div className={`bg-white rounded-md p-6 ${isBlurred ? 'blur-sm' : ''}`}>
+              <div className="space-y-6">
+                {/* Employee Info */}
+                <div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm">EMP NO. - EMP. NAME</p>
+                      <p className="text-sm">POSITION</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Payroll Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-semibold">Payroll Period</p>
+                    <p>Oct 26 - November 10, 2024</p>
+                    <p className="text-sm">Pay Date</p>
+                    <p>Friday, November 15, 2024</p>
+                    <p className="text-sm">No. of Working Hrs.</p>
+                    <p>112</p>
+                  </div>
+                </div>
+
+                {/* Earnings Section */}
+                <div>
+                  <h3 className="font-bold border-b">EARNINGS</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="col-span-2">
+                      <p className="text-sm">BASIC RATE</p>
+                      <p className="text-sm">BASIC</p>
+                      <p className="text-sm">ALLOWANCE</p>
+                      <p className="text-sm">OTH. EARNINGS N-TAX</p>
+                      <p className="text-sm">13/14/OTHERS</p>
+                    </div>
+                    <div className="text-right">
+                      <p>Monthly</p>
+                      <p>₱13,000.00</p>
+                      <p>₱9,500.00</p>
+                      <p>₱750.00</p>
+                      <p>-</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Overtime Section */}
+                <div>
+                  <h3 className="font-bold border-b">OVERTIME BREAKDOWN</h3>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-sm">OVERTIME</p>
+                      <p className="text-sm">REG OT</p>
+                      <p className="text-sm">REG. HOL</p>
+                      <p className="text-sm">SPL HOL</p>
+                      <p className="text-sm">REST DAY</p>
+                      <p className="text-sm">NIGHT DIFF</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm">NO. HOURS</p>
+                      <p>1</p>
+                      <p>1</p>
+                      <p>1</p>
+                      <p>1</p>
+                      <p>1</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm">AMOUNT</p>
+                      <p>114.18</p>
+                      <p>1461.54</p>
+                      <p>118.75</p>
+                      <p>118.75</p>
+                      <p>9.11</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm">TOTAL</p>
+                      <p>114.18</p>
+                      <p>1461.54</p>
+                      <p>118.75</p>
+                      <p>118.75</p>
+                      <p>9.11</p>
+                    </div>
+                  </div>
+                  <p className="text-right font-bold">1822.33</p>
+                </div>
+
+                {/* Deductions Section */}
+                <div>
+                  <h3 className="font-bold border-b">DEDUCTIONS</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm">SSS</p>
+                      <p className="text-sm">PHILHEALTH</p>
+                      <p className="text-sm">PAG-IBIG</p>
+                      <p className="text-sm">W/TAX (S)</p>
+                    </div>
+                    <div className="text-right">
+                      <p>427.50</p>
+                      <p>227.50</p>
+                      <p>200.00</p>
+                      <p>-</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Net Pay Section */}
+                <div className="border-t pt-4">
+                  <div className="flex justify-between">
+                    <p className="font-bold">NETPAY</p>
+                    <p className="font-bold text-red-600">₱ 8,144.83</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel (Secondary #576D2C) */}
+          <div 
+            className="w-full md:w-1/3 rounded-md p-6 text-white flex flex-col justify-between"
+            style={{ backgroundColor: '#576D2C' }}
+          >
+            {/* Top Section: User Info & Period Select */}
+            <div>
+              {/* Profile */}
+              <div className="flex items-center justify-center mb-8">
+                <div className="text-center">
+                  <div className="h-16 w-16 bg-white rounded-full mx-auto mb-2 flex items-center justify-center">
+                    <UserCircle className="h-10 w-10" style={{ color: '#42573C' }} />
+                  </div>
+                  <h3 className="font-bold">Racell Gabriel Sincioco</h3>
+                  <p className="text-sm">2022174599</p>
+                </div>
+              </div>
+
+              <label className="block text-sm mb-2">Payroll Period</label>
+              <div className="relative">
+                <select
+                  value={selectedPeriod}
+                  onChange={(e) => setSelectedPeriod(e.target.value)}
+                  className="w-full text-[#373A45] rounded px-3 py-2 appearance-none"
+                  style={{ backgroundColor: '#FFFFFF' }}
+                >
+                  <option value="">Select Payroll Period</option>
+                  {payrollPeriods.map((period, index) => (
+                    <option key={index} value={period}>
+                      {period}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[#373A45] pointer-events-none h-5 w-5" />
+              </div>
+
+              {/* Pay Slip / Generate Slip Boxes */}
+              <div className="mt-6 space-y-4">
+                {/* Pay Slip box */}
+                <div className="rounded-md p-4" style={{ backgroundColor: '#A3BC84' }}>
+                  <p className="text-xs font-semibold mb-1 text-[#373A45]">Pay Slip</p>
+                  <p className="text-xs mb-2 text-[#373A45]">Approved: -</p>
+                  <button 
+                    className="w-full rounded py-2 text-white"
+                    style={{ backgroundColor: '#373A45' }}
+                  >
+                    Approve
+                  </button>
+                </div>
+
+                {/* Generate Slip box */}
+                <div className="rounded-md p-4" style={{ backgroundColor: '#A3BC84' }}>
+                  <p className="text-xs font-semibold mb-1 text-[#373A45]">Generate Slip</p>
+                  <p className="text-xs text-[#373A45]">Approved: -</p>
+                  <p className="text-xs mb-2 text-[#373A45]">Last Generated: -</p>
+                  <button 
+                    className="w-full rounded py-2 text-white"
+                    style={{ backgroundColor: '#373A45' }}
+                    onClick={handleGenerate}
+                  >
+                    Generate
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Section: Back Button */}
+            <div className="flex justify-end mt-6">
+              <button 
+                className="px-6 py-2 rounded text-white flex items-center gap-2"
+                style={{ backgroundColor: '#373A45' }}
+              >
+                Back
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Password Dialog */}
+      {showPasswordDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+          <div className="bg-white p-6 rounded-lg w-96">
+            <h2 className="text-xl font-bold mb-4">Enter Password to Generate Payslip</h2>
+            <form onSubmit={handlePasswordSubmit} className="space-y-4">
+              <input
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded"
+              />
+              <button 
+                type="submit"
+                className="w-full text-white py-2 rounded"
+                style={{ backgroundColor: '#42573C' }}
+              >
+                Submit
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default PayslipPage
