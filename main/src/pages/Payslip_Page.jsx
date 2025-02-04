@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import NavBar from '../components/Nav_Bar'
-import { UserCircle, ChevronDown } from 'lucide-react'
+import { UserCircle, ChevronDown, ArrowLeft } from 'lucide-react'
 
 function PayslipPage() {
   const [isBlurred, setIsBlurred] = useState(true)
@@ -28,16 +28,16 @@ function PayslipPage() {
   return (
     <div className="min-h-screen bg-white">
       <NavBar />
-      
+
       <div className="container mx-auto p-6 flex justify-center">
-        {/* Main “Green Card” using Primary (#42573C) and responsive flex direction */}
+        {/* Outer Container (Green) */}
         <div
-          className="w-full max-w-5xl rounded-lg p-6 flex flex-col md:flex-row items-start"
+          className="w-full max-w-5xl rounded-lg p-6 flex flex-col md:flex-row items-stretch"
           style={{ backgroundColor: '#42573C' }}
         >
-          {/* Payslip Preview (Left Side) */}
+          {/* LEFT: Payslip */}
           <div className="w-full md:w-2/3 md:pr-6 mb-6 md:mb-0">
-            <div className={`bg-white rounded-md p-6 ${isBlurred ? 'blur-sm' : ''}`}>
+            <div className={`bg-white rounded-md p-6 h-full ${isBlurred ? 'blur-sm' : ''}`}>
               <div className="space-y-6">
                 {/* Employee Info */}
                 <div>
@@ -152,78 +152,86 @@ function PayslipPage() {
             </div>
           </div>
 
-          {/* Right Panel (Secondary #576D2C) */}
-          <div 
-            className="w-full md:w-1/3 rounded-md p-6 text-white flex flex-col justify-between"
+          {/* RIGHT: #576D2C, bigger accent boxes */}
+          <div
+            className="w-full md:w-1/3 rounded-md p-6 flex flex-col justify-between"
             style={{ backgroundColor: '#576D2C' }}
           >
-            {/* Top Section: User Info & Period Select */}
-            <div>
-              {/* Profile */}
-              <div className="flex items-center justify-center mb-8">
-                <div className="text-center">
-                  <div className="h-16 w-16 bg-white rounded-full mx-auto mb-2 flex items-center justify-center">
-                    <UserCircle className="h-10 w-10" style={{ color: '#42573C' }} />
-                  </div>
-                  <h3 className="font-bold">Racell Gabriel Sincioco</h3>
-                  <p className="text-sm">2022174599</p>
-                </div>
+            {/* Profile Section */}
+            <div className="text-center mb-6">
+              <div className="h-16 w-16 bg-white rounded-full mx-auto mb-2 flex items-center justify-center">
+                <UserCircle className="h-10 w-10" style={{ color: '#42573C' }} />
               </div>
+              <h3 className="text-lg font-bold text-white">Racell Gabriel Sincioco</h3>
+              <p className="text-sm text-white">2022174599</p>
+            </div>
 
-              <label className="block text-sm mb-2">Payroll Period</label>
+            {/* Payroll Period */}
+            <p className="text-sm font-bold mb-2 text-white">Payroll Period</p>
+            <div
+              className="rounded-md p-5 mb-6 shadow-sm w-full"
+              style={{ backgroundColor: '#A3BC84' }}
+            >
               <div className="relative">
                 <select
                   value={selectedPeriod}
                   onChange={(e) => setSelectedPeriod(e.target.value)}
-                  className="w-full text-[#373A45] rounded px-3 py-2 appearance-none"
-                  style={{ backgroundColor: '#FFFFFF' }}
+                  className="w-full rounded-md py-2 px-3 appearance-none focus:outline-none"
+                  style={{ backgroundColor: '#FFFFFF', color: '#373A45' }}
                 >
                   <option value="">Select Payroll Period</option>
-                  {payrollPeriods.map((period, index) => (
-                    <option key={index} value={period}>
+                  {payrollPeriods.map((period, idx) => (
+                    <option key={idx} value={period}>
                       {period}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 text-[#373A45] pointer-events-none h-5 w-5" />
-              </div>
-
-              {/* Pay Slip / Generate Slip Boxes */}
-              <div className="mt-6 space-y-4">
-                {/* Pay Slip box */}
-                <div className="rounded-md p-4" style={{ backgroundColor: '#A3BC84' }}>
-                  <p className="text-xs font-semibold mb-1 text-[#373A45]">Pay Slip</p>
-                  <p className="text-xs mb-2 text-[#373A45]">Approved: -</p>
-                  <button 
-                    className="w-full rounded py-2 text-white"
-                    style={{ backgroundColor: '#373A45' }}
-                  >
-                    Approve
-                  </button>
-                </div>
-
-                {/* Generate Slip box */}
-                <div className="rounded-md p-4" style={{ backgroundColor: '#A3BC84' }}>
-                  <p className="text-xs font-semibold mb-1 text-[#373A45]">Generate Slip</p>
-                  <p className="text-xs text-[#373A45]">Approved: -</p>
-                  <p className="text-xs mb-2 text-[#373A45]">Last Generated: -</p>
-                  <button 
-                    className="w-full rounded py-2 text-white"
-                    style={{ backgroundColor: '#373A45' }}
-                    onClick={handleGenerate}
-                  >
-                    Generate
-                  </button>
-                </div>
+                <ChevronDown
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 pointer-events-none"
+                  style={{ color: '#373A45' }}
+                />
               </div>
             </div>
 
-            {/* Bottom Section: Back Button */}
-            <div className="flex justify-end mt-6">
-              <button 
-                className="px-6 py-2 rounded text-white flex items-center gap-2"
+            {/* Pay Slip */}
+            <p className="text-sm font-bold mb-2 text-white">Pay Slip</p>
+            <div
+              className="rounded-md p-6 mb-6 shadow-sm w-full"
+              style={{ backgroundColor: '#A3BC84' }}
+            >
+              <p className="text-xs text-white">Approved: -</p>
+              <button
+                className="mt-3 w-full rounded-md py-2 font-medium text-white"
                 style={{ backgroundColor: '#373A45' }}
               >
+                Approve
+              </button>
+            </div>
+
+            {/* Generate Slip */}
+            <p className="text-sm font-bold mb-2 text-white">Generate Slip</p>
+            <div
+              className="rounded-md p-6 shadow-sm w-full"
+              style={{ backgroundColor: '#A3BC84' }}
+            >
+              <p className="text-xs text-white">Approved: -</p>
+              <p className="text-xs text-white">Last Generated: -</p>
+              <button
+                className="mt-3 w-full rounded-md py-2 font-medium text-white"
+                style={{ backgroundColor: '#373A45' }}
+                onClick={handleGenerate}
+              >
+                Generate
+              </button>
+            </div>
+
+            {/* Back Button at bottom */}
+            <div className="flex justify-end mt-6">
+              <button
+                className="px-6 py-2 rounded-md text-white flex items-center gap-2 font-medium"
+                style={{ backgroundColor: '#373A45' }}
+              >
+                <ArrowLeft className="w-4 h-4" />
                 Back
               </button>
             </div>
@@ -244,7 +252,7 @@ function PayslipPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded"
               />
-              <button 
+              <button
                 type="submit"
                 className="w-full text-white py-2 rounded"
                 style={{ backgroundColor: '#42573C' }}
