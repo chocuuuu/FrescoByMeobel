@@ -6,6 +6,7 @@ import leaf_1 from './assets/Login_Page/leaf-1.png'
 import leaf_2 from './assets/Login_Page/leaf-2.png'
 import leaf_3 from './assets/Login_Page/leaf-3.png'
 import AdminDashboardPage from './pages/Admin_Dashboard_Page'
+import AdminEmployeePayrollPage from './pages/Admin_Employee_Payroll_Page'
 import AdminEmployeePage from './pages/Admin_Employees_Page'
 
 function LoginPage() {
@@ -159,7 +160,8 @@ function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/dashboard" element={<AdminDashboardPage />} />
-        <Route path="/payroll" element={<AdminEmployeePage />} />
+        <Route path="/employee" element={<AdminEmployeePage />} />
+        <Route path="/payroll" element={<AdminEmployeePayrollPage />} />
       </Routes>
     </Router>
   )
