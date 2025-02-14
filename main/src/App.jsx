@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom'
+import { useState, useEffect } from "react"
+import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom"
+
 
 import logo from './assets/Login_Page/fresco_logo_black.png'
 import leaf_1 from './assets/Login_Page/leaf-1.png'
@@ -8,12 +9,13 @@ import leaf_3 from './assets/Login_Page/leaf-3.png'
 import AdminDashboardPage from './pages/Admin_Dashboard_Page'
 import AdminEmployeePayrollPage from './pages/Admin_Employee_Payroll_Page'
 import AdminEmployeePage from './pages/Admin_Employees_Page'
+import PayslipPage from "./pages/Payslip_Page"
 
 function LoginPage() {
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
-    id: '',
-    password: ''
+    id: "",
+    password: "",
   })
   const [error, setError] = useState("")
 
@@ -32,10 +34,9 @@ function LoginPage() {
       })
 
       const data = await response.json() // Parse the JSON response
-      console.log(data)  // Log the response to check its structure
+      console.log(data) // Log the response to check its structure
 
       if (response.ok) {
-
         // Check if response contains tokens and user info
         if (data.access && data.refresh) {
           // Store the tokens and user details in localStorage
@@ -62,15 +63,15 @@ function LoginPage() {
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     })
   }
 
   // Prevent scrolling
   useEffect(() => {
-    document.body.style.overflow = 'hidden'
+    document.body.style.overflow = "hidden"
     return () => {
-      document.body.style.overflow = 'auto'
+      document.body.style.overflow = "auto"
     }
   }, [])
 
@@ -78,26 +79,22 @@ function LoginPage() {
     <div className="min-h-screen w-full relative bg-white p-4 sm:p-6 overflow-hidden">
       {/* Logo */}
       <div className="absolute top-4 left-4 sm:top-8 sm:left-8">
-        <img
-          src={logo}
-          alt="Fresco Logo"
-          className="w-40 sm:w-60 object-contain"
-        />
+        <img src={logo || "/placeholder.svg"} alt="Fresco Logo" className="w-40 sm:w-60 object-contain" />
       </div>
 
       {/* Decorative Leaves */}
       <img
-        src={leaf_1}
+        src={leaf_1 || "/placeholder.svg"}
         alt="Decorative Leaf"
         className="absolute bottom-0 left-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6 max-w-xs opacity-70"
       />
       <img
-        src={leaf_3}
+        src={leaf_3 || "/placeholder.svg"}
         alt="Decorative Leaf"
         className="absolute top-0 right-0 w-1/3 sm:w-1/4 md:w-1/5 lg:w-1/6 max-w-xs opacity-70"
       />
       <img
-        src={leaf_2}
+        src={leaf_2 || "/placeholder.svg"}
         alt="Decorative Leaf"
         className="absolute bottom-0 right-0 w-1/4 sm:w-1/5 md:w-1/6 lg:w-1/8 max-w-xs opacity-70"
       />
@@ -109,7 +106,9 @@ function LoginPage() {
           <div className="bg-white shadow-md rounded-lg p-6 sm:p-8">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label htmlFor="id" className="block text-sm font-medium text-gray-700">ID</label>
+                <label htmlFor="id" className="block text-sm font-medium text-gray-700">
+                  ID
+                </label>
                 <input
                   type="text"
                   id="id"
@@ -122,7 +121,9 @@ function LoginPage() {
                 />
               </div>
               <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password</label>
+                <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                  Password
+                </label>
                 <input
                   type="password"
                   id="password"
@@ -160,11 +161,15 @@ function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/dashboard" element={<AdminDashboardPage />} />
+
+        <Route path="/payslip" element={<PayslipPage />} />
         <Route path="/employee" element={<AdminEmployeePage />} />
         <Route path="/payroll" element={<AdminEmployeePayrollPage />} />
+          
       </Routes>
     </Router>
   )
 }
 
 export default App
+
