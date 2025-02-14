@@ -1,12 +1,34 @@
-import React, { useState } from 'react'
 import NavBar from '../components/Nav_Bar'
 import { UserCircle, ChevronDown, ArrowLeft } from 'lucide-react'
+import React, { useState, useEffect } from 'react';
 
 function PayslipPage() {
   const [isBlurred, setIsBlurred] = useState(true)
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [password, setPassword] = useState('')
   const [selectedPeriod, setSelectedPeriod] = useState('')
+
+  useEffect(() => {
+    // Disable right-click
+    const disableRightClick = (event) => event.preventDefault();
+    document.addEventListener('contextmenu', disableRightClick);
+
+    // Disable DevTools key combinations
+    const handleKeyDown = (event) => {
+      if (
+        (event.ctrlKey && event.shiftKey && (event.key === 'I' || event.key === 'C' || event.key === 'J')) ||
+        event.key === 'F12'
+      ) {
+        event.preventDefault();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.removeEventListener('contextmenu', disableRightClick);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
 
   const payrollPeriods = [
     'Oct 26 - Nov 10',
@@ -37,7 +59,11 @@ function PayslipPage() {
         >
           {/* LEFT: Payslip */}
           <div className="w-full md:w-2/3 md:pr-6 mb-6 md:mb-0">
-            <div className={`bg-white rounded-md p-6 h-full ${isBlurred ? 'blur-sm' : ''}`}>
+          <div className={`bg-white rounded-md p-6 h-full ${isBlurred ? 'blur-sm pointer-events-none select-none' : ''}`}>
+            {isBlurred && (
+              <div className="absolute top-0 left-0 w-full h-full bg-gray-900 opacity-30 rounded-md"></div>
+            )}
+
               <div className="space-y-6">
                 {/* Employee Info */}
                 <div>
