@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar"
+import AddEmployee from "../components/Add_Employee"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -13,6 +14,7 @@ function AdminEmployeePage() {
   const [yearFilter, setYearFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const employeesPerPage = 5
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -53,6 +55,10 @@ function AdminEmployeePage() {
 
   const getYearFromDate = (dateString) => {
     return new Date(dateString).getFullYear()
+  }
+
+  const handleAddEmployee = (newEmployee) => {
+    setEmployees((prev) => [...prev, newEmployee])
   }
 
   const filteredEmployees = employees.filter((employee) => {
@@ -193,7 +199,10 @@ function AdminEmployeePage() {
 
           {/* Footer Section */}
           <div className="flex justify-between items-center mt-4">
-            <button className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors">
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
+            >
               Add Account
             </button>
             <div className="flex space-x-2">
@@ -222,9 +231,9 @@ function AdminEmployeePage() {
           </div>
         </div>
       </div>
+      <AddEmployee isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddEmployee} />
     </div>
   )
 }
 
 export default AdminEmployeePage
-
