@@ -138,7 +138,7 @@ class EmploymentInfoSerializer(serializers.ModelSerializer):
         """Customize response to include user and role-specific details."""
         representation = super().to_representation(instance)
 
-        # Find user from related admin or employee
+        # Check if an Admin or Employee is associated with the employment info
         admin = Admin.objects.filter(employment_info=instance).first()
         employee = Employee.objects.filter(employment_info=instance).first()
 
@@ -151,3 +151,4 @@ class EmploymentInfoSerializer(serializers.ModelSerializer):
             representation["employee"] = EmployeeSerializer(employee).data
 
         return representation
+

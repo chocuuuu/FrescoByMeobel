@@ -24,33 +24,51 @@ class EmploymentInfoViewset(GenericViewset, viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        """Update EmploymentInfo, ensuring user role sync."""
+        """
+        Update EmploymentInfo and corresponding role-based instance.
+        """
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
-        old_role = instance.user.role if instance.user else None
 
+        # Retrieve associated user
+        admin = Admin.objects.filter(employment_info=instance).first()
+        employee = Employee.objects.filter(employment_info=instance).first()
+
+        user = admin.user if admin else employee.user if employee else None
+        if not user:
+            return Response(
+                {"detail": "No user associated with this employment info."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Handle update process
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        employment_info = serializer.save()
+        serializer.save()
 
-        # Update user role if changed
-        new_role = request.data.get("role")
-        if old_role and new_role and old_role != new_role:
-            user = instance.user
-            if user:
-                # Delete old role instance
-                if old_role == "admin":
-                    Admin.objects.filter(user=user).delete()
-                elif old_role == "employee":
-                    Employee.objects.filter(user=user).delete()
+        # Update user if email, password, or role changes
+        email = request.data.get("email")
+        password = request.data.get("password")
+        role = request.data.get("role")
 
-                # Update user role and create new role instance
-                user.role = new_role
-                user.save()
+        if email and email != user.email:
+            user.email = email
+        if password:
+            user.set_password(password)
+        if role and role != user.role:
+            # Delete old role instance and create new one
+            if user.role == "admin":
+                Admin.objects.filter(user=user).delete()
+            elif user.role == "employee":
+                Employee.objects.filter(user=user).delete()
 
-                if new_role == "admin":
-                    Admin.objects.create(user=user, employment_info=employment_info)
-                elif new_role == "employee":
-                    Employee.objects.create(user=user, employment_info=employment_info)
+            user.role = role
+            user.save()
 
+            if role == "admin":
+                Admin.objects.create(user=user, employment_info=instance)
+            elif role == "employee":
+                Employee.objects.create(user=user, employment_info=instance)
+
+        user.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
