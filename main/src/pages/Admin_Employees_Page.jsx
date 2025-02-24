@@ -21,7 +21,7 @@ function AdminEmployeePage() {
 
       try {
         const accessToken = localStorage.getItem("access_token")
-        const response = await fetch("http://localhost:8000/api/v1/employees/", {
+        const response = await fetch("http://localhost:8000/api/v1/employment-info/", {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
@@ -56,19 +56,18 @@ function AdminEmployeePage() {
   }
 
   const filteredEmployees = employees.filter((employee) => {
-    const fullName = `${employee.employment_info.first_name} ${employee.employment_info.last_name}`.toLowerCase()
+    const fullName = `${employee.first_name} ${employee.last_name}`.toLowerCase()
     const matchesSearch = fullName.includes(searchTerm.toLowerCase())
-    const matchesTab = activeTab === "active" ? employee.employment_info.active : !employee.employment_info.active
-    const yearEmployed = getYearFromDate(employee.employment_info.hire_date)
+    const matchesTab = activeTab === "active" ? employee.active : !employee.active
+    const yearEmployed = getYearFromDate(employee.hire_date)
     const matchesYear = yearFilter === "all" || yearEmployed.toString() === yearFilter
-    const matchesStatus =
-      statusFilter === "all" || employee.employment_info.status.toLowerCase() === statusFilter.toLowerCase()
+    const matchesStatus = statusFilter === "all" || employee.status.toLowerCase() === statusFilter.toLowerCase()
     return matchesSearch && matchesTab && matchesYear && matchesStatus
   })
 
   // Get unique years and statuses for filters
-  const years = [...new Set(employees.map((e) => getYearFromDate(e.employment_info.hire_date)))].sort((a, b) => b - a)
-  const statuses = [...new Set(employees.map((e) => e.employment_info.status))]
+  const years = [...new Set(employees.map((e) => getYearFromDate(e.hire_date)))].sort((a, b) => b - a)
+  const statuses = [...new Set(employees.map((e) => e.status))]
 
   // Pagination logic
   const indexOfLastEmployee = currentPage * employeesPerPage
@@ -166,12 +165,10 @@ function AdminEmployeePage() {
               <tbody className="text-white">
                 {currentEmployees.map((employee) => (
                   <tr key={employee.id} className="border-b border-white/10">
-                    <td className="py-3 px-4 truncate">{employee.employment_info.employee_number}</td>
-                    <td className="py-3 px-4 truncate">
-                      {`${employee.employment_info.first_name} ${employee.employment_info.last_name}`}
-                    </td>
-                    <td className="py-3 px-4 truncate">{getYearFromDate(employee.employment_info.hire_date)}</td>
-                    <td className="py-3 px-4 truncate">{employee.employment_info.status}</td>
+                    <td className="py-3 px-4 truncate">{employee.employee_number}</td>
+                    <td className="py-3 px-4 truncate">{`${employee.first_name} ${employee.last_name}`}</td>
+                    <td className="py-3 px-4 truncate">{getYearFromDate(employee.hire_date)}</td>
+                    <td className="py-3 px-4 truncate">{employee.status}</td>
                     <td className="py-3 px-4">
                       <div className="space-x-2">
                         <button className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors">
