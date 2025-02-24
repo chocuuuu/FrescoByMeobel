@@ -1,7 +1,11 @@
 from rest_framework import serializers
 from .models import CustomUser, EmploymentInfo, Admin
 
-
+class AdminSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Admin
+        fields = "__all__"
+"""
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
@@ -36,3 +40,4 @@ class AdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Admin
         fields = ["id", "user", "employment_info", "user_id", "employment_info_id"]
+"""

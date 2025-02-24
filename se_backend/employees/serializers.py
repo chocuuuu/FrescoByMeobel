@@ -1,7 +1,12 @@
 from rest_framework import serializers
 from .models import CustomUser, EmploymentInfo, Employee
 
+class EmployeeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Employee
+        fields = "__all__"
 
+"""
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
@@ -36,3 +41,4 @@ class EmployeeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = ["id", "user", "employment_info", "user_id", "employment_info_id"]
+"""

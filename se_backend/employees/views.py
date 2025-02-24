@@ -19,35 +19,37 @@ class EmployeeViewset(GenericViewset, viewsets.ModelViewSet):
             return [IsAdminUser()]
         return [IsAuthenticated()]
 
-    def create(self, request, *args, **kwargs):
-        """
-        Creates an Employee instance using existing user and employment_info.
-        """
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+    # Commented out as employee creation is now handled via EmploymentInfo creation
+    # def create(self, request, *args, **kwargs):
+    #     """
+    #     Creates an Employee instance using existing user and employment_info.
+    #     """
+    #     serializer = self.get_serializer(data=request.data)
+    #     serializer.is_valid(raise_exception=True)
 
-        user = serializer.validated_data.pop("user_id")
-        employment_info = serializer.validated_data.pop("employment_info_id")
+    #     user = serializer.validated_data.pop("user_id")
+    #     employment_info = serializer.validated_data.pop("employment_info_id")
 
-        employee = Employee.objects.create(user=user, employment_info=employment_info)
+    #     employee = Employee.objects.create(user=user, employment_info=employment_info)
 
-        return Response(self.get_serializer(employee).data, status=status.HTTP_201_CREATED)
+    #     return Response(self.get_serializer(employee).data, status=status.HTTP_201_CREATED)
 
-    def update(self, request, *args, **kwargs):
-        """
-        Updates the Employee instance, allowing user and employment_info changes.
-        """
-        partial = kwargs.pop("partial", False)
-        instance = self.get_object()
+    # Commented out as employee updates should be managed via user and employment_info updates
+    # def update(self, request, *args, **kwargs):
+    #     """
+    #     Updates the Employee instance, allowing user and employment_info changes.
+    #     """
+    #     partial = kwargs.pop("partial", False)
+    #     instance = self.get_object()
 
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
-        serializer.is_valid(raise_exception=True)
+    #     serializer = self.get_serializer(instance, data=request.data, partial=partial)
+    #     serializer.is_valid(raise_exception=True)
 
-        if "user_id" in serializer.validated_data:
-            instance.user = serializer.validated_data.pop("user_id")
-        if "employment_info_id" in serializer.validated_data:
-            instance.employment_info = serializer.validated_data.pop("employment_info_id")
+    #     if "user_id" in serializer.validated_data:
+    #         instance.user = serializer.validated_data.pop("user_id")
+    #     if "employment_info_id" in serializer.validated_data:
+    #         instance.employment_info = serializer.validated_data.pop("employment_info_id")
 
-        instance.save()
+    #     instance.save()
 
-        return Response(self.get_serializer(instance).data, status=status.HTTP_200_OK)
+    #     return Response(self.get_serializer(instance).data, status=status.HTTP_200_OK)

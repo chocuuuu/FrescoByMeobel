@@ -1,7 +1,61 @@
 from rest_framework import serializers
 from employment_info.models import EmploymentInfo
+from employees.models import Employee
+from admins.models import Admin
+from users.models import CustomUser
 
 
+class EmploymentInfoSerializer(serializers.ModelSerializer):
+    role = serializers.ChoiceField(choices=CustomUser.ROLE_CHOICES, write_only=True)
+
+    class Meta:
+        model = EmploymentInfo
+        fields = '__all__'
+
+    def create(self, validated_data):
+        role = validated_data.pop("role")
+        employment_info = EmploymentInfo.objects.create(**validated_data)
+
+        # Create corresponding CustomUser
+        email = f"{employment_info.first_name.lower()}.{employment_info.last_name.lower()}@company.com"
+        user = CustomUser.objects.create_user(email=email, password="defaultpassword123", role=role)
+
+        # Create Admin or Employee based on role
+        if role == "admin":
+            Admin.objects.create(user=user, employment_info=employment_info)
+        elif role == "employee":
+            Employee.objects.create(user=user, employment_info=employment_info)
+
+        return employment_info
+
+    def update(self, instance, validated_data):
+        role = validated_data.pop("role", None)
+        instance = super().update(instance, validated_data)
+
+        # Update user role and corresponding model if role changes
+        if role:
+            user = CustomUser.objects.filter(email=f"{instance.first_name.lower()}.{instance.last_name.lower()}@company.com").first()
+
+            if user and user.role != role:
+                # Delete old role instance
+                if user.role == "admin":
+                    Admin.objects.filter(user=user).delete()
+                elif user.role == "employee":
+                    Employee.objects.filter(user=user).delete()
+
+                # Update user role and create new role instance
+                user.role = role
+                user.save()
+
+                if role == "admin":
+                    Admin.objects.create(user=user, employment_info=instance)
+                elif role == "employee":
+                    Employee.objects.create(user=user, employment_info=instance)
+
+        return instance
+
+
+"""
 class EmploymentInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmploymentInfo
@@ -48,3 +102,4 @@ class EmploymentInfoSerializer(serializers.ModelSerializer):
         if not isinstance(value, bool):
             raise serializers.ValidationError("Active field must be a boolean value.")
         return value
+"""
