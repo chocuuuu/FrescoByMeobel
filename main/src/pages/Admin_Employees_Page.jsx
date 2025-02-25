@@ -2,6 +2,9 @@
 
 import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar"
+import AddEmployee from "../components/Add_Employee"
+import DeleteEmployee from "../components/Delete_Employee"
+import EditEmployee from "../components/Edit_Employee"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -13,6 +16,12 @@ function AdminEmployeePage() {
   const [yearFilter, setYearFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
   const employeesPerPage = 5
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [employeeToDelete, setEmployeeToDelete] = useState(null)
+  const [deleteError, setDeleteError] = useState(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [employeeToEdit, setEmployeeToEdit] = useState(null)
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -21,7 +30,7 @@ function AdminEmployeePage() {
 
       try {
         const accessToken = localStorage.getItem("access_token")
-        const response = await fetch("http://localhost:8000/api/v1/employees/", {
+        const response = await fetch("http://localhost:8000/api/v1/employment-info/", {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
@@ -55,20 +64,69 @@ function AdminEmployeePage() {
     return new Date(dateString).getFullYear()
   }
 
+  const handleAddEmployee = (newEmployee) => {
+    setEmployees((prev) => [...prev, newEmployee])
+  }
+
+  const handleEditClick = (employee) => {
+    setEmployeeToEdit(employee)
+    setIsEditModalOpen(true)
+  }
+
+  const handleUpdateEmployee = (updatedEmployee) => {
+    setEmployees((prevEmployees) =>
+      prevEmployees.map((emp) => (emp.id === updatedEmployee.id ? updatedEmployee : emp))
+    )
+  }
+
+  const handleDeleteClick = (employee) => {
+    setEmployeeToDelete(employee)
+    setDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!employeeToDelete) return
+
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const response = await fetch(`http://localhost:8000/api/v1/employment-info/${employeeToDelete.id}/`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        // Remove the deleted employee from the state
+        setEmployees((prevEmployees) => prevEmployees.filter((emp) => emp.id !== employeeToDelete.id))
+        setDeleteModalOpen(false)
+        setEmployeeToDelete(null)
+        setDeleteError(null)
+      } else {
+        const errorData = await response.json()
+        setDeleteError(errorData.message || "Failed to delete employee")
+      }
+    } catch (error) {
+      console.error("Error deleting employee:", error)
+      setDeleteError("An error occurred while deleting the employee")
+    }
+  }
+
   const filteredEmployees = employees.filter((employee) => {
-    const fullName = `${employee.employment_info.first_name} ${employee.employment_info.last_name}`.toLowerCase()
+    const fullName = `${employee.first_name} ${employee.last_name}`.toLowerCase()
     const matchesSearch = fullName.includes(searchTerm.toLowerCase())
-    const matchesTab = activeTab === "active" ? employee.employment_info.active : !employee.employment_info.active
-    const yearEmployed = getYearFromDate(employee.employment_info.hire_date)
+    const matchesTab = activeTab === "active" ? employee.active : !employee.active
+    const yearEmployed = getYearFromDate(employee.hire_date)
     const matchesYear = yearFilter === "all" || yearEmployed.toString() === yearFilter
-    const matchesStatus =
-      statusFilter === "all" || employee.employment_info.status.toLowerCase() === statusFilter.toLowerCase()
+    const matchesStatus = statusFilter === "all" || employee.status.toLowerCase() === statusFilter.toLowerCase()
     return matchesSearch && matchesTab && matchesYear && matchesStatus
   })
 
   // Get unique years and statuses for filters
-  const years = [...new Set(employees.map((e) => getYearFromDate(e.employment_info.hire_date)))].sort((a, b) => b - a)
-  const statuses = [...new Set(employees.map((e) => e.employment_info.status))]
+
+  const years = [...new Set(employees.map((e) => getYearFromDate(e.hire_date)))].sort((a, b) => b - a)
+  const statuses = [...new Set(employees.map((e) => e.status))]
 
   // Pagination logic
   const indexOfLastEmployee = currentPage * employeesPerPage
@@ -92,6 +150,10 @@ function AdminEmployeePage() {
       <NavBar />
 
       <div className="container mx-auto px-4 pt-24">
+        {deleteError && (
+          <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">{deleteError}</div>
+        )}
+
         <div className="bg-[#A7BC8F] rounded-lg p-6">
           {/* Header Section */}
           <div className="flex justify-between items-center mb-6">
@@ -166,18 +228,22 @@ function AdminEmployeePage() {
               <tbody className="text-white">
                 {currentEmployees.map((employee) => (
                   <tr key={employee.id} className="border-b border-white/10">
-                    <td className="py-3 px-4 truncate">{employee.employment_info.employee_number}</td>
-                    <td className="py-3 px-4 truncate">
-                      {`${employee.employment_info.first_name} ${employee.employment_info.last_name}`}
-                    </td>
-                    <td className="py-3 px-4 truncate">{getYearFromDate(employee.employment_info.hire_date)}</td>
-                    <td className="py-3 px-4 truncate">{employee.employment_info.status}</td>
+                    <td className="py-3 px-4 truncate">{employee.employee_number}</td>
+                    <td className="py-3 px-4 truncate">{`${employee.first_name} ${employee.last_name}`}</td>
+                    <td className="py-3 px-4 truncate">{getYearFromDate(employee.hire_date)}</td>
+                    <td className="py-3 px-4 truncate">{employee.status}</td>
                     <td className="py-3 px-4">
                       <div className="space-x-2">
-                        <button className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors">
+                        <button
+                          onClick={() => handleDeleteClick(employee)}
+                          className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors"
+                        >
                           Delete
                         </button>
-                        <button className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors">
+                        <button
+                          onClick={() => handleEditClick(employee)}
+                          className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors"
+                        >
                           Edit
                         </button>
                       </div>
@@ -196,7 +262,10 @@ function AdminEmployeePage() {
 
           {/* Footer Section */}
           <div className="flex justify-between items-center mt-4">
-            <button className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors">
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
+            >
               Add Account
             </button>
             <div className="flex space-x-2">
@@ -210,7 +279,7 @@ function AdminEmployeePage() {
                 Previous
               </button>
               <button className="bg-white text-[#5C7346] px-4 py-2 rounded-md">
-                {currentPage}
+                {currentPage} of {totalPages}
               </button>
               <button
                 onClick={nextPage}
@@ -225,6 +294,32 @@ function AdminEmployeePage() {
           </div>
         </div>
       </div>
+
+      {/* Add Employee Modal */}
+      <AddEmployee isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddEmployee} />
+      
+      {/* Edit Employee Modal */}
+      <EditEmployee
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setEmployeeToEdit(null)
+        }}
+        onUpdate={handleUpdateEmployee}
+        employeeData={employeeToEdit}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteEmployee
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false)
+          setEmployeeToDelete(null)
+          setDeleteError(null)
+        }}
+        onConfirm={handleDeleteConfirm}
+        employeeName={employeeToDelete ? `${employeeToDelete.first_name} ${employeeToDelete.last_name}` : ""}
+      />
     </div>
   )
 }
