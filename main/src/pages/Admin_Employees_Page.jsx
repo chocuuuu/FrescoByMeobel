@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar"
 import AddEmployee from "../components/Add_Employee"
+import DeleteEmployee from "../components/Delete_Employee"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -15,6 +16,9 @@ function AdminEmployeePage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const employeesPerPage = 5
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [employeeToDelete, setEmployeeToDelete] = useState(null)
+  const [deleteError, setDeleteError] = useState(null)
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -61,6 +65,40 @@ function AdminEmployeePage() {
     setEmployees((prev) => [...prev, newEmployee])
   }
 
+  const handleDeleteClick = (employee) => {
+    setEmployeeToDelete(employee)
+    setDeleteModalOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!employeeToDelete) return
+
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const response = await fetch(`http://localhost:8000/api/v1/employment-info/${employeeToDelete.id}/`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (response.ok) {
+        // Remove the deleted employee from the state
+        setEmployees((prevEmployees) => prevEmployees.filter((emp) => emp.id !== employeeToDelete.id))
+        setDeleteModalOpen(false)
+        setEmployeeToDelete(null)
+        setDeleteError(null)
+      } else {
+        const errorData = await response.json()
+        setDeleteError(errorData.message || "Failed to delete employee")
+      }
+    } catch (error) {
+      console.error("Error deleting employee:", error)
+      setDeleteError("An error occurred while deleting the employee")
+    }
+  }
+
   const filteredEmployees = employees.filter((employee) => {
     const fullName = `${employee.first_name} ${employee.last_name}`.toLowerCase()
     const matchesSearch = fullName.includes(searchTerm.toLowerCase())
@@ -97,6 +135,10 @@ function AdminEmployeePage() {
       <NavBar />
 
       <div className="container mx-auto px-4 pt-24">
+        {deleteError && (
+          <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">{deleteError}</div>
+        )}
+
         <div className="bg-[#A7BC8F] rounded-lg p-6">
           {/* Header Section */}
           <div className="flex justify-between items-center mb-6">
@@ -177,7 +219,10 @@ function AdminEmployeePage() {
                     <td className="py-3 px-4 truncate">{employee.status}</td>
                     <td className="py-3 px-4">
                       <div className="space-x-2">
-                        <button className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors">
+                        <button
+                          onClick={() => handleDeleteClick(employee)}
+                          className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors"
+                        >
                           Delete
                         </button>
                         <button className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors">
@@ -231,9 +276,24 @@ function AdminEmployeePage() {
           </div>
         </div>
       </div>
+
+      {/* Add Employee Modal */}
       <AddEmployee isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddEmployee} />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteEmployee
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false)
+          setEmployeeToDelete(null)
+          setDeleteError(null)
+        }}
+        onConfirm={handleDeleteConfirm}
+        employeeName={employeeToDelete ? `${employeeToDelete.first_name} ${employeeToDelete.last_name}` : ""}
+      />
     </div>
   )
 }
 
 export default AdminEmployeePage
+
