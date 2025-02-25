@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "employees",
     'admins',
     "owner",
+    "biometricdata",
 
 
 ]
