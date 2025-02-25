@@ -16,7 +16,7 @@ export default function DeleteEmployee({
         <p className="text-4xl font-bold text-red-600 text-center">
           {employeeName}?
         </p>
-        <p className="text-gray-600 mt-4 text-center">
+        <p className="text-gray-600 my-4 text-center">
           This action cannot be undone.
         </p>
 

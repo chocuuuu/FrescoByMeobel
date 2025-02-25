@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar"
 import AddEmployee from "../components/Add_Employee"
 import DeleteEmployee from "../components/Delete_Employee"
+import EditEmployee from "../components/Edit_Employee"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -19,6 +20,8 @@ function AdminEmployeePage() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [employeeToDelete, setEmployeeToDelete] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [employeeToEdit, setEmployeeToEdit] = useState(null)
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -63,6 +66,17 @@ function AdminEmployeePage() {
 
   const handleAddEmployee = (newEmployee) => {
     setEmployees((prev) => [...prev, newEmployee])
+  }
+
+  const handleEditClick = (employee) => {
+    setEmployeeToEdit(employee)
+    setIsEditModalOpen(true)
+  }
+
+  const handleUpdateEmployee = (updatedEmployee) => {
+    setEmployees((prevEmployees) =>
+      prevEmployees.map((emp) => (emp.id === updatedEmployee.id ? updatedEmployee : emp))
+    )
   }
 
   const handleDeleteClick = (employee) => {
@@ -225,7 +239,10 @@ function AdminEmployeePage() {
                         >
                           Delete
                         </button>
-                        <button className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors">
+                        <button
+                          onClick={() => handleEditClick(employee)}
+                          className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors"
+                        >
                           Edit
                         </button>
                       </div>
@@ -279,6 +296,17 @@ function AdminEmployeePage() {
 
       {/* Add Employee Modal */}
       <AddEmployee isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddEmployee} />
+      
+      {/* Edit Employee Modal */}
+      <EditEmployee
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setEmployeeToEdit(null)
+        }}
+        onUpdate={handleUpdateEmployee}
+        employeeData={employeeToEdit}
+      />
 
       {/* Delete Confirmation Modal */}
       <DeleteEmployee
