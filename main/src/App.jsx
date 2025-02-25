@@ -161,7 +161,6 @@ function App() {
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/dashboard" element={<AdminDashboardPage />} />
-
         <Route path="/payslip" element={<PayslipPage />} />
         <Route path="/employee" element={<AdminEmployeePage />} />
         <Route path="/payroll" element={<AdminEmployeePayrollPage />} />

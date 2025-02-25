@@ -193,7 +193,7 @@ function AdminEmployeePayrollPage() {
                 Previous
               </button>
               <button className="bg-white text-[#5C7346] px-4 py-2 rounded-md">
-                {currentPage} of {totalPages}
+                {currentPage}
               </button>
               <button
                 onClick={nextPage}
