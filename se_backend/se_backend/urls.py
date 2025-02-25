@@ -11,5 +11,6 @@ urlpatterns = [
     path(f"{api_prefix}employees/", include("employees.urls")),
     path(f"{api_prefix}admins/", include("admins.urls")),
     path(f"{api_prefix}owner/", include("owner.urls")),
+    path(f"{api_prefix}biometricdata/", include("biometricdata.urls")),
 
 ]
