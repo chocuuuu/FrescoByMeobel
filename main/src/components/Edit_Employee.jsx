@@ -3,11 +3,11 @@
 import { useState, useEffect } from "react"
 
 function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
-  // Initial form state - moved to a constant so we can reuse it
+  // Initial form state with nested structure
   const initialFormState = {
     user: {
       role: "",
-      email: "", // Email will be optional like password
+      email: "",
       password: "",
     },
     employment_info: {
@@ -25,17 +25,18 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
   const [formData, setFormData] = useState(initialFormState)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [currentEmail, setCurrentEmail] = useState("") // Store current email for reference
 
   // Populate form when employeeData changes
   useEffect(() => {
     if (employeeData) {
-      setCurrentEmail(employeeData.email || "") // Store current email
+      // Get the user data from the nested structure
+      const userData = employeeData.user || {}
+
       setFormData({
         user: {
-          role: employeeData.role || "",
-          email: "", // Start with empty email
-          password: "",
+          role: employeeData.user?.role,
+          email: "", // Start empty for optional update
+          password: "", // Start empty for optional update
         },
         employment_info: {
           employee_number: employeeData.employee_number || "",
@@ -59,12 +60,9 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
     try {
       const accessToken = localStorage.getItem("access_token")
 
-      // Create request payload
+      // Create request payload with only the fields that should be updated
       const requestPayload = {
         role: formData.user.role,
-        // Only include email and password if they are provided
-        ...(formData.user.email && { email: formData.user.email }),
-        ...(formData.user.password && { password: formData.user.password }),
         first_name: formData.employment_info.first_name,
         last_name: formData.employment_info.last_name,
         position: formData.employment_info.position,
@@ -73,10 +71,18 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
         active: formData.employment_info.active,
       }
 
+      // Only include email and password if they are provided
+      if (formData.user.email.trim()) {
+        requestPayload.email = formData.user.email
+      }
+      if (formData.user.password.trim()) {
+        requestPayload.password = formData.user.password
+      }
+
       console.log("Update Request Payload:", requestPayload)
 
       const response = await fetch(`http://localhost:8000/api/v1/employment-info/${employeeData.id}/`, {
-        method: "PUT",
+        method: "PATCH",
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
@@ -122,7 +128,6 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 
   const handleChange = (e, section) => {
     const { name, value, type, checked } = e.target
-
     setFormData((prev) => ({
       ...prev,
       [section]: {
@@ -132,7 +137,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
     }))
   }
 
-  if (!isOpen) return null
+  if (!isOpen || !employeeData) return null
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -177,6 +182,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
                     placeholder="Leave blank to keep current email"
                   />
+                  <p className="text-sm text-gray-500">Current: {employeeData.user?.email}</p>
                 </div>
               </div>
 
@@ -201,8 +207,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Employee Number</label>
                 <input
-                  type="number"
-                  name="employee_number"
+                  type="text"
                   value={formData.employment_info.employee_number}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
                   disabled
@@ -261,7 +266,6 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                 <label className="block text-sm text-gray-700">Hire Date</label>
                 <input
                   type="date"
-                  name="hire_date"
                   value={formData.employment_info.hire_date}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed"
                   disabled
@@ -323,3 +327,4 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 }
 
 export default EditEmployee
+
