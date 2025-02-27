@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar"
-import AddEmployee from "../components/Add_Employee"
-import DeleteEmployee from "../components/Delete_Employee"
-import EditEmployee from "../components/Edit_Employee"
+import AddEmployeeModal from "../components/Add_Employee"
+import DeleteConfirmationModal from "../components/Delete_Employee"
+import EditEmployeeModal from "../components/Edit_Employee"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -15,13 +15,14 @@ function AdminEmployeePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [yearFilter, setYearFilter] = useState("all")
   const [statusFilter, setStatusFilter] = useState("all")
-  const employeesPerPage = 5
+  const [roleFilter, setRoleFilter] = useState("all") // New role filter state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [employeeToDelete, setEmployeeToDelete] = useState(null)
   const [deleteError, setDeleteError] = useState(null)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [employeeToEdit, setEmployeeToEdit] = useState(null)
+  const employeesPerPage = 5
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -38,7 +39,7 @@ function AdminEmployeePage() {
         })
 
         const data = await response.json()
-        console.log(data) // Log the response to check its structure
+        console.log("Fetched employee data:", data)
 
         if (response.ok) {
           if (Array.isArray(data)) {
@@ -60,6 +61,12 @@ function AdminEmployeePage() {
     fetchEmployees()
   }, [])
 
+  // Helper function to capitalize role for display
+  const capitalizeRole = (role) => {
+    if (!role) return ""
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
+  }
+
   const getYearFromDate = (dateString) => {
     return new Date(dateString).getFullYear()
   }
@@ -68,20 +75,25 @@ function AdminEmployeePage() {
     setEmployees((prev) => [...prev, newEmployee])
   }
 
+  const handleDeleteClick = (employee) => {
+    setEmployeeToDelete(employee)
+    setDeleteModalOpen(true)
+  }
+
   const handleEditClick = (employee) => {
+    console.log("Employee being edited:", employee)
     setEmployeeToEdit(employee)
     setIsEditModalOpen(true)
   }
 
-  const handleUpdateEmployee = (updatedEmployee) => {
-    setEmployees((prevEmployees) =>
-      prevEmployees.map((emp) => (emp.id === updatedEmployee.id ? updatedEmployee : emp))
-    )
-  }
-
-  const handleDeleteClick = (employee) => {
-    setEmployeeToDelete(employee)
-    setDeleteModalOpen(true)
+  const handleUpdateEmployee = async (updatedEmployee) => {
+    try {
+      setEmployees((prevEmployees) =>
+        prevEmployees.map((emp) => (emp.id === updatedEmployee.id ? updatedEmployee : emp)),
+      )
+    } catch (error) {
+      console.error("Error updating employee state:", error)
+    }
   }
 
   const handleDeleteConfirm = async () => {
@@ -98,7 +110,6 @@ function AdminEmployeePage() {
       })
 
       if (response.ok) {
-        // Remove the deleted employee from the state
         setEmployees((prevEmployees) => prevEmployees.filter((emp) => emp.id !== employeeToDelete.id))
         setDeleteModalOpen(false)
         setEmployeeToDelete(null)
@@ -113,6 +124,12 @@ function AdminEmployeePage() {
     }
   }
 
+  // Handle tab change
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+    setCurrentPage(1) // Reset to first page when changing tabs
+  }
+
   const filteredEmployees = employees.filter((employee) => {
     const fullName = `${employee.first_name} ${employee.last_name}`.toLowerCase()
     const matchesSearch = fullName.includes(searchTerm.toLowerCase())
@@ -120,19 +137,27 @@ function AdminEmployeePage() {
     const yearEmployed = getYearFromDate(employee.hire_date)
     const matchesYear = yearFilter === "all" || yearEmployed.toString() === yearFilter
     const matchesStatus = statusFilter === "all" || employee.status.toLowerCase() === statusFilter.toLowerCase()
-    return matchesSearch && matchesTab && matchesYear && matchesStatus
+    const matchesRole =
+      roleFilter === "all" || (employee.user && employee.user.role.toLowerCase() === roleFilter.toLowerCase())
+    return matchesSearch && matchesTab && matchesYear && matchesStatus && matchesRole
   })
 
-  // Get unique years and statuses for filters
-
+  // Get unique years, statuses, and roles for filters
   const years = [...new Set(employees.map((e) => getYearFromDate(e.hire_date)))].sort((a, b) => b - a)
   const statuses = [...new Set(employees.map((e) => e.status))]
+  const roles = [...new Set(employees.filter((e) => e.user?.role).map((e) => e.user.role))]
 
   // Pagination logic
-  const indexOfLastEmployee = currentPage * employeesPerPage
+  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / employeesPerPage))
+  // Ensure current page is within valid range
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
+  if (currentPage !== validCurrentPage) {
+    setCurrentPage(validCurrentPage)
+  }
+
+  const indexOfLastEmployee = validCurrentPage * employeesPerPage
   const indexOfFirstEmployee = indexOfLastEmployee - employeesPerPage
   const currentEmployees = filteredEmployees.slice(indexOfFirstEmployee, indexOfLastEmployee)
-  const totalPages = Math.ceil(filteredEmployees.length / employeesPerPage)
 
   const nextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
@@ -162,7 +187,7 @@ function AdminEmployeePage() {
                 className={`px-4 py-2 rounded-md ${
                   activeTab === "active" ? "bg-[#5C7346] text-white" : "bg-[#D1DBC4] text-gray-700"
                 }`}
-                onClick={() => setActiveTab("active")}
+                onClick={() => handleTabChange("active")}
               >
                 ACTIVE
               </button>
@@ -170,7 +195,7 @@ function AdminEmployeePage() {
                 className={`px-4 py-2 rounded-md ${
                   activeTab === "inactive" ? "bg-[#5C7346] text-white" : "bg-[#D1DBC4] text-gray-700"
                 }`}
-                onClick={() => setActiveTab("inactive")}
+                onClick={() => handleTabChange("inactive")}
               >
                 INACTIVE
               </button>
@@ -204,6 +229,18 @@ function AdminEmployeePage() {
                 {statuses.map((status) => (
                   <option key={status} value={status}>
                     {status}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
+              >
+                <option value="all">All Roles</option>
+                {roles.map((role) => (
+                  <option key={role} value={role.toLowerCase()}>
+                    {capitalizeRole(role)}
                   </option>
                 ))}
               </select>
@@ -296,21 +333,10 @@ function AdminEmployeePage() {
       </div>
 
       {/* Add Employee Modal */}
-      <AddEmployee isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddEmployee} />
-      
-      {/* Edit Employee Modal */}
-      <EditEmployee
-        isOpen={isEditModalOpen}
-        onClose={() => {
-          setIsEditModalOpen(false)
-          setEmployeeToEdit(null)
-        }}
-        onUpdate={handleUpdateEmployee}
-        employeeData={employeeToEdit}
-      />
+      <AddEmployeeModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddEmployee} />
 
       {/* Delete Confirmation Modal */}
-      <DeleteEmployee
+      <DeleteConfirmationModal
         isOpen={deleteModalOpen}
         onClose={() => {
           setDeleteModalOpen(false)
@@ -318,7 +344,18 @@ function AdminEmployeePage() {
           setDeleteError(null)
         }}
         onConfirm={handleDeleteConfirm}
-        employeeName={employeeToDelete ? `${employeeToDelete.first_name} ${employeeToDelete.last_name}` : ""}
+        employeeName={employeeToEdit ? `${employeeToEdit.first_name} ${employeeToEdit.last_name}` : ""}
+      />
+
+      {/* Edit Employee Modal */}
+      <EditEmployeeModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setEmployeeToEdit(null)
+        }}
+        onUpdate={handleUpdateEmployee}
+        employeeData={employeeToEdit}
       />
     </div>
   )
