@@ -136,19 +136,18 @@ function AdminEmployeePage() {
     const matchesTab = activeTab === "active" ? employee.active : !employee.active
     const yearEmployed = getYearFromDate(employee.hire_date)
     const matchesYear = yearFilter === "all" || yearEmployed.toString() === yearFilter
-    const matchesStatus = statusFilter === "all" || employee.status.toLowerCase() === statusFilter.toLowerCase()
     const matchesRole =
       roleFilter === "all" || (employee.user && employee.user.role.toLowerCase() === roleFilter.toLowerCase())
-    return matchesSearch && matchesTab && matchesYear && matchesStatus && matchesRole
+    return matchesSearch && matchesTab && matchesYear && matchesRole
   })
 
   // Get unique years, statuses, and roles for filters
   const years = [...new Set(employees.map((e) => getYearFromDate(e.hire_date)))].sort((a, b) => b - a)
-  const statuses = [...new Set(employees.map((e) => e.status))]
   const roles = [...new Set(employees.filter((e) => e.user?.role).map((e) => e.user.role))]
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / employeesPerPage))
+  
   // Ensure current page is within valid range
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
   if (currentPage !== validCurrentPage) {
@@ -209,38 +208,26 @@ function AdminEmployeePage() {
                 className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
               />
               <select
-                value={yearFilter}
-                onChange={(e) => setYearFilter(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
-              >
-                <option value="all">All Years</option>
-                {years.map((year) => (
-                  <option key={year} value={year.toString()}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
-              >
-                <option value="all">All Statuses</option>
-                {statuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-              <select
                 value={roleFilter}
                 onChange={(e) => setRoleFilter(e.target.value)}
                 className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
               >
-                <option value="all">All Roles</option>
+                <option value="all">Roles</option>
                 {roles.map((role) => (
                   <option key={role} value={role.toLowerCase()}>
                     {capitalizeRole(role)}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={yearFilter}
+                onChange={(e) => setYearFilter(e.target.value)}
+                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
+              >
+                <option value="all">Years</option>
+                {years.map((year) => (
+                  <option key={year} value={year.toString()}>
+                    {year}
                   </option>
                 ))}
               </select>
