@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar"
-import AddEmployeeModal from "../components/Add_Employee"
-import DeleteConfirmationModal from "../components/Delete_Employee"
-import EditEmployeeModal from "../components/Edit_Employee"
+import AddEmployee from "../components/Add_Employee"
+import DeleteEmployee from "../components/Delete_Employee"
+import EditEmployee from "../components/Edit_Employee"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -14,7 +14,6 @@ function AdminEmployeePage() {
   const [activeTab, setActiveTab] = useState("active")
   const [currentPage, setCurrentPage] = useState(1)
   const [yearFilter, setYearFilter] = useState("all")
-  const [statusFilter, setStatusFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all") // New role filter state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -137,17 +136,18 @@ function AdminEmployeePage() {
     const yearEmployed = getYearFromDate(employee.hire_date)
     const matchesYear = yearFilter === "all" || yearEmployed.toString() === yearFilter
     const matchesRole =
-      roleFilter === "all" || (employee.user && employee.user.role.toLowerCase() === roleFilter.toLowerCase())
+      roleFilter === "all" ||
+      (roleFilter === "owner" && !employee.user) || // Consider entries without user object as owners
+      (employee.user && employee.user.role.toLowerCase() === roleFilter.toLowerCase())
     return matchesSearch && matchesTab && matchesYear && matchesRole
   })
 
-  // Get unique years, statuses, and roles for filters
+  // Get unique years and roles for filters
   const years = [...new Set(employees.map((e) => getYearFromDate(e.hire_date)))].sort((a, b) => b - a)
-  const roles = [...new Set(employees.filter((e) => e.user?.role).map((e) => e.user.role))]
+  const roles = ["owner", "admin", "employee"] // Make sure these are all lowercase
 
   // Pagination logic
   const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / employeesPerPage))
-  
   // Ensure current page is within valid range
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
   if (currentPage !== validCurrentPage) {
@@ -208,26 +208,26 @@ function AdminEmployeePage() {
                 className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
               />
               <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
-              >
-                <option value="all">Roles</option>
-                {roles.map((role) => (
-                  <option key={role} value={role.toLowerCase()}>
-                    {capitalizeRole(role)}
-                  </option>
-                ))}
-              </select>
-              <select
                 value={yearFilter}
                 onChange={(e) => setYearFilter(e.target.value)}
                 className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
               >
-                <option value="all">Years</option>
+                <option value="all">All Years</option>
                 {years.map((year) => (
                   <option key={year} value={year.toString()}>
                     {year}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
+              >
+                <option value="all">All Roles</option>
+                {roles.map((role) => (
+                  <option key={role} value={role.toLowerCase()}>
+                    {capitalizeRole(role)}
                   </option>
                 ))}
               </select>
@@ -320,10 +320,10 @@ function AdminEmployeePage() {
       </div>
 
       {/* Add Employee Modal */}
-      <AddEmployeeModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddEmployee} />
+      <AddEmployee isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddEmployee} />
 
       {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal
+      <DeleteEmployee
         isOpen={deleteModalOpen}
         onClose={() => {
           setDeleteModalOpen(false)
@@ -331,11 +331,11 @@ function AdminEmployeePage() {
           setDeleteError(null)
         }}
         onConfirm={handleDeleteConfirm}
-        employeeName={employeeToEdit ? `${employeeToEdit.first_name} ${employeeToEdit.last_name}` : ""}
+        employeeName={employeeToDelete ? `${employeeToDelete.first_name} ${employeeToDelete.last_name}` : ""}
       />
 
       {/* Edit Employee Modal */}
-      <EditEmployeeModal
+      <EditEmployee
         isOpen={isEditModalOpen}
         onClose={() => {
           setIsEditModalOpen(false)
