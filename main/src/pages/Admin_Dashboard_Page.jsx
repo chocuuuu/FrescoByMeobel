@@ -1,7 +1,9 @@
 import React from "react";
 import NavBar from "../components/Nav_Bar";
+import { useNavigate } from "react-router-dom"
 
 function AdminDashboardPage() {
+  const navigate = useNavigate()
   const transaction_history = [
     {
       id: 1,
@@ -140,7 +142,7 @@ function AdminDashboardPage() {
           <button className="bg-gray-800 text-white px-6 py-2 rounded-md w-32">
             Attendance
           </button>
-          <button className="bg-gray-800 text-white px-6 py-2 rounded-md w-32">
+          <button onClick={() => navigate("/payslip")} className="bg-gray-800 text-white px-6 py-2 rounded-md w-32">
             Payslip
           </button>
         </div>
