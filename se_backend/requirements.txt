@@ -8,3 +8,4 @@ psycopg2-binary==2.9.6  # PostgreSQL adapter for Django (optional, if using Post
 python-decouple==3.8
 gunicorn
 setuptools
+pillow==11.1.0 # For image uploads (can change to S3 if viable)
