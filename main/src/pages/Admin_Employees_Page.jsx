@@ -1,198 +1,227 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import NavBar from "../components/Nav_Bar"
-import AddEmployee from "../components/Add_Employee"
-import DeleteEmployee from "../components/Delete_Employee"
-import EditEmployee from "../components/Edit_Employee"
+import { useState, useEffect } from "react";
+import NavBar from "../components/Nav_Bar";
+import AddEmployee from "../components/Add_Employee";
+import EditEmployee from "../components/Edit_Employee";
+import DeleteEmployee from "../components/Delete_Employee";
+
+const formatStatus = (status) => {
+  if (status === "ON_LEAVE") return "ON LEAVE";
+  return status;
+};
 
 function AdminEmployeePage() {
-  const [employees, setEmployees] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [activeTab, setActiveTab] = useState("active")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [yearFilter, setYearFilter] = useState("all")
-  const [roleFilter, setRoleFilter] = useState("all") // New role filter state
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [employeeToDelete, setEmployeeToDelete] = useState(null)
-  const [deleteError, setDeleteError] = useState(null)
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
-  const [employeeToEdit, setEmployeeToEdit] = useState(null)
-  const employeesPerPage = 5
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("active");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [yearFilter, setYearFilter] = useState("all");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [employeeToEdit, setEmployeeToEdit] = useState(null);
+  const [employeeToDelete, setEmployeeToDelete] = useState(null);
+  const employeesPerPage = 5;
 
   useEffect(() => {
     const fetchEmployees = async () => {
-      setLoading(true)
-      setError(null)
+      setLoading(true);
+      setError(null);
 
       try {
-        const accessToken = localStorage.getItem("access_token")
-        const response = await fetch("http://localhost:8000/api/v1/employment-info/", {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
+        const accessToken = localStorage.getItem("access_token");
+        const response = await fetch(
+          "http://localhost:8000/api/v1/employment-info/",
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
 
-        const data = await response.json()
-        console.log("Fetched employee data:", data)
+        const data = await response.json();
+        console.log("Fetched employee data:", data);
 
         if (response.ok) {
           if (Array.isArray(data)) {
-            setEmployees(data)
+            setEmployees(data);
           } else {
-            setError("Unexpected data format received from the server.")
+            setError("Unexpected data format received from the server.");
           }
         } else {
-          setError(data.message || "Failed to fetch employee data. Please try again.")
+          setError(
+            data.message || "Failed to fetch employee data. Please try again."
+          );
         }
       } catch (error) {
-        console.error("Error fetching employees:", error)
-        setError("An error occurred while fetching employee data. Please try again later.")
+        console.error("Error fetching employees:", error);
+        setError(
+          "An error occurred while fetching employee data. Please try again later."
+        );
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchEmployees()
-  }, [])
+    fetchEmployees();
+  }, []);
 
   // Helper function to capitalize role for display
   const capitalizeRole = (role) => {
-    if (!role) return ""
-    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()
-  }
+    if (!role) return "";
+    return role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+  };
 
   const getYearFromDate = (dateString) => {
-    return new Date(dateString).getFullYear()
-  }
+    if (!dateString) return "-";
+    return new Date(dateString).getFullYear();
+  };
 
   const handleAddEmployee = (newEmployee) => {
-    setEmployees((prev) => [...prev, newEmployee])
-  }
-
-  const handleDeleteClick = (employee) => {
-    setEmployeeToDelete(employee)
-    setDeleteModalOpen(true)
-  }
+    setEmployees((prev) => [...prev, newEmployee]);
+  };
 
   const handleEditClick = (employee) => {
-    console.log("Employee being edited:", employee)
-    setEmployeeToEdit(employee)
-    setIsEditModalOpen(true)
-  }
+    console.log("Employee being edited:", employee);
+    setEmployeeToEdit(employee);
+    setIsEditModalOpen(true);
+  };
 
   const handleUpdateEmployee = async (updatedEmployee) => {
     try {
       setEmployees((prevEmployees) =>
-        prevEmployees.map((emp) => (emp.id === updatedEmployee.id ? updatedEmployee : emp)),
-      )
+        prevEmployees.map((emp) =>
+          emp.id === updatedEmployee.id ? updatedEmployee : emp
+        )
+      );
     } catch (error) {
-      console.error("Error updating employee state:", error)
+      console.error("Error updating employee state:", error);
     }
-  }
-
-  const handleDeleteConfirm = async () => {
-    if (!employeeToDelete) return
-
-    try {
-      const accessToken = localStorage.getItem("access_token")
-      const response = await fetch(`http://localhost:8000/api/v1/employment-info/${employeeToDelete.id}/`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (response.ok) {
-        setEmployees((prevEmployees) => prevEmployees.filter((emp) => emp.id !== employeeToDelete.id))
-        setDeleteModalOpen(false)
-        setEmployeeToDelete(null)
-        setDeleteError(null)
-      } else {
-        const errorData = await response.json()
-        setDeleteError(errorData.message || "Failed to delete employee")
-      }
-    } catch (error) {
-      console.error("Error deleting employee:", error)
-      setDeleteError("An error occurred while deleting the employee")
-    }
-  }
+  };
 
   // Handle tab change
   const handleTabChange = (tab) => {
-    setActiveTab(tab)
-    setCurrentPage(1) // Reset to first page when changing tabs
-  }
+    setActiveTab(tab);
+    setCurrentPage(1); // Reset to first page when changing tabs
+    // Reset filters when switching tabs
+    if (tab === "inactive") {
+      setYearFilter("all");
+      setRoleFilter("all");
+    }
+  };
 
   const filteredEmployees = employees.filter((employee) => {
-    const fullName = `${employee.first_name} ${employee.last_name}`.toLowerCase()
-    const matchesSearch = fullName.includes(searchTerm.toLowerCase())
-    const matchesTab = activeTab === "active" ? employee.active : !employee.active
-    const yearEmployed = getYearFromDate(employee.hire_date)
-    const matchesYear = yearFilter === "all" || yearEmployed.toString() === yearFilter
+    const fullName =
+      `${employee.first_name} ${employee.last_name}`.toLowerCase();
+    const matchesSearch = fullName.includes(searchTerm.toLowerCase());
+
+    // Modified tab logic to include ON_LEAVE in active tab
+    const matchesTab =
+      activeTab === "active"
+        ? employee.active || employee.status === "ON_LEAVE"
+        : !employee.active && employee.status === "INACTIVE";
+
+    const yearEmployed = getYearFromDate(employee.hire_date);
+    const matchesYear =
+      yearFilter === "all" || yearEmployed.toString() === yearFilter;
     const matchesRole =
       roleFilter === "all" ||
-      (roleFilter === "owner" && !employee.user) || // Consider entries without user object as owners
-      (employee.user && employee.user.role.toLowerCase() === roleFilter.toLowerCase())
-    return matchesSearch && matchesTab && matchesYear && matchesRole
-  })
+      (roleFilter === "owner" && !employee.user) ||
+      (employee.user &&
+        employee.user.role.toLowerCase() === roleFilter.toLowerCase());
+
+    return (
+      matchesSearch &&
+      matchesTab &&
+      (activeTab === "inactive" || (matchesYear && matchesRole))
+    );
+  });
 
   // Get unique years and roles for filters
-  const years = [...new Set(employees.map((e) => getYearFromDate(e.hire_date)))].sort((a, b) => b - a)
-  const roles = ["owner", "admin", "employee"] // Make sure these are all lowercase
+  const years = [...new Set(employees.map((e) => getYearFromDate(e.hire_date)))]
+    .filter((year) => year !== "-")
+    .sort((a, b) => b - a);
+  const roles = ["owner", "admin", "employee"];
 
   // Pagination logic
-  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / employeesPerPage))
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredEmployees.length / employeesPerPage)
+  );
   // Ensure current page is within valid range
-  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
+  const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
   if (currentPage !== validCurrentPage) {
-    setCurrentPage(validCurrentPage)
+    setCurrentPage(validCurrentPage);
   }
 
-  const indexOfLastEmployee = validCurrentPage * employeesPerPage
-  const indexOfFirstEmployee = indexOfLastEmployee - employeesPerPage
-  const currentEmployees = filteredEmployees.slice(indexOfFirstEmployee, indexOfLastEmployee)
+  const indexOfLastEmployee = validCurrentPage * employeesPerPage;
+  const indexOfFirstEmployee = indexOfLastEmployee - employeesPerPage;
+  const currentEmployees = filteredEmployees.slice(
+    indexOfFirstEmployee,
+    indexOfLastEmployee
+  );
 
   const nextPage = () => {
-    setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-  }
+    setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  };
 
   const prevPage = () => {
-    setCurrentPage((prev) => Math.max(prev - 1, 1))
-  }
+    setCurrentPage((prev) => Math.max(prev - 1, 1));
+  };
 
-  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>
-  if (error) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">{error}</div>
+  const handleDeleteClick = (employee) => {
+    setEmployeeToDelete(employee);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    // Add delete logic here
+    setIsDeleteModalOpen(false);
+    setEmployeeToDelete(null);
+  };
+
+  if (loading)
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  if (error)
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">
+        {error}
+      </div>
+    );
 
   return (
     <div className="min-h-screen bg-gray-50">
       <NavBar />
 
       <div className="container mx-auto px-4 pt-24">
-        {deleteError && (
-          <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">{deleteError}</div>
-        )}
-
         <div className="bg-[#A7BC8F] rounded-lg p-6">
           {/* Header Section */}
           <div className="flex justify-between items-center mb-6">
             <div className="space-x-2">
               <button
-                className={`px-4 py-2 rounded-md ${
-                  activeTab === "active" ? "bg-[#5C7346] text-white" : "bg-[#D1DBC4] text-gray-700"
+                className={`px-6 py-2 rounded-md ${
+                  activeTab === "active"
+                    ? "bg-[#5C7346] text-white font-semibold"
+                    : "bg-[#D1DBC4] text-gray-700"
                 }`}
                 onClick={() => handleTabChange("active")}
               >
                 ACTIVE
               </button>
               <button
-                className={`px-4 py-2 rounded-md ${
-                  activeTab === "inactive" ? "bg-[#5C7346] text-white" : "bg-[#D1DBC4] text-gray-700"
+                className={`px-6 py-2 rounded-md ${
+                  activeTab === "inactive"
+                    ? "bg-[#5C7346] text-white font-semibold"
+                    : "bg-[#D1DBC4] text-gray-700"
                 }`}
                 onClick={() => handleTabChange("inactive")}
               >
@@ -205,32 +234,36 @@ function AdminEmployeePage() {
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
+                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-64"
               />
-              <select
-                value={yearFilter}
-                onChange={(e) => setYearFilter(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
-              >
-                <option value="all">All Years</option>
-                {years.map((year) => (
-                  <option key={year} value={year.toString()}>
-                    {year}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={roleFilter}
-                onChange={(e) => setRoleFilter(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
-              >
-                <option value="all">All Roles</option>
-                {roles.map((role) => (
-                  <option key={role} value={role.toLowerCase()}>
-                    {capitalizeRole(role)}
-                  </option>
-                ))}
-              </select>
+              {activeTab === "active" && (
+                <>
+                  <select
+                    value={yearFilter}
+                    onChange={(e) => setYearFilter(e.target.value)}
+                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
+                  >
+                    <option value="all">All Years</option>
+                    {years.map((year) => (
+                      <option key={year} value={year.toString()}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={roleFilter}
+                    onChange={(e) => setRoleFilter(e.target.value)}
+                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
+                  >
+                    <option value="all">All Roles</option>
+                    {roles.map((role) => (
+                      <option key={role} value={role.toLowerCase()}>
+                        {capitalizeRole(role)}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
             </div>
           </div>
 
@@ -239,14 +272,21 @@ function AdminEmployeePage() {
 
           {/* Employee Table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full table-fixed">
+            <table className="min-w-full">
               <thead>
                 <tr className="text-left text-white border-b border-white/20">
                   <th className="py-3 px-4 w-1/6">ID</th>
                   <th className="py-3 px-4 w-1/4">NAME</th>
                   <th className="py-3 px-4 w-1/6">YEAR EMPLOYED</th>
-                  <th className="py-3 px-4 w-1/5">STATUS</th>
-                  <th className="py-3 px-4 w-1/5">ACTIONS</th>
+                  {activeTab === "inactive" && (
+                    <th className="py-3 px-4 w-1/5">YEAR RESIGNED</th>
+                  )}
+                  {activeTab === "active" && (
+                    <th className="py-3 px-4 w-1/5">STATUS</th>
+                  )}
+                  {activeTab === "active" && (
+                    <th className="py-3 px-4 w-1/5">ACTIONS</th>
+                  )}
                 </tr>
               </thead>
               <tbody className="text-white">
@@ -254,30 +294,55 @@ function AdminEmployeePage() {
                   <tr key={employee.id} className="border-b border-white/10">
                     <td className="py-3 px-4 truncate">{employee.employee_number}</td>
                     <td className="py-3 px-4 truncate">{`${employee.first_name} ${employee.last_name}`}</td>
-                    <td className="py-3 px-4 truncate">{getYearFromDate(employee.hire_date)}</td>
-                    <td className="py-3 px-4 truncate">{employee.status}</td>
-                    <td className="py-3 px-4">
-                      <div className="space-x-2">
-                        <button
-                          onClick={() => handleDeleteClick(employee)}
-                          className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors"
-                        >
-                          Delete
-                        </button>
-                        <button
-                          onClick={() => handleEditClick(employee)}
-                          className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors"
-                        >
-                          Edit
-                        </button>
-                      </div>
+                    <td className="py-3 px-4 truncate">
+                      {getYearFromDate(employee.hire_date)}
                     </td>
+
+                    {/* Show Year Resigned only for inactive employees */}
+                    {activeTab === "inactive" && (
+                      <td className="py-3 px-4 truncate">
+                        {getYearFromDate(employee.inactive_date) || "-"}
+                      </td>
+                    )}
+
+                    {/* Show Status and Actions only for active employees */}
+                    {activeTab === "active" && (
+                      <>
+                        <td className="py-3 px-4">
+                          {formatStatus(employee.status)}
+                        </td>
+                        <td className="py-3 px-4 truncate">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleDeleteClick(employee)}
+                              className="bg-red-600 text-white px-4 py-1 rounded-md hover:bg-red-700 transition-colors"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              onClick={() => handleEditClick(employee)}
+                              className="bg-[#5C7346] text-white px-4 py-1 rounded-md hover:bg-[#4a5c38] transition-colors"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
-                {/* Add empty rows to maintain table height */}
-                {[...Array(Math.max(0, employeesPerPage - currentEmployees.length))].map((_, index) => (
-                  <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
-                    <td colSpan="5"></td>
+
+                {/* Empty rows for consistent height */}
+                {[
+                  ...Array(
+                    Math.max(0, employeesPerPage - currentEmployees.length)
+                  ),
+                ].map((_, index) => (
+                  <tr
+                    key={`empty-${index}`}
+                    className="border-b border-white/10 h-[52px]"
+                  >
+                    <td colSpan={activeTab === "inactive" ? "6" : "5"}></td>
                   </tr>
                 ))}
               </tbody>
@@ -286,31 +351,31 @@ function AdminEmployeePage() {
 
           {/* Footer Section */}
           <div className="flex justify-between items-center mt-4">
-            <button
-              onClick={() => setIsAddModalOpen(true)}
-              className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
-            >
-              Add Account
-            </button>
+            {activeTab === "active" ? (
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="bg-[#5C7346] text-white px-6 py-2 rounded-md hover:bg-[#4a5c38] transition-colors font-medium"
+              >
+                Add Account
+              </button>
+            ) : (
+              <div></div> /* Empty div to maintain layout when in inactive tab */
+            )}
             <div className="flex space-x-2">
               <button
                 onClick={prevPage}
                 disabled={currentPage === 1}
-                className={`bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors ${
-                  currentPage === 1 ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors disabled:opacity-50"
               >
                 Previous
               </button>
-              <button className="bg-white text-[#5C7346] px-4 py-2 rounded-md">
+              <div className="bg-white text-[#5C7346] px-4 py-2 rounded-md">
                 {currentPage} of {totalPages}
-              </button>
+              </div>
               <button
                 onClick={nextPage}
                 disabled={currentPage === totalPages}
-                className={`bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors ${
-                  currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""
-                }`}
+                className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors disabled:opacity-50"
               >
                 Next
               </button>
@@ -319,34 +384,38 @@ function AdminEmployeePage() {
         </div>
       </div>
 
-      {/* Add Employee Modal */}
-      <AddEmployee isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onAdd={handleAddEmployee} />
-
-      {/* Delete Confirmation Modal */}
-      <DeleteEmployee
-        isOpen={deleteModalOpen}
-        onClose={() => {
-          setDeleteModalOpen(false)
-          setEmployeeToDelete(null)
-          setDeleteError(null)
-        }}
-        onConfirm={handleDeleteConfirm}
-        employeeName={employeeToDelete ? `${employeeToDelete.first_name} ${employeeToDelete.last_name}` : ""}
+      {/* Modals */}
+      <AddEmployee
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={handleAddEmployee}
       />
 
-      {/* Edit Employee Modal */}
       <EditEmployee
         isOpen={isEditModalOpen}
         onClose={() => {
-          setIsEditModalOpen(false)
-          setEmployeeToEdit(null)
+          setIsEditModalOpen(false);
+          setEmployeeToEdit(null);
         }}
         onUpdate={handleUpdateEmployee}
         employeeData={employeeToEdit}
       />
+
+      <DeleteEmployee
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setEmployeeToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        employeeName={
+          employeeToDelete
+            ? `${employeeToDelete.first_name} ${employeeToDelete.last_name}`
+            : ""
+        }
+      />
     </div>
-  )
+  );
 }
 
-export default AdminEmployeePage
-
+export default AdminEmployeePage;
