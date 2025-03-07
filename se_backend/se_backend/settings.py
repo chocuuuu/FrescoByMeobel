@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "attendance",
     "attendance_summary",
     "shift",
+    "schedule",
 
 ]
 

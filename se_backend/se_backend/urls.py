@@ -18,6 +18,7 @@ urlpatterns = [
     path(f"{api_prefix}attendance/", include("attendance.urls")),
     path(f"{api_prefix}attendance_summary/", include("attendance_summary.urls")),
     path(f"{api_prefix}shift/", include("shift.urls")),
+    path(f"{api_prefix}schedule/", include("schedule.urls")),
 
 ]
 
