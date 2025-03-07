@@ -16,6 +16,8 @@ urlpatterns = [
     path(f"{api_prefix}owner/", include("owner.urls")),
     path(f"{api_prefix}biometricdata/", include("biometricdata.urls")),
     path(f"{api_prefix}attendance/", include("attendance.urls")),
+    path(f"{api_prefix}attendance_summary/", include("attendance_summary.urls")),
+    path(f"{api_prefix}shift/", include("shift.urls")),
 
 ]
 

@@ -64,7 +64,8 @@ INSTALLED_APPS = [
     "owner",
     "biometricdata",
     "attendance",
-
+    "attendance_summary",
+    "shift",
 
 ]
 
