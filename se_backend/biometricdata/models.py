@@ -2,7 +2,6 @@ from django.db import models
 
 class BiometricData(models.Model):
     id = models.AutoField(primary_key=True)
-    user_id = models.IntegerField()
     emp_id = models.IntegerField()
     name = models.CharField(max_length=255)
     time = models.DateTimeField()
