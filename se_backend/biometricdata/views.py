@@ -4,11 +4,12 @@
 # from rest_framework import generics, status
 # from rest_framework.response import Response
 # from rest_framework.views import APIView
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from shared.generic_viewset import GenericViewset
 from .models import BiometricData
 from .serializers import BiometricDataSerializer
-
 
 # async on standby before proper integration
 """
@@ -46,3 +47,15 @@ class BiometricDataViewSet(GenericViewset):
     permissions = [IsAuthenticated]
     queryset = BiometricData.objects.all()
     serializer_class = BiometricDataSerializer
+
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        is_bulk = isinstance(data, list)  # Check if request contains a list
+
+        serializer = self.get_serializer(data=data, many=is_bulk)
+        serializer.is_valid(raise_exception=True)
+
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
