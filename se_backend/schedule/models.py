@@ -19,7 +19,7 @@ class Schedule(models.Model):
     id = models.AutoField(primary_key=True)
     user_id = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
     shift_ids = models.ManyToManyField(Shift)
-    days = ArrayField(models.CharField(max_length=10, choices=DAYS_OF_WEEK))
+    days = ArrayField(models.CharField(max_length=10, choices=DAYS_OF_WEEK), default=list)
     sickleave = models.DateField(null=True, blank=True)
     regularholiday = ArrayField(models.DateField(), null=True, blank=True)
     specialholiday = ArrayField(models.DateField(), null=True, blank=True)
