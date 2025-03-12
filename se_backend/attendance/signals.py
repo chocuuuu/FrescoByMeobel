@@ -27,6 +27,12 @@ def get_shift_details(user, date):
     """Retrieve shift details for the given user and date."""
     biweekly_start = get_biweekly_period(date)
 
+    logger.debug(f"[get_shift_details] Searching for Schedule with User ID: {user}, Biweekly Start: {biweekly_start}")
+
+    schedules = Schedule.objects.filter(user_id=user).values('id', 'bi_weekly_start')
+    logger.debug(f"[get_shift_details] Available schedules for User {user}: {list(schedules)}")
+
+
     schedule = Schedule.objects.filter(
         user_id=user,
         bi_weekly_start=biweekly_start
@@ -47,7 +53,12 @@ def get_shift_details(user, date):
 
 def get_biweekly_period(date):
     """Determine the biweekly period start date."""
-    return date.replace(day=1) if date.day < 16 else date.replace(day=16)
+    first_day = date.replace(day=1)
+    if date.day < 16:
+        return first_day
+    else:
+        return first_day + timedelta(days=15)
+
 
 
 @receiver(post_save, sender=Attendance)
