@@ -1,8 +1,10 @@
 import NavBar from '../components/Nav_Bar'
 import { UserCircle, ChevronDown, ArrowLeft } from 'lucide-react'
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function PayslipPage() {
+  const navigate = useNavigate()
   const [isBlurred, setIsBlurred] = useState(true)
   const [showPasswordDialog, setShowPasswordDialog] = useState(false)
   const [password, setPassword] = useState('')
@@ -254,6 +256,7 @@ function PayslipPage() {
             {/* Back Button at bottom */}
             <div className="flex justify-end mt-6">
               <button
+                onClick={() => navigate("/dashboard")}
                 className="px-6 py-2 rounded-md text-white flex items-center gap-2 font-medium"
                 style={{ backgroundColor: '#373A45' }}
               >
