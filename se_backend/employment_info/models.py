@@ -8,7 +8,10 @@ class EmploymentInfo(models.Model):
     position = models.CharField(max_length=255)
     address = models.CharField(max_length=255)
     hire_date = models.DateField()
-    status = models.CharField(max_length=50)
+    birth_date = models.DateField(blank=True, null=True)
+    marital_status = models.CharField(max_length=50, blank=True, null=True)
+    other_info = models.CharField(max_length=255, blank=True, null=True)
+    profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
     active = models.BooleanField()
 
     def __str__(self):
