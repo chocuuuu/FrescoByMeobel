@@ -144,23 +144,27 @@ function AdminEmployeePayrollPage() {
             <table className="min-w-full table-fixed">
               <thead>
                 <tr className="text-left text-white border-b border-white/20">
-                  <th className="py-3 px-4 w-1/6">ID</th>
-                  <th className="py-3 px-4 w-1/4">NAME</th>
-                  <th className="py-3 px-4 w-1/6">RATE PER MONTH</th>
-                  <th className="py-3 px-4 w-1/6">DEDUCTIONS</th>
-                  <th className="py-3 px-4 w-1/6">PAY DATE</th>
-                  <th className="py-3 px-4 w-1/6">ACTIONS</th>
+                  <th className="py-3 px-4 w-[10%]">ID</th>
+                  <th className="py-3 px-4 w-[30%]">NAME</th>
+                  <th className="py-3 px-4 w-[20%]">RATE PER MONTH</th>
+                  <th className="py-3 px-4 w-[15%]">DEDUCTIONS</th>
+                  <th className="py-3 px-4 w-[15%]">PAY DATE</th>
+                  <th className="py-3 px-4 w-[10%]">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="text-white">
                 {currentEmployees.map((item) => (
                   <tr key={item.id} className="border-b border-white/10">
                     <td className="py-3 px-4 truncate">{item.id}</td>
-                    <td className="py-3 px-4 truncate">{item.name}</td>
+                    <td className="py-3 px-4">
+                      <div className="truncate max-w-full" title={item.name}>
+                        {item.name}
+                      </div>
+                    </td>
                     <td className="py-3 px-4 truncate">₱{item.rate_per_month}</td>
                     <td className="py-3 px-4 truncate">₱{item.deductions}</td>
                     <td className="py-3 px-4 truncate">{item.pay_date}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 whitespace-nowrap">
                       <button
                         onClick={() => handleEditClick(item)}
                         className="bg-[#5C7346] text-white px-4 py-1 rounded-md hover:bg-[#4a5c38] transition-colors"
@@ -193,7 +197,7 @@ function AdminEmployeePayrollPage() {
                 Previous
               </button>
               <button className="bg-white text-[#5C7346] px-4 py-2 rounded-md">
-                {currentPage}
+                {currentPage} of {totalPages}
               </button>
               <button
                 onClick={nextPage}
