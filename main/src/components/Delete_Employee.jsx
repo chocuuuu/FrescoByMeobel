@@ -8,7 +8,12 @@ export default function DeleteEmployee({ isOpen, onClose, onConfirm, employeeNam
       <div className="bg-white rounded-lg w-full max-w-md p-6">
         <h2 className="text-xl font-semibold mb-4">Confirm Delete</h2>
         <p className="text-gray-600 mb-4 text-center">Are you sure you want to delete</p>
-        <p className="text-xl font-bold text-red-600 text-center truncate max-w-full">{employeeName}?</p>
+        <p
+          className="text-xl font-bold text-red-600 text-center overflow-hidden text-ellipsis whitespace-nowrap max-w-full"
+          title={employeeName}
+        >
+          {employeeName}?
+        </p>
         <p className="text-gray-600 my-4 text-center">This action cannot be undone.</p>
 
         <div className="flex justify-end space-x-4">

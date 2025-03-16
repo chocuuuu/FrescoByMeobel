@@ -253,7 +253,7 @@ function AdminEmployeePage() {
 
           {/* Employee Table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full">
+            <table className="min-w-full table-fixed">
               <thead>
                 <tr className="text-left text-white border-b border-white/20">
                   <th className="py-3 px-4 w-[10%]">ID</th>
@@ -268,24 +268,36 @@ function AdminEmployeePage() {
               <tbody className="text-white">
                 {currentEmployees.map((employee) => (
                   <tr key={employee.id} className="border-b border-white/10">
-                    <td className="py-3 px-4 truncate">{employee.employee_number}</td>
-                    <td className="py-3 px-4">
-                      <div className="truncate max-w-full" title={`${employee.first_name} ${employee.last_name}`}>
-                        {`${employee.first_name} ${employee.last_name}`}
-                      </div>
+                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                      {employee.employee_number}
                     </td>
-                    <td className="py-3 px-4 truncate">{employee.position}</td>
-                    <td className="py-3 px-4 truncate">{getYearFromDate(employee.hire_date)}</td>
+                    <td
+                      className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap"
+                      title={`${employee.first_name} ${employee.last_name}`}
+                    >
+                      {(() => {
+                        const fullName = `${employee.first_name} ${employee.last_name}`
+                        return fullName.length > 60 ? fullName.substring(0, 57) + "..." : fullName
+                      })()}
+                    </td>
+                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap" title={employee.position}>
+                      {employee.position}
+                    </td>
+                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                      {getYearFromDate(employee.hire_date)}
+                    </td>
 
                     {/* Show Year Resigned only for inactive employees */}
                     {activeTab === "inactive" && (
-                      <td className="py-3 px-4 truncate">{getYearFromDate(employee.inactive_date) || "-"}</td>
+                      <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {getYearFromDate(employee.inactive_date) || "-"}
+                      </td>
                     )}
 
                     {/* Status column - only for active tab */}
                     {activeTab === "active" && (
                       <td className="py-3 px-4">
-                        <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full font-medium whitespace-nowrap">
+                        <span className="px-4 py-1 bg-green-100 text-green-800 rounded-full font-medium whitespace-nowrap">
                           Active
                         </span>
                       </td>

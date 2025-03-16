@@ -155,15 +155,15 @@ function AdminEmployeePayrollPage() {
               <tbody className="text-white">
                 {currentEmployees.map((item) => (
                   <tr key={item.id} className="border-b border-white/10">
-                    <td className="py-3 px-4 truncate">{item.id}</td>
-                    <td className="py-3 px-4">
-                      <div className="truncate max-w-full" title={item.name}>
-                        {item.name}
-                      </div>
+                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">{item.id}</td>
+                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap" title={item.name}>
+                      {item.name.length > 50 ? item.name.substring(0, 47) + "..." : item.name}
                     </td>
-                    <td className="py-3 px-4 truncate">₱{item.rate_per_month}</td>
-                    <td className="py-3 px-4 truncate">₱{item.deductions}</td>
-                    <td className="py-3 px-4 truncate">{item.pay_date}</td>
+                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                      ₱{item.rate_per_month}
+                    </td>
+                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">₱{item.deductions}</td>
+                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">{item.pay_date}</td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <button
                         onClick={() => handleEditClick(item)}
