@@ -1,6 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
+// or keep using Calendar if you prefer
+// import SimpleDatePicker from "./SimpleDatePicker"
+// Update the import statement to use Calendar instead of DatePickerComponent
+import Calendar from "./Calendar"
+import dayjs from "dayjs"
 
 function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
   // Initial form state with flattened structure
@@ -176,6 +181,14 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
     }
   }
 
+  // Handle date changes
+  const handleDateChange = (name, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
   if (!isOpen || !employeeData) return null
 
   return (
@@ -303,16 +316,12 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Hire Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={formData.hire_date}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed pr-10"
-                    disabled
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  </div>
-                </div>
+                <Calendar
+                  label="Hire Date"
+                  value={formData.hire_date}
+                  onChange={(value) => handleDateChange("hire_date", value)}
+                  disabled={true}
+                />
               </div>
             </div>
           </div>
@@ -323,18 +332,12 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Birth Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    name="birth_date"
-                    value={formData.birth_date}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed pr-10"
-                    disabled
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  </div>
-                </div>
+                <Calendar
+                  label="Birth Date"
+                  value={formData.birth_date}
+                  onChange={(value) => handleDateChange("birth_date", value)}
+                  maxDate={dayjs().format("YYYY-MM-DD")}
+                />
               </div>
 
               <div className="space-y-1">
