@@ -16,8 +16,9 @@ function AdminEmployeeEditSchedulePage() {
   const [error, setError] = useState(null)
 
   // State for calendar and schedule
-  const [currentDate, setCurrentDate] = useState(dayjs("2025-04-01"))
-  const [selectedDate, setSelectedDate] = useState(dayjs("2025-04-06"))
+  const currentMonthYear = dayjs().format("MMMM YYYY")
+  const [currentDate, setCurrentDate] = useState(dayjs())
+  const [selectedDate, setSelectedDate] = useState(dayjs())
   const [schedule, setSchedule] = useState({
     id: null,
     user_id: Number.parseInt(employeeId),
@@ -497,17 +498,22 @@ function AdminEmployeeEditSchedulePage() {
     <div className="min-h-screen bg-gray-50">
       <NavBar />
 
-      <div className="container mx-auto px-4 pt-8 pb-8 flex flex-col md:flex-row gap-6 mt-16">
+      <div className="container mx-auto px-2 sm:px-4 pt-8 pb-8 flex flex-col md:flex-row gap-4 md:gap-6 mt-16">
         {/* Calendar Section */}
-        <div className="bg-[#5C7346] rounded-lg p-6 flex-1">
-          <div className="text-white text-4xl font-bold mb-4 text-center">April 2025</div>
+        <div className="bg-[#5C7346] rounded-lg p-3 sm:p-4 md:p-6 flex-1">
+          <div className="text-white text-2xl sm:text-3xl md:text-4xl font-bold mb-2 md:mb-4 text-center">
+            {currentMonthYear}
+          </div>
 
           {/* Calendar Grid */}
-          <div className="grid grid-cols-7 gap-2">
+          <div className="grid grid-cols-7 gap-4">
             {/* Day Headers */}
-            {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
-              <div key={day} className="text-white text-center py-2 text-sm">
-                {day}
+            {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day, i) => (
+              <div key={day} className="text-white text-center py-2 text-xs sm:text-sm md:text-base lg:text-xl">
+                <span className="hidden md:inline">
+                  {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][i]}
+                </span>
+                <span className="md:hidden">{day}</span>
               </div>
             ))}
 
@@ -517,26 +523,28 @@ function AdminEmployeeEditSchedulePage() {
               const status = day.isCurrentMonth ? dayStatus[dateStr] : null
 
               return (
-                <div
+                    <div
                   key={index}
-                  className={`${getDayStatusColor(day)} rounded-lg h-14 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90 relative ${
+                  className={`${getDayStatusColor(day)} rounded-2xl h-20 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90 relative p-2 sm:p-2 md:p-3 ${
                     selectedDate && day.date.format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")
                       ? "ring-2 ring-white"
                       : ""
                   }`}
                   onClick={() => handleDayClick(day)}
                 >
-                  <span className="text-lg font-medium">{day.dayOfMonth}</span>
+                  <span className="text-sm sm:text-base md:text-lg font-medium">{day.dayOfMonth}</span>
 
                   {/* Event indicators */}
                   {day.isCurrentMonth && status && status !== "attended" && status !== "absent" && (
-                    <div className="absolute bottom-1 text-[8px] px-1 text-center">
-                      {status === "sickleave" && "sick leave"}
-                      {status === "specialholiday" && "special holiday"}
-                      {status === "regularholiday" && "regular holiday"}
-                      {status === "vacationleave" && "vacation leave"}
-                      {status === "nightdiff" && "night diff"}
-                      {status === "oncall" && "on call"}
+                    <div className="absolute bottom-1 left-0 right-0 text-center">
+                      <span className="text-[8px] md:text-[9px] lg:text-[10px] px-1 whitespace-nowrap overflow-hidden text-ellipsis inline-block max-w-full">
+                        {status === "sickleave" && "sick leave"}
+                        {status === "specialholiday" && "special holiday"}
+                        {status === "regularholiday" && "regular holiday"}
+                        {status === "vacationleave" && "vacation leave"}
+                        {status === "nightdiff" && "night diff"}
+                        {status === "oncall" && "on call"}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -545,24 +553,24 @@ function AdminEmployeeEditSchedulePage() {
           </div>
 
           {/* Legend */}
-          <div className="flex justify-center mt-4 space-x-6">
+          <div className="flex flex-wrap justify-center mt-4 gap-2 sm:gap-4 md:gap-6">
             <div className="flex items-center">
-              <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
-              <span className="text-white text-sm">Attended</span>
+              <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-green-500 mr-1 md:mr-2"></div>
+              <span className="text-white text-xs md:text-sm">Attended</span>
             </div>
             <div className="flex items-center">
-              <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
-              <span className="text-white text-sm">Absent</span>
+              <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-red-500 mr-1 md:mr-2"></div>
+              <span className="text-white text-xs md:text-sm">Absent</span>
             </div>
             <div className="flex items-center">
-              <div className="w-4 h-4 rounded-full bg-orange-400 mr-2"></div>
-              <span className="text-white text-sm">Events</span>
+              <div className="w-3 h-3 md:w-4 md:h-4 rounded-full bg-orange-400 mr-1 md:mr-2"></div>
+              <span className="text-white text-xs md:text-sm">Events</span>
             </div>
           </div>
         </div>
 
         {/* Employee Schedule Panel */}
-        <div className="bg-[#3A4D2B] rounded-lg p-6 md:w-80">
+        <div className="bg-[#3A4D2B] rounded-lg p-3 sm:p-4 md:p-6 w-full md:w-80">
           {/* Employee Info */}
           <div className="flex flex-col items-center mb-6">
             <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center mb-2">
@@ -583,11 +591,11 @@ function AdminEmployeeEditSchedulePage() {
           </div>
 
           {/* Schedule Section */}
-          <div className="mb-6">
+          <div className="mb-4 md:mb-6">
             <p className="text-sm font-bold mb-2 text-white">Schedule</p>
-            <div className="bg-[#A3BC84] rounded-md p-4">
+            <div className="bg-[#A3BC84] rounded-md p-3 md:p-4">
               <div className="flex justify-end mb-2">
-                <span className="text-white bg-[#5C7346] px-2 py-1 rounded-md text-xs">APR 15</span>
+                <span className="text-white bg-[#5C7346] px-2 py-1 rounded-md text-xs">{currentMonthYear}</span>
               </div>
               <div className="flex justify-between">
                 {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => {
@@ -595,7 +603,7 @@ function AdminEmployeeEditSchedulePage() {
                   return (
                     <div
                       key={day}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer ${
+                      className={`w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center cursor-pointer text-xs sm:text-sm ${
                         selectedDays[dayKey] ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"
                       }`}
                       onClick={() => handleDaySelection(dayKey)}
@@ -609,30 +617,30 @@ function AdminEmployeeEditSchedulePage() {
           </div>
 
           {/* Shifts Section */}
-          <div className="mb-6">
+          <div className="mb-4 md:mb-6">
             <p className="text-sm font-bold mb-2 text-white">Shifts</p>
-            <div className="bg-[#A3BC84] rounded-md p-4">
+            <div className="bg-[#A3BC84] rounded-md p-3 md:p-4">
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <button
                   className={`py-1 px-2 rounded text-xs ${selectedShift === "morning" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
                   onClick={() => handleShiftSelection("morning")}
                 >
-                  Morning
-                  <div className="text-[10px]">10 AM - 7 PM</div>
+                  <span className="block">Morning</span>
+                  <span className="text-[9px] md:text-[10px] block">10 AM - 7 PM</span>
                 </button>
                 <button
                   className={`py-1 px-2 rounded text-xs ${selectedShift === "midday" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
                   onClick={() => handleShiftSelection("midday")}
                 >
-                  Midday
-                  <div className="text-[10px]">12 PM - 9 PM</div>
+                  <span className="block">Midday</span>
+                  <span className="text-[9px] md:text-[10px] block">12 PM - 9 PM</span>
                 </button>
                 <button
                   className={`py-1 px-2 rounded text-xs ${selectedShift === "night" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
                   onClick={() => handleShiftSelection("night")}
                 >
-                  Night
-                  <div className="text-[10px]">7 PM - 11 PM</div>
+                  <span className="block">Night</span>
+                  <span className="text-[9px] md:text-[10px] block">7 PM - 11 PM</span>
                 </button>
                 <button
                   className={`py-1 px-2 rounded text-xs ${selectedShift === "custom" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
@@ -662,15 +670,15 @@ function AdminEmployeeEditSchedulePage() {
           </div>
 
           {/* Events Section */}
-          <div className="mb-6">
+          <div className="mb-4 md:mb-6">
             <p className="text-sm font-bold mb-2 text-white">Events</p>
-            <div className="bg-[#A3BC84] rounded-md p-4">
+            <div className="bg-[#A3BC84] rounded-md p-3 md:p-4">
               <div className="flex flex-col">
-                <div className="text-center mb-4">
-                  <div className="text-5xl font-bold text-white">{getEventLabel()}</div>
+                <div className="text-center mb-3 md:mb-4">
+                  <div className="text-3xl sm:text-4xl md:text-5xl font-bold text-white">{getEventLabel()}</div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 text-[10px] sm:text-xs">
                   <div className="flex items-center">
                     <input
                       type="radio"
