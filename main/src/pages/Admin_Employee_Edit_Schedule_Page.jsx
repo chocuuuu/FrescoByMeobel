@@ -6,7 +6,7 @@ import NavBar from "../components/Nav_Bar"
 import { ArrowLeft, User2 } from "lucide-react"
 import dayjs from "dayjs"
 
-function Admin_Employee_Edit_Schedule_Page() {
+function AdminEmployeeEditSchedulePage() {
   const { employeeId } = useParams()
   const navigate = useNavigate()
 
@@ -319,7 +319,7 @@ function Admin_Employee_Edit_Schedule_Page() {
 
   // Get status color for calendar day
   const getDayStatusColor = (day) => {
-    if (!day.isCurrentMonth) return "bg-gray-200 text-gray-400"
+    if (!day.isCurrentMonth) return "bg-white text-gray-400"
 
     const dateStr = day.date.format("YYYY-MM-DD")
     const status = dayStatus[dateStr]
@@ -375,328 +375,308 @@ function Admin_Employee_Edit_Schedule_Page() {
     <div className="min-h-screen bg-gray-50">
       <NavBar />
 
-      <div className="container mx-auto px-4 pt-24 pb-8">
-        <div className="bg-[#A7BC8F] rounded-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold text-white">Employee Schedule</h2>
-            {employee && (
-              <div className="text-white">
-                <span className="font-medium">
-                  {employee.first_name} {employee.last_name}
-                </span>{" "}
-                -<span className="ml-2">{employee.employee_number}</span>
+      <div className="container mx-auto px-4 pt-8 pb-8 flex flex-col md:flex-row gap-6 mt-16">
+        {/* Calendar Section */}
+        <div className="bg-[#5C7346] rounded-lg p-6 flex-1">
+          <div className="text-white text-4xl font-bold mb-4 text-center">{currentDate.format("MMMM YYYY")}</div>
+
+          {/* Calendar Grid */}
+          <div className="grid grid-cols-7 gap-2">
+            {/* Day Headers */}
+            {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
+              <div key={day} className="text-white text-center py-2 text-sm">
+                {day}
               </div>
-            )}
+            ))}
+
+            {/* Calendar Days */}
+            {calendarDays.map((day, index) => (
+              <div
+                key={index}
+                className={`${getDayStatusColor(day)} rounded-lg h-14 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90 relative`}
+                onClick={() => handleDayClick(day)}
+              >
+                <span className="text-lg font-medium">{day.dayOfMonth}</span>
+
+                {/* Event indicators */}
+                {day.isCurrentMonth &&
+                  dayStatus[day.date.format("YYYY-MM-DD")] &&
+                  dayStatus[day.date.format("YYYY-MM-DD")] !== "attended" &&
+                  dayStatus[day.date.format("YYYY-MM-DD")] !== "absent" && (
+                    <div className="absolute bottom-1 text-[8px] px-1 text-center">
+                      {dayStatus[day.date.format("YYYY-MM-DD")] === "sickleave" && "sick leave"}
+                      {dayStatus[day.date.format("YYYY-MM-DD")] === "specialholiday" && "special holiday"}
+                      {dayStatus[day.date.format("YYYY-MM-DD")] === "regularholiday" && "regular holiday"}
+                      {dayStatus[day.date.format("YYYY-MM-DD")] === "vacationleave" && "vacation leave"}
+                      {dayStatus[day.date.format("YYYY-MM-DD")] === "nightdiff" && "night diff"}
+                      {dayStatus[day.date.format("YYYY-MM-DD")] === "oncall" && "on call"}
+                    </div>
+                  )}
+              </div>
+            ))}
           </div>
 
-          <div className="flex flex-col md:flex-row gap-6">
-            {/* Calendar Section */}
-            <div className="bg-[#5C7346] rounded-lg p-6 flex-1">
-              <div className="text-white text-4xl font-bold mb-4">{currentDate.format("MMMM YYYY")}</div>
-
-              {/* Calendar Grid */}
-              <div className="grid grid-cols-7 gap-2">
-                {/* Day Headers */}
-                {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
-                  <div key={day} className="text-white text-center py-2 text-sm">
-                    {day}
-                  </div>
-                ))}
-
-                {/* Calendar Days */}
-                {calendarDays.map((day, index) => (
-                  <div
-                    key={index}
-                    className={`${getDayStatusColor(day)} rounded-lg h-16 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90 relative ${
-                      selectedDate && day.date.format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")
-                        ? "ring-2 ring-white"
-                        : ""
-                    }`}
-                    onClick={() => handleDayClick(day)}
-                  >
-                    <span className="text-lg font-medium">{day.dayOfMonth}</span>
-
-                    {/* Event indicators */}
-                    {day.isCurrentMonth &&
-                      dayStatus[day.date.format("YYYY-MM-DD")] &&
-                      dayStatus[day.date.format("YYYY-MM-DD")] !== "attended" &&
-                      dayStatus[day.date.format("YYYY-MM-DD")] !== "absent" && (
-                        <div className="absolute bottom-1 text-[9px] px-1 text-center">
-                          {dayStatus[day.date.format("YYYY-MM-DD")] === "sickleave" && "sick leave"}
-                          {dayStatus[day.date.format("YYYY-MM-DD")] === "specialholiday" && "special holiday"}
-                          {dayStatus[day.date.format("YYYY-MM-DD")] === "regularholiday" && "regular holiday"}
-                          {dayStatus[day.date.format("YYYY-MM-DD")] === "vacationleave" && "vacation leave"}
-                          {dayStatus[day.date.format("YYYY-MM-DD")] === "nightdiff" && "night diff"}
-                          {dayStatus[day.date.format("YYYY-MM-DD")] === "oncall" && "on call"}
-                        </div>
-                      )}
-                  </div>
-                ))}
-              </div>
-
-              {/* Legend */}
-              <div className="flex justify-center mt-4 space-x-6">
-                <div className="flex items-center">
-                  <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
-                  <span className="text-white text-sm">Attended</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
-                  <span className="text-white text-sm">Absent</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-4 h-4 rounded-full bg-orange-400 mr-2"></div>
-                  <span className="text-white text-sm">Events</span>
-                </div>
-              </div>
+          {/* Legend */}
+          <div className="flex justify-center mt-4 space-x-6">
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded-full bg-green-500 mr-2"></div>
+              <span className="text-white text-sm">Attended</span>
             </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded-full bg-red-500 mr-2"></div>
+              <span className="text-white text-sm">Absent</span>
+            </div>
+            <div className="flex items-center">
+              <div className="w-4 h-4 rounded-full bg-orange-400 mr-2"></div>
+              <span className="text-white text-sm">Events</span>
+            </div>
+          </div>
+        </div>
 
-            {/* Employee Schedule Panel */}
-            <div className="bg-[#5C7346] rounded-lg p-6 md:w-80">
-              {/* Employee Info */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center mb-2">
-                  {employee?.profile_picture ? (
-                    <img
-                      src={employee.profile_picture || "/placeholder.svg"}
-                      alt={`${employee.first_name} ${employee.last_name}`}
-                      className="h-full w-full object-cover rounded-full"
-                    />
-                  ) : (
-                    <User2 className="h-10 w-10" style={{ color: "#42573C" }} />
-                  )}
-                </div>
-                <h3 className="text-lg font-bold text-white">
-                  {employee?.first_name} {employee?.last_name}
-                </h3>
-                <p className="text-sm text-white">{employee?.employee_number}</p>
+        {/* Employee Schedule Panel */}
+        <div className="bg-[#3A4D2B] rounded-lg p-6 md:w-80">
+          {/* Employee Info */}
+          <div className="flex flex-col items-center mb-6">
+            <div className="h-16 w-16 bg-white rounded-full flex items-center justify-center mb-2">
+              {employee?.profile_picture ? (
+                <img
+                  src={employee.profile_picture || "/placeholder.svg"}
+                  alt={`${employee.first_name} ${employee.last_name}`}
+                  className="h-full w-full object-cover rounded-full"
+                />
+              ) : (
+                <User2 className="h-10 w-10" style={{ color: "#42573C" }} />
+              )}
+            </div>
+            <h3 className="text-lg font-bold text-white">
+              {employee?.first_name} {employee?.last_name}
+            </h3>
+            <p className="text-sm text-white">{employee?.employee_number}</p>
+          </div>
+
+          {/* Schedule Section */}
+          <div className="mb-6">
+            <p className="text-sm font-bold mb-2 text-white">Schedule</p>
+            <div className="bg-[#A3BC84] rounded-md p-4">
+              <div className="flex justify-end mb-2">
+                <span className="text-white bg-[#5C7346] px-2 py-1 rounded-md text-xs">APR 15</span>
               </div>
-
-              {/* Schedule Section */}
-              <div className="mb-6">
-                <p className="text-sm font-bold mb-2 text-white">Schedule</p>
-                <div className="bg-[#A3BC84] rounded-md p-4">
-                  <div className="flex justify-between mb-2">
-                    <span className="text-white">APR 15</span>
-                  </div>
-                  <div className="flex justify-between">
-                    {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => {
-                      const dayKey = index === 4 ? "T2" : index === 6 ? "S2" : day
-                      return (
-                        <div
-                          key={day}
-                          className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer ${
-                            selectedDays[dayKey] ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"
-                          }`}
-                          onClick={() => handleDaySelection(dayKey)}
-                        >
-                          {day}
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Shifts Section */}
-              <div className="mb-6">
-                <p className="text-sm font-bold mb-2 text-white">Shifts</p>
-                <div className="bg-[#A3BC84] rounded-md p-4">
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <button
-                      className={`py-1 px-2 rounded text-xs ${selectedShift === "morning" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
-                      onClick={() => handleShiftSelection("morning")}
-                    >
-                      Morning
-                      <div className="text-[10px]">10 AM - 7 PM</div>
-                    </button>
-                    <button
-                      className={`py-1 px-2 rounded text-xs ${selectedShift === "midday" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
-                      onClick={() => handleShiftSelection("midday")}
-                    >
-                      Midday
-                      <div className="text-[10px]">12 PM - 9 PM</div>
-                    </button>
-                    <button
-                      className={`py-1 px-2 rounded text-xs ${selectedShift === "night" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
-                      onClick={() => handleShiftSelection("night")}
-                    >
-                      Night
-                      <div className="text-[10px]">7 PM - 11 PM</div>
-                    </button>
-                    <button
-                      className={`py-1 px-2 rounded text-xs ${selectedShift === "custom" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
-                      onClick={() => handleShiftSelection("custom")}
-                    >
-                      Custom
-                    </button>
-                  </div>
-
-                  {selectedShift === "custom" && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        value={customShiftStart}
-                        onChange={(e) => setCustomShiftStart(e.target.value)}
-                        className="py-1 px-2 rounded text-xs bg-white text-[#5C7346]"
-                      />
-                      <input
-                        type="text"
-                        value={customShiftEnd}
-                        onChange={(e) => setCustomShiftEnd(e.target.value)}
-                        className="py-1 px-2 rounded text-xs bg-white text-[#5C7346]"
-                      />
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Events Section */}
-              <div className="mb-6">
-                <p className="text-sm font-bold mb-2 text-white">Events</p>
-                <div className="bg-[#A3BC84] rounded-md p-4">
-                  <div className="flex flex-col">
-                    <div className="text-center mb-4">
-                      <div className="text-5xl font-bold text-white">{selectedDate ? getEventLabel() : "-"}</div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="regularHoliday"
-                          name="eventType"
-                          className="mr-1"
-                          checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "regularholiday"}
-                          onChange={() => handleEventSelection("regularholiday")}
-                          disabled={!selectedDate}
-                        />
-                        <label htmlFor="regularHoliday" className="text-white">
-                          Regular Holiday
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="sickLeave"
-                          name="eventType"
-                          className="mr-1"
-                          checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "sickleave"}
-                          onChange={() => handleEventSelection("sickleave")}
-                          disabled={!selectedDate}
-                        />
-                        <label htmlFor="sickLeave" className="text-white">
-                          Sick leave
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="specialHoliday"
-                          name="eventType"
-                          className="mr-1"
-                          checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "specialholiday"}
-                          onChange={() => handleEventSelection("specialholiday")}
-                          disabled={!selectedDate}
-                        />
-                        <label htmlFor="specialHoliday" className="text-white">
-                          Special Holiday
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="onCall"
-                          name="eventType"
-                          className="mr-1"
-                          checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "oncall"}
-                          onChange={() => handleEventSelection("oncall")}
-                          disabled={!selectedDate}
-                        />
-                        <label htmlFor="onCall" className="text-white">
-                          Oncall
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="restDay"
-                          name="eventType"
-                          className="mr-1"
-                          checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "absent"}
-                          onChange={() => handleEventSelection("absent")}
-                          disabled={!selectedDate}
-                        />
-                        <label htmlFor="restDay" className="text-white">
-                          Rest Day
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="nightDiff"
-                          name="eventType"
-                          className="mr-1"
-                          checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "nightdiff"}
-                          onChange={() => handleEventSelection("nightdiff")}
-                          disabled={!selectedDate}
-                        />
-                        <label htmlFor="nightDiff" className="text-white">
-                          Nightdiff
-                        </label>
-                      </div>
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="vacationLeave"
-                          name="eventType"
-                          className="mr-1"
-                          checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "vacationleave"}
-                          onChange={() => handleEventSelection("vacationleave")}
-                          disabled={!selectedDate}
-                        />
-                        <label htmlFor="vacationLeave" className="text-white">
-                          Vacation Leave
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
               <div className="flex justify-between">
-                <button
-                  className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
-                  onClick={() => navigate(`/payslip?employeeId=${employeeId}`)}
-                >
-                  Payslip
-                </button>
-                <button
-                  className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
-                  onClick={handleSaveSchedule}
-                >
-                  Confirm
-                </button>
+                {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => {
+                  const dayKey = index === 4 ? "T2" : index === 6 ? "S2" : day
+                  return (
+                    <div
+                      key={day}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center cursor-pointer ${
+                        selectedDays[dayKey] ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"
+                      }`}
+                      onClick={() => handleDaySelection(dayKey)}
+                    >
+                      {day}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
 
-          {/* Back Button */}
-          <div className="mt-6">
+          {/* Shifts Section */}
+          <div className="mb-6">
+            <p className="text-sm font-bold mb-2 text-white">Shifts</p>
+            <div className="bg-[#A3BC84] rounded-md p-4">
+              <div className="grid grid-cols-2 gap-2 mb-2">
+                <button
+                  className={`py-1 px-2 rounded text-xs ${selectedShift === "morning" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
+                  onClick={() => handleShiftSelection("morning")}
+                >
+                  Morning
+                  <div className="text-[10px]">10 AM - 7 PM</div>
+                </button>
+                <button
+                  className={`py-1 px-2 rounded text-xs ${selectedShift === "midday" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
+                  onClick={() => handleShiftSelection("midday")}
+                >
+                  Midday
+                  <div className="text-[10px]">12 PM - 9 PM</div>
+                </button>
+                <button
+                  className={`py-1 px-2 rounded text-xs ${selectedShift === "night" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
+                  onClick={() => handleShiftSelection("night")}
+                >
+                  Night
+                  <div className="text-[10px]">7 PM - 11 PM</div>
+                </button>
+                <button
+                  className={`py-1 px-2 rounded text-xs ${selectedShift === "custom" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
+                  onClick={() => handleShiftSelection("custom")}
+                >
+                  Custom
+                </button>
+              </div>
+
+              {selectedShift === "custom" && (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={customShiftStart}
+                    onChange={(e) => setCustomShiftStart(e.target.value)}
+                    className="py-1 px-2 rounded text-xs bg-white text-[#5C7346]"
+                  />
+                  <input
+                    type="text"
+                    value={customShiftEnd}
+                    onChange={(e) => setCustomShiftEnd(e.target.value)}
+                    className="py-1 px-2 rounded text-xs bg-white text-[#5C7346]"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Events Section */}
+          <div className="mb-6">
+            <p className="text-sm font-bold mb-2 text-white">Events</p>
+            <div className="bg-[#A3BC84] rounded-md p-4">
+              <div className="flex flex-col">
+                <div className="text-center mb-4">
+                  <div className="text-5xl font-bold text-white">{selectedDate ? selectedDate.format("D") : "6"}</div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="regularHoliday"
+                      name="eventType"
+                      className="mr-1"
+                      checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "regularholiday"}
+                      onChange={() => handleEventSelection("regularholiday")}
+                      disabled={!selectedDate}
+                    />
+                    <label htmlFor="regularHoliday" className="text-white">
+                      Regular Holiday
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="sickLeave"
+                      name="eventType"
+                      className="mr-1"
+                      checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "sickleave"}
+                      onChange={() => handleEventSelection("sickleave")}
+                      disabled={!selectedDate}
+                    />
+                    <label htmlFor="sickLeave" className="text-white">
+                      Sick leave
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="specialHoliday"
+                      name="eventType"
+                      className="mr-1"
+                      checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "specialholiday"}
+                      onChange={() => handleEventSelection("specialholiday")}
+                      disabled={!selectedDate}
+                    />
+                    <label htmlFor="specialHoliday" className="text-white">
+                      Special Holiday
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="onCall"
+                      name="eventType"
+                      className="mr-1"
+                      checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "oncall"}
+                      onChange={() => handleEventSelection("oncall")}
+                      disabled={!selectedDate}
+                    />
+                    <label htmlFor="onCall" className="text-white">
+                      Oncall
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="restDay"
+                      name="eventType"
+                      className="mr-1"
+                      checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "absent"}
+                      onChange={() => handleEventSelection("absent")}
+                      disabled={!selectedDate}
+                    />
+                    <label htmlFor="restDay" className="text-white">
+                      Rest Day
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="nightDiff"
+                      name="eventType"
+                      className="mr-1"
+                      checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "nightdiff"}
+                      onChange={() => handleEventSelection("nightdiff")}
+                      disabled={!selectedDate}
+                    />
+                    <label htmlFor="nightDiff" className="text-white">
+                      Nightdiff
+                    </label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      id="vacationLeave"
+                      name="eventType"
+                      className="mr-1"
+                      checked={selectedDate && dayStatus[selectedDate.format("YYYY-MM-DD")] === "vacationleave"}
+                      onChange={() => handleEventSelection("vacationleave")}
+                      disabled={!selectedDate}
+                    />
+                    <label htmlFor="vacationLeave" className="text-white">
+                      Vacation Leave
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-between">
             <button
-              className="flex items-center gap-2 bg-[#373A45] text-white px-6 py-2 rounded-md hover:bg-gray-700 transition-colors"
-              onClick={() => navigate(-1)}
+              className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+              onClick={() => navigate(`/payslip?employeeId=${employeeId}`)}
             >
-              <ArrowLeft className="w-4 h-4" />
-              Back
+              Payslip
+            </button>
+            <button
+              className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+              onClick={handleSaveSchedule}
+            >
+              Confirm
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Back Button */}
+      <div className="container mx-auto px-4 pb-8">
+        <button
+          className="flex items-center gap-2 bg-[#373A45] text-white px-6 py-2 rounded-md hover:bg-gray-700 transition-colors"
+          onClick={() => navigate(-1)}
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </button>
       </div>
     </div>
   )
 }
 
-export default Admin_Employee_Edit_Schedule_Page
+export default AdminEmployeeEditSchedulePage
 
