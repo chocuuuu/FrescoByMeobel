@@ -1227,7 +1227,7 @@ function AdminEmployeeEditSchedulePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 text-[10px] sm:text-xs">
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="regularHoliday"
                       name="eventType"
                       className="mr-1"
@@ -1241,7 +1241,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="sickLeave"
                       name="eventType"
                       className="mr-1"
@@ -1255,7 +1255,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="specialHoliday"
                       name="eventType"
                       className="mr-1"
@@ -1269,7 +1269,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="onCall"
                       name="eventType"
                       className="mr-1"
@@ -1283,7 +1283,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="restDay"
                       name="eventType"
                       className="mr-1"
@@ -1297,7 +1297,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="nightDiff"
                       name="eventType"
                       className="mr-1"
@@ -1311,7 +1311,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="vacationLeave"
                       name="eventType"
                       className="mr-1"
