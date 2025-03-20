@@ -327,8 +327,6 @@ function AdminEmployeeEditSchedulePage() {
       if (day.isCurrentMonth) {
         const dateStr = day.date.format("YYYY-MM-DD")
         const dayOfWeek = day.date.format("dddd")
-        const isToday = day.date.isSame(dayjs(), "day")
-        const isFuture = day.date.isAfter(dayjs(), "day")
 
         // Check if the day is in any of the special categories
         if (schedule.sickleave === dateStr) {
@@ -346,14 +344,9 @@ function AdminEmployeeEditSchedulePage() {
         } else {
           // Default status based on whether it's a working day
           if (schedule.days?.includes(dayOfWeek)) {
-            // Only mark as attended/absent for past days
-            if (isToday || isFuture) {
-              newDayStatus[dateStr] = "unselected" // Keep future days neutral
-            } else {
-              newDayStatus[dateStr] = "absent" // Only past days can be marked absent by default
-            }
+            newDayStatus[dateStr] = "attended"
           } else {
-            newDayStatus[dateStr] = "unselected"
+            newDayStatus[dateStr] = "absent"
           }
         }
       }
@@ -655,19 +648,10 @@ function AdminEmployeeEditSchedulePage() {
 
   // Get status color for calendar day
   const getDayStatusColor = (day) => {
-    if (!day.isCurrentMonth) return "bg-gray-100 text-gray-400 cursor-default pointer-events-none"
+    if (!day.isCurrentMonth) return "bg-gray-300 text-gray-600 cursor-default pointer-events-none"
 
     const dateStr = day.date.format("YYYY-MM-DD")
     const status = dayStatus[dateStr]
-
-    // Check if this is a future date
-    const isToday = day.date.isSame(dayjs(), "day")
-    const isFuture = day.date.isAfter(dayjs(), "day")
-
-    // For future dates or today, don't show as absent unless explicitly set
-    if ((isToday || isFuture) && status === "absent") {
-      return "bg-white" // Keep future days white
-    }
 
     switch (status) {
       case "attended":
@@ -806,13 +790,11 @@ function AdminEmployeeEditSchedulePage() {
         // Update day status based on attendance
         const newDayStatus = { ...dayStatus }
 
-        // Mark all working days as absent by default (but only past days)
+        // Mark all working days as absent by default
         calendarDays.forEach((day) => {
           if (day.isCurrentMonth) {
             const dateStr = day.date.format("YYYY-MM-DD")
             const dayOfWeek = day.date.format("dddd")
-            const isToday = day.date.isSame(dayjs(), "day")
-            const isFuture = day.date.isAfter(dayjs(), "day")
 
             // If it's a working day according to the schedule
             if (schedule.days?.includes(dayOfWeek)) {
@@ -825,8 +807,7 @@ function AdminEmployeeEditSchedulePage() {
                 (schedule.oncall && schedule.oncall.includes(dateStr)) ||
                 (schedule.vacationleave && schedule.vacationleave.includes(dateStr))
 
-              // Only mark past days as absent
-              if (!hasSpecialStatus && !isToday && !isFuture) {
+              if (!hasSpecialStatus) {
                 newDayStatus[dateStr] = "absent"
               }
             }
@@ -984,9 +965,6 @@ function AdminEmployeeEditSchedulePage() {
           <div className="mb-4 md:mb-6">
             <p className="text-sm font-bold mb-2 text-white">Shifts</p>
             <div className="bg-[#A3BC84] rounded-md p-3 md:p-4">
-              <div className="flex justify-end mb-2">
-                <span className="text-white bg-[#5C7346] px-2 py-1 rounded-md text-xs">{currentMonthYear}</span>
-              </div>
               <div className="grid grid-cols-2 gap-2 mb-2">
                 <button
                   className={`py-1 px-2 rounded text-xs ${selectedShift === "morning" ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"}`}
@@ -1048,7 +1026,7 @@ function AdminEmployeeEditSchedulePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-2 text-[10px] sm:text-xs">
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="regularHoliday"
                       name="eventType"
                       className="mr-1"
@@ -1062,7 +1040,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="sickLeave"
                       name="eventType"
                       className="mr-1"
@@ -1076,7 +1054,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="specialHoliday"
                       name="eventType"
                       className="mr-1"
@@ -1090,7 +1068,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="onCall"
                       name="eventType"
                       className="mr-1"
@@ -1104,7 +1082,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="restDay"
                       name="eventType"
                       className="mr-1"
@@ -1118,7 +1096,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="nightDiff"
                       name="eventType"
                       className="mr-1"
@@ -1132,7 +1110,7 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
                   <div className="flex items-center">
                     <input
-                      type="radio"
+                      type="checkbox"
                       id="vacationLeave"
                       name="eventType"
                       className="mr-1"
