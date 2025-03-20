@@ -349,7 +349,7 @@ function AdminEmployeeEditSchedulePage() {
   }, []);
 
    // Fetch schedule data
-   useEffect(() => {
+  useEffect(() => {
     const fetchScheduleData = async () => {
       try {
         // Reset schedule state first to avoid showing previous employee's data
@@ -542,8 +542,6 @@ function AdminEmployeeEditSchedulePage() {
       if (day.isCurrentMonth) {
         const dateStr = day.date.format("YYYY-MM-DD");
         const dayOfWeek = day.date.format("dddd");
-        const isToday = day.date.isSame(dayjs(), "day")
-        const isFuture = day.date.isAfter(dayjs(), "day")
 
         // Check if the day is in any of the special categories
         if (schedule.sickleave === dateStr) {
@@ -561,14 +559,9 @@ function AdminEmployeeEditSchedulePage() {
         } else {
           // Default status based on whether it's a working day
           if (schedule.days?.includes(dayOfWeek)) {
-            // Only mark as attended/absent for past days
-            if (isToday || isFuture) {
-              newDayStatus[dateStr] = "unselected" // Keep future days neutral
-            } else {
-              newDayStatus[dateStr] = "absent" // Only past days can be marked absent by default
-            }
+            newDayStatus[dateStr] = "attended";
           } else {
-            newDayStatus[dateStr] = "unselected"
+            newDayStatus[dateStr] = "absent";
           }
         }
       }
@@ -588,12 +581,6 @@ function AdminEmployeeEditSchedulePage() {
   const handleDaySelection = async (day) => {
     // Prevent multiple operations at once
     if (isProcessingShifts) return;
-
-    // Check if a shift type is selected
-    if (!selectedShift) {
-      alert("Please select a shift type first");
-      return;
-    }
 
     setIsProcessingShifts(true);
 
