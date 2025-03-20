@@ -21,7 +21,7 @@ function AdminEmployeeEditSchedulePage() {
   const [selectedDate, setSelectedDate] = useState(dayjs())
   const [schedule, setSchedule] = useState({
     id: null,
-    user_id: Number.parseInt(employeeId),
+    user_id: null, // We'll set this after fetching employee data
     shift_ids: [],
     days: [],
     sickleave: null,
@@ -35,17 +35,17 @@ function AdminEmployeeEditSchedulePage() {
     bi_weekly_start: "",
   })
 
-  // State for selected days and shifts
+  // State for selected days and shifts - start with none selected
   const [selectedDays, setSelectedDays] = useState({
     S: false,
-    M: true,
-    T: true,
-    W: true,
-    T2: true,
-    F: true,
+    M: false,
+    T: false,
+    W: false,
+    T2: false,
+    F: false,
     S2: false,
   })
-  const [selectedShift, setSelectedShift] = useState("morning")
+  const [selectedShift, setSelectedShift] = useState("")
   const [customShiftStart, setCustomShiftStart] = useState("8:00 AM")
   const [customShiftEnd, setCustomShiftEnd] = useState("5:00 PM")
 
@@ -53,6 +53,9 @@ function AdminEmployeeEditSchedulePage() {
   const [calendarDays, setCalendarDays] = useState([])
   const [dayStatus, setDayStatus] = useState({})
   const [shifts, setShifts] = useState([])
+
+  // State to track if we're currently processing shifts to prevent duplicates
+  const [isProcessingShifts, setIsProcessingShifts] = useState(false)
 
   // Fetch employee data
   useEffect(() => {
@@ -73,6 +76,12 @@ function AdminEmployeeEditSchedulePage() {
 
         const data = await response.json()
         setEmployee(data)
+
+        // Update schedule with the correct user_id
+        setSchedule((prev) => ({
+          ...prev,
+          user_id: data.user?.id || null,
+        }))
       } catch (error) {
         console.error("Error fetching employee:", error)
         setError(error.message)
@@ -117,7 +126,7 @@ function AdminEmployeeEditSchedulePage() {
         // Reset schedule state first to avoid showing previous employee's data
         setSchedule({
           id: null,
-          user_id: Number.parseInt(employeeId),
+          user_id: employee?.user?.id || null,
           shift_ids: [],
           days: [],
           sickleave: null,
@@ -131,7 +140,7 @@ function AdminEmployeeEditSchedulePage() {
           bi_weekly_start: "",
         })
 
-        // Reset selected days
+        // Reset selected days to none selected
         setSelectedDays({
           S: false,
           M: false,
@@ -141,6 +150,9 @@ function AdminEmployeeEditSchedulePage() {
           F: false,
           S2: false,
         })
+
+        // Reset selected shift
+        setSelectedShift("")
 
         const accessToken = localStorage.getItem("access_token")
         console.log(`Fetching schedule for employee ID: ${employeeId}`)
@@ -160,7 +172,7 @@ function AdminEmployeeEditSchedulePage() {
             const scheduleData = data[0]
 
             // Verify this schedule belongs to the current employee
-            if (scheduleData.user_id === Number.parseInt(employeeId)) {
+            if (scheduleData.user_id === Number.parseInt(employeeId) || scheduleData.user_id === employee?.user?.id) {
               setSchedule(scheduleData)
 
               // Set selected days based on schedule
@@ -191,6 +203,45 @@ function AdminEmployeeEditSchedulePage() {
               })
 
               setSelectedDays(newSelectedDays)
+
+              // Determine shift type based on shift_ids
+              if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
+                // Fetch the first shift to determine the type
+                try {
+                  const shiftResponse = await fetch(
+                    `http://localhost:8000/api/v1/shift/${scheduleData.shift_ids[0]}/`,
+                    {
+                      headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        "Content-Type": "application/json",
+                      },
+                    },
+                  )
+
+                  if (shiftResponse.ok) {
+                    const shiftData = await shiftResponse.json()
+
+                    // Determine shift type based on start/end times
+                    const startTime = shiftData.shift_start
+                    const endTime = shiftData.shift_end
+
+                    if (startTime === "10:00:00" && endTime === "19:00:00") {
+                      setSelectedShift("morning")
+                    } else if (startTime === "12:00:00" && endTime === "21:00:00") {
+                      setSelectedShift("midday")
+                    } else if (startTime === "19:00:00" && endTime === "23:00:00") {
+                      setSelectedShift("night")
+                    } else {
+                      setSelectedShift("custom")
+                      // Convert 24h format to 12h format for display
+                      setCustomShiftStart(convertTimeFormatToTimeString(startTime))
+                      setCustomShiftEnd(convertTimeFormatToTimeString(endTime))
+                    }
+                  }
+                } catch (error) {
+                  console.error("Error fetching shift details:", error)
+                }
+              }
             } else {
               console.warn(`Received schedule for user_id ${scheduleData.user_id} but expected ${employeeId}`)
             }
@@ -203,10 +254,10 @@ function AdminEmployeeEditSchedulePage() {
       }
     }
 
-    if (employeeId) {
+    if (employeeId && employee) {
       fetchScheduleData()
     }
-  }, [employeeId])
+  }, [employeeId, employee])
 
   // Generate calendar days for the current month
   useEffect(() => {
@@ -298,16 +349,335 @@ function AdminEmployeeEditSchedulePage() {
   }
 
   // Handle day selection in schedule panel
-  const handleDaySelection = (day) => {
-    setSelectedDays((prev) => ({
-      ...prev,
-      [day]: !prev[day],
-    }))
+  const handleDaySelection = async (day) => {
+    // Prevent multiple operations at once
+    if (isProcessingShifts) return
+
+    // Check if a shift type is selected
+    if (!selectedShift) {
+      alert("Please select a shift type first")
+      return
+    }
+
+    setIsProcessingShifts(true)
+
+    try {
+      const newSelectedDays = {
+        ...selectedDays,
+        [day]: !selectedDays[day],
+      }
+
+      setSelectedDays(newSelectedDays)
+
+      // Get the day name from the key
+      const dayName = {
+        S: "Sunday",
+        M: "Monday",
+        T: "Tuesday",
+        W: "Wednesday",
+        T2: "Thursday",
+        F: "Friday",
+        S2: "Saturday",
+      }[day]
+
+      // If the day is being selected (not deselected)
+      if (!selectedDays[day]) {
+        // Generate shifts for all instances of this day in the current month
+        await generateShiftsForDay(dayName)
+      } else {
+        // Remove this day from the schedule
+        await removeShiftsForDay(dayName)
+      }
+
+      // Update calendar colors for all instances of this day
+      const newDayStatus = { ...dayStatus }
+      calendarDays.forEach((calDay) => {
+        if (calDay.isCurrentMonth) {
+          const dateStr = calDay.date.format("YYYY-MM-DD")
+          const dayOfWeek = calDay.date.format("dddd")
+          const dayKey = {
+            Sunday: "S",
+            Monday: "M",
+            Tuesday: "T",
+            Wednesday: "W",
+            Thursday: "T2",
+            Friday: "F",
+            Saturday: "S2",
+          }[dayOfWeek]
+
+          // If this day's checkbox was toggled, update its status
+          if (dayKey === day) {
+            // Check if this day has any special status
+            const hasSpecialStatus =
+              schedule.sickleave === dateStr ||
+              (schedule.regularholiday && schedule.regularholiday.includes(dateStr)) ||
+              (schedule.specialholiday && schedule.specialholiday.includes(dateStr)) ||
+              (schedule.nightdiff && schedule.nightdiff.includes(dateStr)) ||
+              (schedule.oncall && schedule.oncall.includes(dateStr)) ||
+              (schedule.vacationleave && schedule.vacationleave.includes(dateStr))
+
+            // Only update if it doesn't have a special status
+            if (!hasSpecialStatus) {
+              newDayStatus[dateStr] = !selectedDays[day] ? "attended" : "absent"
+            }
+          }
+        }
+      })
+
+      setDayStatus(newDayStatus)
+    } catch (error) {
+      console.error("Error handling day selection:", error)
+    } finally {
+      setIsProcessingShifts(false)
+    }
+  }
+
+  // Generate shifts for all instances of a specific day in the current month
+  const generateShiftsForDay = async (dayName) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const year = currentDate.year()
+      const month = currentDate.month()
+      const daysInMonth = currentDate.daysInMonth()
+
+      console.log(`Generating shifts for ${dayName} with shift type: ${selectedShift}`)
+
+      // Find all dates in the current month that match the day name
+      const matchingDates = []
+      for (let i = 1; i <= daysInMonth; i++) {
+        const date = dayjs(new Date(year, month, i))
+        if (date.format("dddd") === dayName) {
+          matchingDates.push(date.format("YYYY-MM-DD"))
+        }
+      }
+
+      console.log(`Found ${matchingDates.length} matching dates for ${dayName}:`, matchingDates)
+
+      // Get shift times based on selected shift type
+      let shiftStart, shiftEnd
+      switch (selectedShift) {
+        case "morning":
+          shiftStart = "10:00:00"
+          shiftEnd = "19:00:00"
+          break
+        case "midday":
+          shiftStart = "12:00:00"
+          shiftEnd = "21:00:00"
+          break
+        case "night":
+          shiftStart = "19:00:00"
+          shiftEnd = "23:00:00"
+          break
+        case "custom":
+          shiftStart = convertTimeStringToTimeFormat(customShiftStart)
+          shiftEnd = convertTimeStringToTimeFormat(customShiftEnd)
+          break
+      }
+
+      // First, find and remove any existing shifts for these dates
+      const existingShiftIds = []
+      const remainingShiftIds = []
+
+      if (schedule.shift_ids && schedule.shift_ids.length > 0) {
+        console.log(`Checking ${schedule.shift_ids.length} existing shifts for duplicates`)
+
+        // For each shift ID in the schedule
+        for (const shiftId of schedule.shift_ids) {
+          try {
+            // Fetch the shift details
+            const shiftResponse = await fetch(`http://localhost:8000/api/v1/shift/${shiftId}/`, {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+              },
+            })
+
+            if (shiftResponse.ok) {
+              const shiftData = await shiftResponse.json()
+              // If this shift is for one of our matching dates, add it to the list to remove
+              if (matchingDates.includes(shiftData.date)) {
+                existingShiftIds.push(shiftId)
+                console.log(`Found existing shift ${shiftId} for date ${shiftData.date}`)
+              } else {
+                remainingShiftIds.push(shiftId)
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching shift ${shiftId}:`, error)
+            // If we can't fetch the shift, keep it in the schedule to be safe
+            remainingShiftIds.push(shiftId)
+          }
+        }
+      }
+
+      console.log(`Found ${existingShiftIds.length} existing shifts to replace`)
+
+      // Create shifts for each matching date
+      const newShiftIds = []
+      for (const dateStr of matchingDates) {
+        // Create a new shift
+        const shiftResponse = await fetch("http://localhost:8000/api/v1/shift/", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            date: dateStr,
+            shift_start: shiftStart,
+            shift_end: shiftEnd,
+          }),
+        })
+
+        if (shiftResponse.ok) {
+          const shiftData = await shiftResponse.json()
+          newShiftIds.push(shiftData.id)
+          console.log(`Created shift ${shiftData.id} for ${dateStr}`)
+        }
+      }
+
+      console.log(`Created ${newShiftIds.length} new shifts`)
+
+      // Update the schedule with the new shift IDs
+      setSchedule((prev) => {
+        // Combine remaining shift IDs with new ones
+        const combinedShiftIds = [...remainingShiftIds, ...newShiftIds]
+
+        // Add the day to the days array if it's not already there
+        const updatedDays = [...prev.days]
+        if (!updatedDays.includes(dayName)) {
+          updatedDays.push(dayName)
+        }
+
+        console.log(`Updated schedule with ${combinedShiftIds.length} total shifts`)
+
+        return {
+          ...prev,
+          shift_ids: combinedShiftIds,
+          days: updatedDays,
+        }
+      })
+    } catch (error) {
+      console.error(`Error generating shifts for ${dayName}:`, error)
+    }
+  }
+
+  // Remove shifts for a specific day
+  const removeShiftsForDay = async (dayName) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const year = currentDate.year()
+      const month = currentDate.month()
+      const daysInMonth = currentDate.daysInMonth()
+
+      console.log(`Removing shifts for ${dayName}`)
+
+      // Find all dates in the current month that match the day name
+      const matchingDates = []
+      for (let i = 1; i <= daysInMonth; i++) {
+        const date = dayjs(new Date(year, month, i))
+        if (date.format("dddd") === dayName) {
+          matchingDates.push(date.format("YYYY-MM-DD"))
+        }
+      }
+
+      console.log(`Found ${matchingDates.length} dates to remove shifts for`)
+
+      // Find shifts for these dates
+      const shiftsToRemove = []
+      const shiftsToKeep = []
+
+      if (schedule.shift_ids && schedule.shift_ids.length > 0) {
+        for (const shiftId of schedule.shift_ids) {
+          try {
+            const shiftResponse = await fetch(`http://localhost:8000/api/v1/shift/${shiftId}/`, {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+                "Content-Type": "application/json",
+              },
+            })
+
+            if (shiftResponse.ok) {
+              const shiftData = await shiftResponse.json()
+              if (matchingDates.includes(shiftData.date)) {
+                shiftsToRemove.push(shiftId)
+                console.log(`Found shift ${shiftId} to remove for date ${shiftData.date}`)
+              } else {
+                shiftsToKeep.push(shiftId)
+              }
+            } else {
+              // If we can't fetch the shift, keep it in the schedule to be safe
+              shiftsToKeep.push(shiftId)
+            }
+          } catch (error) {
+            console.error(`Error fetching shift ${shiftId}:`, error)
+            // If we can't fetch the shift, keep it in the schedule to be safe
+            shiftsToKeep.push(shiftId)
+          }
+        }
+      }
+
+      console.log(`Removing ${shiftsToRemove.length} shifts, keeping ${shiftsToKeep.length} shifts`)
+
+      // Update the schedule to remove these shifts
+      setSchedule((prev) => {
+        // Remove the day from the days array
+        const updatedDays = prev.days.filter((d) => d !== dayName)
+
+        return {
+          ...prev,
+          days: updatedDays,
+          shift_ids: shiftsToKeep,
+        }
+      })
+    } catch (error) {
+      console.error(`Error removing shifts for ${dayName}:`, error)
+    }
   }
 
   // Handle shift selection
-  const handleShiftSelection = (shift) => {
-    setSelectedShift(shift)
+  const handleShiftSelection = async (shift) => {
+    // Prevent multiple operations at once
+    if (isProcessingShifts) return
+
+    setIsProcessingShifts(true)
+
+    try {
+      setSelectedShift(shift)
+      console.log(`Selected shift type: ${shift}`)
+
+      // Regenerate shifts for all selected days with the new shift type
+      const selectedDayNames = []
+      Object.entries(selectedDays).forEach(([day, isSelected]) => {
+        if (isSelected) {
+          const dayName = {
+            S: "Sunday",
+            M: "Monday",
+            T: "Tuesday",
+            W: "Wednesday",
+            T2: "Thursday",
+            F: "Friday",
+            S2: "Saturday",
+          }[day]
+          selectedDayNames.push(dayName)
+        }
+      })
+
+      console.log(`Regenerating shifts for ${selectedDayNames.length} days with new shift type`)
+
+      // Process each day one at a time to avoid race conditions
+      for (const dayName of selectedDayNames) {
+        // Remove existing shifts for this day
+        await removeShiftsForDay(dayName)
+
+        // Generate new shifts with the updated shift type
+        await generateShiftsForDay(dayName)
+      }
+    } catch (error) {
+      console.error("Error handling shift selection:", error)
+    } finally {
+      setIsProcessingShifts(false)
+    }
   }
 
   // Handle event selection for the selected date
@@ -321,6 +691,7 @@ function AdminEmployeeEditSchedulePage() {
     if (newSchedule.sickleave === dateStr) {
       newSchedule.sickleave = null
     }
+    // Clear from all event arrays
     ;["regularholiday", "specialholiday", "nightdiff", "oncall", "vacationleave"].forEach((field) => {
       if (Array.isArray(newSchedule[field])) {
         newSchedule[field] = newSchedule[field].filter((d) => d !== dateStr)
@@ -358,7 +729,6 @@ function AdminEmployeeEditSchedulePage() {
     }))
   }
 
-  // Handle save schedule
   const handleSaveSchedule = async () => {
     try {
       // Convert selected days to array of day names
@@ -376,10 +746,17 @@ function AdminEmployeeEditSchedulePage() {
         .filter(([_, isSelected]) => isSelected)
         .map(([day, _]) => daysMap[day])
 
+      // Use the shift IDs that have already been created
+      const shiftIds = schedule.shift_ids
+
+      // Get the correct user ID from the employee data
+      // This ensures we're using the user_id associated with this employee, not the employee ID
+      const userId = employee?.user?.id || Number.parseInt(employeeId)
+
       // Prepare the schedule data in the exact format expected by the API
       const scheduleData = {
-        user_id: Number.parseInt(employeeId),
-        shift_ids: schedule.shift_ids && schedule.shift_ids.length > 0 ? schedule.shift_ids : [1, 2, 3], // Default to shifts 1, 2, 3 if none are set
+        user_id: userId,
+        shift_ids: shiftIds,
         days: selectedDaysArray,
         sickleave: schedule.sickleave,
         regularholiday: schedule.regularholiday || [],
@@ -387,9 +764,9 @@ function AdminEmployeeEditSchedulePage() {
         nightdiff: schedule.nightdiff || [],
         oncall: schedule.oncall || [],
         vacationleave: schedule.vacationleave || [],
-        payroll_period: "2025-04-15", // Using the fixed date from the example
+        payroll_period: "2025-04-15",
         hours: 8,
-        bi_weekly_start: "2025-04-01", // Using the fixed date from the example
+        bi_weekly_start: "2025-04-01",
       }
 
       console.log("Saving schedule data:", scheduleData)
@@ -491,6 +868,52 @@ function AdminEmployeeEditSchedulePage() {
     return status === eventType
   }
 
+  // Helper function to convert time strings like "10:00 AM" to "10:00:00" format
+  const convertTimeStringToTimeFormat = (timeString) => {
+    try {
+      // Parse the time string
+      const [time, period] = timeString.split(" ")
+      let [hours, minutes] = time.split(":").map(Number)
+
+      // Convert to 24-hour format
+      if (period === "PM" && hours < 12) {
+        hours += 12
+      } else if (period === "AM" && hours === 12) {
+        hours = 0
+      }
+
+      // Format as HH:MM:00
+      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:00`
+    } catch (error) {
+      console.error("Error converting time string:", error)
+      return "00:00:00" // Default fallback
+    }
+  }
+
+  // Helper function to convert time format like "10:00:00" to "10:00 AM"
+  const convertTimeFormatToTimeString = (timeFormat) => {
+    try {
+      const [hours, minutes] = timeFormat.split(":").map(Number)
+
+      // Convert to 12-hour format
+      let period = "AM"
+      let displayHours = hours
+
+      if (hours >= 12) {
+        period = "PM"
+        displayHours = hours === 12 ? 12 : hours - 12
+      }
+      if (displayHours === 0) {
+        displayHours = 12
+      }
+
+      return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
+    } catch (error) {
+      console.error("Error converting time format:", error)
+      return "12:00 AM" // Default fallback
+    }
+  }
+
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>
   if (error) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">{error}</div>
 
@@ -523,9 +946,9 @@ function AdminEmployeeEditSchedulePage() {
               const status = day.isCurrentMonth ? dayStatus[dateStr] : null
 
               return (
-                    <div
+                <div
                   key={index}
-                  className={`${getDayStatusColor(day)} rounded-2xl h-20 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90 relative p-2 sm:p-2 md:p-3 ${
+                  className={`${getDayStatusColor(day)} rounded-lg h-20 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90 relative p-2 sm:p-3 md:p-4 ${
                     selectedDate && day.date.format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")
                       ? "ring-2 ring-white"
                       : ""
