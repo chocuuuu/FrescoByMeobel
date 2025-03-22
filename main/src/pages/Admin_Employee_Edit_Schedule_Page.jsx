@@ -1499,7 +1499,6 @@ function AdminEmployeeEditSchedulePage() {
             </div>
 
             {/* Shift Section */}
-            {/* Shift Section */}
             <div className="mb-4">
               <div className="flex items-center mb-2">
                 <Clock className="h-5 w-5 text-white mr-2" />
@@ -1532,8 +1531,8 @@ function AdminEmployeeEditSchedulePage() {
                   ))}
                 </div>
 
-                {/* Custom Shift Selection */}
-                <div className="flex items-center gap-2">
+                {/* Custom Shift Selection (Responsive) */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                   {/* Custom Shift Button */}
                   <button
                     className={`py-2 px-3 w-full rounded-md text-sm font-medium transition-all ${
@@ -1546,33 +1545,30 @@ function AdminEmployeeEditSchedulePage() {
                     <span className="text-lg font-bold">Custom</span>
                   </button>
 
-                  {/* Time Inputs (Only Show When Custom is Selected) */}
-                  <div
-                    className={`flex items-center gap-2 transition-all duration-300 ${
-                      selectedShift === "custom"
-                        ? "opacity-100 w-auto"
-                        : "opacity-0 w-0 overflow-hidden"
-                    }`}
-                  >
-                    <input
-                      type="time"
-                      value={customShiftStart}
-                      onChange={(e) => setCustomShiftStart(e.target.value)}
-                      className="py-2 px-3 w-[130px] text-md bg-white text-[#5C7346] border border-gray-400 rounded-md focus:outline-none"
-                    />
+                  {/* Time Inputs (Responsive) */}
+                  {selectedShift === "custom" && (
+                    <div className="flex flex-col sm:flex-row items-center gap-2 transition-all duration-300">
+                      <input
+                        type="time"
+                        value={customShiftStart}
+                        onChange={(e) => setCustomShiftStart(e.target.value)}
+                        className="py-2 px-3 w-full sm:w-[130px] text-md bg-white text-[#5C7346] border border-gray-400 rounded-md focus:outline-none"
+                      />
 
-                    <span className="text-white text-md font-medium">-</span>
+                      <span className="text-white text-md font-medium">-</span>
 
-                    <input
-                      type="time"
-                      value={customShiftEnd}
-                      onChange={(e) => setCustomShiftEnd(e.target.value)}
-                      className="py-2 px-3 w-[130px] text-md bg-white text-[#5C7346] border border-gray-400 rounded-md focus:outline-none"
-                    />
-                  </div>
+                      <input
+                        type="time"
+                        value={customShiftEnd}
+                        onChange={(e) => setCustomShiftEnd(e.target.value)}
+                        className="py-2 px-3 w-full sm:w-[130px] text-md bg-white text-[#5C7346] border border-gray-400 rounded-md focus:outline-none"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
+
 
             {/* Events Section - More compact */}
             <div className="mb-4">
