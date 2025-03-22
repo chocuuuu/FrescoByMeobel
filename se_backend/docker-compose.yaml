@@ -26,8 +26,8 @@ services:
     ports:
       - "${APP_PORT}:${APP_PORT}"
     volumes:
-      - .:/backend
-    working_dir: /backend
+      - .:/app
+    working_dir: /app
   backend_db:
     image: postgres:latest
     volumes:
@@ -50,6 +50,6 @@ services:
       PGADMIN_DEFAULT_EMAIL: "admin@admin.com"
       PGADMIN_DEFAULT_PASSWORD: "admin"
     ports:
-      - "8080:80"
+      - "8081:80"
 volumes:
   prototype-backend:
