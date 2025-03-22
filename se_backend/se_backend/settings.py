@@ -30,14 +30,32 @@ SECRET_KEY = config("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", cast=bool)
 
-ALLOWED_HOSTS = ["localhost"]
-
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "http://localhost:5173",
+ALLOWED_HOSTS = [
+    ".techsauce5.win",  # add this to main repo
+    "techsauce5.win"
+    "localhost",
+    "127.0.0.1",
+    '8'
 ]
 
+CORS_ALLOWED_ORIGINS = [ # just add all of this
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://localhost:8001",
+    "http://localhost:5173",
+    "https://techsauce5.win", # add this to main repo
+]
+CORS_ALLOWED_ORIGIN_REGEXES = [ # this too
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:63342",
+    r"https://[A-Za-z0-9]+\.techsauce5\.win$"
+]
+
+CSRF_TRUSTED_ORIGINS = [  # this
+     'https://dev.techsauce5.win'
+]
 # Application definition
 
 INSTALLED_APPS = [
