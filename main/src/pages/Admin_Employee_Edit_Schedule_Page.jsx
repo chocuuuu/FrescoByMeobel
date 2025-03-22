@@ -17,7 +17,8 @@ function AdminEmployeeEditSchedulePage() {
   const [error, setError] = useState(null)
 
   // State for calendar and schedule
-  const currentMonthYear = dayjs().format("MMMM YYYY")
+  const currentYear = dayjs().format("YYYY")
+  const currentMonth = dayjs().format("MMMM")
   const [currentDate, setCurrentDate] = useState(dayjs())
   const [selectedDate, setSelectedDate] = useState(dayjs())
   const [schedule, setSchedule] = useState({
@@ -255,75 +256,87 @@ function AdminEmployeeEditSchedulePage() {
   // Remove shifts for a specific day
   const removeShiftsForDay = async (dayName) => {
     try {
-      const accessToken = localStorage.getItem("access_token")
-      const year = currentDate.year()
-      const month = currentDate.month()
-      const daysInMonth = currentDate.daysInMonth()
-
-      console.log(`Removing shifts for ${dayName}`)
-
+      const accessToken = localStorage.getItem("access_token");
+      const year = currentDate.year();
+      const month = currentDate.month();
+      const daysInMonth = currentDate.daysInMonth();
+  
+      console.log(`Removing shifts for ${dayName}`);
+  
       // Find all dates in the current month that match the day name
-      const matchingDates = []
+      const matchingDates = [];
       for (let i = 1; i <= daysInMonth; i++) {
-        const date = dayjs(new Date(year, month, i))
+        const date = dayjs(new Date(year, month, i));
         if (date.format("dddd") === dayName) {
-          matchingDates.push(date.format("YYYY-MM-DD"))
+          matchingDates.push(date.format("YYYY-MM-DD"));
         }
       }
-
-      console.log(`Found ${matchingDates.length} dates to remove shifts for`)
-
-      // Find shifts for these dates
-      const shiftsToRemove = []
-      const shiftsToKeep = []
-
+  
+      console.log(`Found ${matchingDates.length} dates to remove shifts for`);
+  
+      // Collect shift IDs that need to be removed
+      let shiftsToRemove = [];
+      let shiftsToKeep = [];
+  
       if (schedule.shift_ids && schedule.shift_ids.length > 0) {
-        for (const shiftId of schedule.shift_ids) {
-          try {
-            const shiftResponse = await fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-              },
-            })
-
-            if (shiftResponse.ok) {
-              const shiftData = await shiftResponse.json()
-              if (matchingDates.includes(shiftData.date)) {
-                shiftsToRemove.push(shiftId)
-                console.log(`Found shift ${shiftId} to remove for date ${shiftData.date}`)
-              } else {
-                shiftsToKeep.push(shiftId)
-              }
-            } else {
-              // If we can't fetch the shift, keep it in the schedule to be safe
-              shiftsToKeep.push(shiftId)
-            }
-          } catch (error) {
-            console.error(`Error fetching shift ${shiftId}:`, error)
-            // If we can't fetch the shift, keep it in the schedule to be safe
-            shiftsToKeep.push(shiftId)
+        const shiftRequests = schedule.shift_ids.map((shiftId) =>
+          fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          }).then((response) => (response.ok ? response.json() : null))
+        );
+  
+        const shiftDataArray = await Promise.all(shiftRequests);
+  
+        shiftDataArray.forEach((shiftData, index) => {
+          if (shiftData && matchingDates.includes(shiftData.date)) {
+            shiftsToRemove.push(schedule.shift_ids[index]);
+            console.log(`Found shift ${schedule.shift_ids[index]} to remove for date ${shiftData.date}`);
+          } else {
+            shiftsToKeep.push(schedule.shift_ids[index]);
           }
-        }
+        });
       }
-
-      console.log(`Removing ${shiftsToRemove.length} shifts, keeping ${shiftsToKeep.length} shifts`)
-
-      // Update the schedule to remove these shifts
-      setSchedule((prev) => {
-        // Remove the day from the days array
-        const updatedDays = prev.days.filter((d) => d !== dayName)
-
-        return {
-          ...prev,
-          days: updatedDays,
-          shift_ids: shiftsToKeep,
-        }
-      })
+  
+      console.log(`Removing ${shiftsToRemove.length} shifts, keeping ${shiftsToKeep.length} shifts`);
+  
+      // **Optimistically update UI BEFORE waiting for the API response**
+      setSchedule((prev) => ({
+        ...prev,
+        days: prev.days.filter((d) => d !== dayName),
+        shift_ids: shiftsToKeep,
+      }));
+  
+      // **Batch delete shifts in chunks (e.g., 10 at a time)**
+      const chunkSize = 10;
+      for (let i = 0; i < shiftsToRemove.length; i += chunkSize) {
+        const chunk = shiftsToRemove.slice(i, i + chunkSize);
+        console.log(`Sending batch delete for ${chunk.length} shifts`);
+  
+        fetch(`${API_BASE_URL}/shifts/batch-delete/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ shift_ids: chunk }),
+        })
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error(`Batch deletion failed for ${chunk.length} shifts`);
+            }
+            console.log(`Successfully deleted ${chunk.length} shifts`);
+          })
+          .catch((err) => console.error(err));
+      }
     } catch (error) {
-      console.error(`Error removing shifts for ${dayName}:`, error)
+      console.error(`Error removing shifts for ${dayName}:`, error);
     }
-  }
+  };
+  
+  
 
   // Fetch employee data
   useEffect(() => {
@@ -1254,7 +1267,7 @@ useEffect(() => {
                 <ArrowLeft className="w-4 h-4" />
                 Back
               </button>
-              <h2 className="text-white text-4xl font-bold p-2">{currentMonthYear}</h2>
+              <h2 className="text-white text-4xl font-bold p-2">{currentMonth} {currentYear}</h2>
               <div className="w-20"></div> {/* Spacer for alignment */}
             </div>
 
@@ -1469,7 +1482,7 @@ useEffect(() => {
               <div className="bg-[#A3BC84] rounded-md p-3">
                 {/* Selected date display */}
                 <div className="text-center mb-2">
-                  <div className="text-3xl font-bold text-white">{getEventLabel()}</div>
+                  <div className="text-3xl font-bold text-white">{currentMonth} {getEventLabel()}</div>
                 </div>
 
                 {/* Event options in a more compact grid */}
