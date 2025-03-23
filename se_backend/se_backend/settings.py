@@ -32,7 +32,7 @@ DEBUG = config("DEBUG", cast=bool)
 
 ALLOWED_HOSTS = [
     ".techsauce5.win",  # add this to main repo
-    "techsauce5.win"
+    "techsauce5.win",
     "localhost",
     "127.0.0.1",
     '8'
