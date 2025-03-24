@@ -13,6 +13,7 @@ class EmploymentInfo(models.Model):
     other_info = models.CharField(max_length=255, blank=True, null=True)
     profile_picture = models.ImageField(upload_to='profile_pictures/', blank=True, null=True)
     active = models.BooleanField()
+    resignation_date = models.DateField(blank=True, null=True)
 
     def __str__(self):
         return f"{self.first_name} {self.last_name} ({self.position})"
