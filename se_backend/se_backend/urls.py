@@ -19,7 +19,11 @@ urlpatterns = [
     path(f"{api_prefix}attendance_summary/", include("attendance_summary.urls")),
     path(f"{api_prefix}shift/", include("shift.urls")),
     path(f"{api_prefix}schedule/", include("schedule.urls")),
-
+    path(f"{api_prefix}overtimebase/", include("overtimebase.urls")),
+    path(f"{api_prefix}overtimehours/", include("overtimehours.urls")),
+    path(f"{api_prefix}totalovertime/", include("totalovertime.urls")),
+    path(f"{api_prefix}earnings/", include("earnings.urls")),
+    path(f"{api_prefix}deductions/", include("deductions.urls")),
 ]
 
 

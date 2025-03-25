@@ -68,6 +68,7 @@ INSTALLED_APPS = [
     "drf_yasg",
     "django_filters",
     "corsheaders",
+    "django_celery_beat",
 
     # Rest-Framework
     "rest_framework",
@@ -87,6 +88,11 @@ INSTALLED_APPS = [
     "attendance_summary",
     "shift",
     "schedule",
+    "overtimebase",
+    "overtimehours",
+    "totalovertime",
+    "earnings",
+    "deductions",
 
 ]
 

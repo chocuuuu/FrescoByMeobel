@@ -128,7 +128,7 @@ def generate_attendance_summary(sender, instance, **kwargs):
             'actual_hours': total_actual_minutes // 60,
             'overtime_hours': total_overtime_minutes // 60,
             'late_minutes': total_late_minutes,
-            'undertime': total_undertime_minutes,
+            'undertime': total_undertime_minutes //60,
             'attendance_id': instance
         }
     )
