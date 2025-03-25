@@ -10,15 +10,6 @@ from schedule.models import Schedule
 # Initialize logger
 logger = logging.getLogger(__name__)
 
-def get_biweek_start(date):
-    """
-    Calculate the start of the biweekly period based on the given date.
-    Assumes biweekly periods start on the 1st and 16th of each month.
-    """
-    if date.day < 16:
-        return date.replace(day=1)
-    else:
-        return date.replace(day=16)
 
 def update_overtime_hours(attendance_summary):
     """
@@ -30,7 +21,7 @@ def update_overtime_hours(attendance_summary):
     overtime_hours = attendance_summary.overtime_hours
     late = attendance_summary.late_minutes
     undertime = attendance_summary.undertime
-    biweek_start = get_biweek_start(attendance_summary.date)
+    biweek_start = attendance_summary.date
 
     logger.info(f"Processing OvertimeHours for User {user.id} | AttendanceSummary ID {attendance_summary.id} | "
                 f"Biweek Start: {biweek_start} | Overtime Hours: {overtime_hours} | Late: {late} | Undertime: {undertime}")
@@ -55,6 +46,7 @@ def update_overtime_hours(attendance_summary):
     nightdiff_hours = len(schedule.nightdiff) * 8 if schedule and schedule.nightdiff else 0
     restday_hours = schedule.restday if schedule and schedule.restday else 0  # Ensure restday exists
 
+
     logger.info(f"Computed Overtime Details for User {user.id}: "
                 f"Regular Holiday Hours: {regularholiday_hours}, "
                 f"Special Holiday Hours: {specialholiday_hours}, "
@@ -64,6 +56,7 @@ def update_overtime_hours(attendance_summary):
     # Check if an OvertimeHours instance exists for the current biweekly period
     overtime, created = OvertimeHours.objects.get_or_create(
         attendancesummary=attendance_summary,
+        user=user,
         biweek_start=biweek_start,
         defaults={
             "otbase": otbase,

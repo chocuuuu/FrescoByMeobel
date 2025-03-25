@@ -208,6 +208,8 @@ def update_total_overtime_for_user(user):
         total_backwage = calculate_backwage(backwage_base, overtime.backwage)
         total_late = calculate_late(late_base, overtime.late)
         total_undertime = calculate_undertime(basic_rate, overtime.undertime)
+        biweek_start = overtime.biweek_start
+        user_id = overtime.user
 
         total_overtime = (
                 total_regularot + total_regularholiday + total_specialholiday +
@@ -226,6 +228,8 @@ def update_total_overtime_for_user(user):
                 "total_late": total_late,
                 "total_undertime": total_undertime,
                 "total_overtime": total_overtime,
+                "biweek_start": biweek_start,
+                "user": user_id
             },
         )
         logger.info(f"Updated TotalOvertime for OvertimeHours ID {overtime.id} after Earnings/Deductions update")
