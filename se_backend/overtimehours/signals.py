@@ -211,7 +211,7 @@ def update_total_overtime_for_user(user):
 
         total_overtime = (
                 total_regularot + total_regularholiday + total_specialholiday +
-                total_restday + total_nightdiff + total_backwage + total_late + total_undertime
+                total_restday + total_nightdiff + total_backwage
         )
 
         TotalOvertime.objects.update_or_create(
