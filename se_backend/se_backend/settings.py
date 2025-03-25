@@ -93,6 +93,9 @@ INSTALLED_APPS = [
     "totalovertime",
     "earnings",
     "deductions",
+    "salary",
+    "payroll",
+    "payslip",
 
 ]
 
@@ -213,3 +216,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Celery Configuration
+CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'

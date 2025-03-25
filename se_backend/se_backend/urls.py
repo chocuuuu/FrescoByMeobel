@@ -24,6 +24,9 @@ urlpatterns = [
     path(f"{api_prefix}totalovertime/", include("totalovertime.urls")),
     path(f"{api_prefix}earnings/", include("earnings.urls")),
     path(f"{api_prefix}deductions/", include("deductions.urls")),
+    path(f"{api_prefix}salary/", include("salary.urls")),
+    path(f"{api_prefix}payroll/", include("payroll.urls")),
+    path(f"{api_prefix}payslip/", include("payslip.urls")),
 ]
 
 
