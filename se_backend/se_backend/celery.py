@@ -36,3 +36,11 @@ app.conf.beat_schedule = {
         "schedule": 60.0,  # Run every 60 seconds
     },
 }
+"""
+app.conf.beat_schedule = {
+    "fetch_biometricdata": {
+        "task": "biometricdata.tasks.fetch_biometricdata_entries",
+        "schedule": 60.0,  # Run every 60 seconds
+    },
+}
+"""
