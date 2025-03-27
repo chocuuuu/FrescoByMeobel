@@ -21,9 +21,9 @@ class TotalOvertimeSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class SalarySerializer(serializers.ModelSerializer):
-    earnings = EarningsSerializer()
-    deductions = DeductionsSerializer()
-    overtime = TotalOvertimeSerializer()
+    earnings_id = EarningsSerializer()
+    deductions_id = DeductionsSerializer()
+    overtime_id = TotalOvertimeSerializer()
 
     class Meta:
         model = Salary
