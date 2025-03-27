@@ -68,7 +68,7 @@ services:
     container_name: celery_worker
     command: celery -A se_backend worker --loglevel=info
     volumes:
-      - .:/app/se_backend
+      - .:/app
     depends_on:
       - redis
       - backend_db
@@ -80,7 +80,7 @@ services:
     container_name: celery_beat
     command: celery -A se_backend beat --loglevel=info
     volumes:
-      - .:/app/se_backend
+      - .:/app
     depends_on:
       - redis
       - backend_db
