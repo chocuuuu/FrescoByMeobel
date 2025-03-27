@@ -12,8 +12,12 @@ class ShiftSerializer(serializers.ModelSerializer):
 
 
 class ScheduleSerializer(serializers.ModelSerializer):
-    """Modified serializer to include shift details instead of just shift IDs."""
-    shift_ids = ShiftSerializer(many=True, read_only=True)  # Nested serializer
+    """Allow writing shift_ids as IDs and reading shift details."""
+
+    shift_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Shift.objects.all(), many=True, write_only=True
+    )
+    shifts = ShiftSerializer(many=True, read_only=True, source="shift_ids")  # Read as nested
 
     class Meta:
         model = Schedule
