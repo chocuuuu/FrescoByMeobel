@@ -12,16 +12,9 @@ class ShiftSerializer(serializers.ModelSerializer):
 
 
 class ScheduleSerializer(serializers.ModelSerializer):
-    shift_ids = serializers.PrimaryKeyRelatedField(
-        queryset=Shift.objects.all(), many=True
-    )
+    """Modified serializer to include shift details instead of just shift IDs."""
+    shift_ids = ShiftSerializer(many=True, read_only=True)  # Nested serializer
 
     class Meta:
         model = Schedule
         fields = '__all__'
-
-    def create(self, validated_data):
-        shift_ids = validated_data.pop('shift_ids', [])  # Extract shift IDs
-        schedule = Schedule.objects.create(**validated_data)  # Create schedule
-        schedule.shift_ids.set(shift_ids)  # Explicitly assign shifts
-        return schedule
