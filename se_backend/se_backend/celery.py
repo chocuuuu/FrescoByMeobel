@@ -2,6 +2,8 @@ from __future__ import absolute_import, unicode_literals
 import os
 from celery import Celery
 from django.conf import settings
+from celery.schedules import crontab
+
 
 # Set the default Django settings module for the 'celery' program.
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'se_backend.settings')
@@ -19,21 +21,20 @@ app.conf.broker_connection_retry_on_startup = True
 app.conf.beat_schedule = {
     "update_total_overtime_for_user": {
         "task": "overtimehours.tasks.update_total_overtime_for_user",
-        "schedule": 60.0,
+        "schedule": crontab(minute=0, hour="*"),  # Run every hour
     },
     "generate_salary_entries": {
         "task": "salary.tasks.generate_salary_entries",
-        "schedule": 60.0,  # Run every 60 seconds
+        "schedule": crontab(minute=0, hour="*"),  # Run every hour
     },
     "generate_payroll_entries": {
         "task": "payroll.tasks.generate_payroll_entries",
-        "schedule": 60.0,  # Run every 60 seconds
+        "schedule": crontab(minute=0, hour="*"),  # Run every hour
     },
     "generate_payslip_entries": {
         "task": "payslip.tasks.generate_payslip_entries",
-        "schedule": 60.0,  # Run every 60 seconds
+        "schedule": crontab(minute=0, hour="*"),  # Run every hour
     },
-
 }
 
 """
