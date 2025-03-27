@@ -10,6 +10,7 @@ gunicorn
 setuptools
 pillow==11.1.0 # For image uploads (can change to S3 if viable)
 pytz==2025.1
-celery[redis]
-django-celery-beat
-pyzk
+celery==5.4.0
+django-celery-beat==2.7.0
+redis==5.2.1
+pyzk==0.9
