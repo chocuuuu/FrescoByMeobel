@@ -5,6 +5,7 @@ import NavBar from "../components/Nav_Bar"
 import AddEmployee from "../components/Add_Employee"
 import EditEmployee from "../components/Edit_Employee"
 import DeleteEmployee from "../components/Delete_Employee"
+import { API_BASE_URL } from "../config/api";
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -21,7 +22,7 @@ function AdminEmployeePage() {
   const [employeeToEdit, setEmployeeToEdit] = useState(null)
   const [employeeToDelete, setEmployeeToDelete] = useState(null)
   const employeesPerPage = 5
-
+  
   useEffect(() => {
     const fetchEmployees = async () => {
       setLoading(true)
@@ -29,7 +30,7 @@ function AdminEmployeePage() {
 
       try {
         const accessToken = localStorage.getItem("access_token")
-        const response = await fetch("http://localhost:8000/api/v1/employment-info/", {
+        const response = await fetch(`${API_BASE_URL}/employment-info/`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
@@ -154,7 +155,7 @@ function AdminEmployeePage() {
       if (!employeeToDelete) return
 
       const accessToken = localStorage.getItem("access_token")
-      const response = await fetch(`http://localhost:8000/api/v1/employment-info/${employeeToDelete.id}/`, {
+      const response = await fetch(`${API_BASE_URL}/employment-info/${employeeToDelete.id}/`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${accessToken}`,
