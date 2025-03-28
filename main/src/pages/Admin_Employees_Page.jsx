@@ -204,12 +204,13 @@ function AdminEmployeePage() {
       <NavBar />
 
       <div className="container mx-auto px-4 pt-24">
-        <div className="bg-[#A7BC8F] rounded-lg p-6">
-          {/* Header Section */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="space-x-2">
+        <div className="bg-[#A7BC8F] rounded-lg p-4 md:p-6">
+          {/* Header Section - Responsive Layout */}
+          <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:justify-between md:items-center mb-6">
+            {/* Tab Buttons - Always at the top on mobile */}
+            <div className="flex space-x-2">
               <button
-                className={`px-6 py-2 rounded-md ${
+                className={`px-4 py-2 md:px-6 md:py-2 rounded-md ${
                   activeTab === "active" ? "bg-[#5C7346] text-white font-semibold" : "bg-[#D1DBC4] text-gray-700"
                 }`}
                 onClick={() => handleTabChange("active")}
@@ -217,7 +218,7 @@ function AdminEmployeePage() {
                 ACTIVE
               </button>
               <button
-                className={`px-6 py-2 rounded-md ${
+                className={`px-4 py-2 md:px-6 md:py-2 rounded-md ${
                   activeTab === "inactive" ? "bg-[#5C7346] text-white font-semibold" : "bg-[#D1DBC4] text-gray-700"
                 }`}
                 onClick={() => handleTabChange("inactive")}
@@ -225,20 +226,22 @@ function AdminEmployeePage() {
                 INACTIVE
               </button>
             </div>
-            <div className="flex items-center space-x-4">
+
+            {/* Search and Filters - Stack on mobile, side by side on larger screens */}
+            <div className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-4 md:items-center">
               <input
                 type="search"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-64"
+                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full md:w-64"
               />
               {activeTab === "active" && (
-                <>
+                <div className="flex space-x-2">
                   <select
                     value={yearFilter}
                     onChange={(e) => setYearFilter(e.target.value)}
-                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
+                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white flex-1 md:flex-none"
                   >
                     <option value="all">All Years</option>
                     {years.map((year) => (
@@ -250,7 +253,7 @@ function AdminEmployeePage() {
                   <select
                     value={roleFilter}
                     onChange={(e) => setRoleFilter(e.target.value)}
-                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
+                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white flex-1 md:flex-none"
                   >
                     <option value="all">All Roles</option>
                     {roles.map((role) => (
@@ -259,109 +262,116 @@ function AdminEmployeePage() {
                       </option>
                     ))}
                   </select>
-                </>
+                </div>
               )}
             </div>
           </div>
 
           {/* Title */}
-          <h2 className="text-2xl font-semibold text-white mb-4">Employees</h2>
+          <h2 className="text-xl md:text-2xl font-semibold text-white mb-4">Employees</h2>
 
-          {/* Employee Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-fixed">
-              <thead>
-                <tr className="text-left text-white border-b border-white/20">
-                  <th className="py-3 px-4 w-[10%]">ID</th>
-                  <th className="py-3 px-4 w-[30%]">NAME</th>
-                  <th className="py-3 px-4 w-[20%]">POSITION</th>
-                  <th className="py-3 px-4 w-[15%]">YEAR EMPLOYED</th>
-                  {activeTab === "inactive" && <th className="py-3 px-4 w-[15%]">YEAR RESIGNED</th>}
-                  {activeTab === "active" && <th className="py-3 px-4 w-[10%]">STATUS</th>}
-                  {activeTab === "active" && <th className="py-3 px-4 w-[15%]">ACTIONS</th>}
-                </tr>
-              </thead>
-              <tbody className="text-white">
-                {currentEmployees.map((employee) => (
-                  <tr key={employee.id} className="border-b border-white/10">
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
-                      {employee.employee_number}
-                    </td>
-                    <td
-                      className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap"
-                      title={`${employee.first_name} ${employee.last_name}`}
-                    >
-                      {(() => {
-                        const fullName = `${employee.first_name} ${employee.last_name}`
-                        return fullName.length > 60 ? fullName.substring(0, 57) + "..." : fullName
-                      })()}
-                    </td>
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap" title={employee.position}>
-                      {employee.position}
-                    </td>
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
-                      {getYearFromDate(employee.hire_date)}
-                    </td>
-
-                    {/* Show Year Resigned only for inactive employees */}
-                    {activeTab === "inactive" && (
+          {/* Employee Table - Responsive with horizontal scroll on small screens */}
+          <div className="overflow-x-auto -mx-4 md:mx-0">
+            <div className="min-w-[800px] md:min-w-0 px-4 md:px-0">
+              <table className="w-full table-fixed">
+                <thead>
+                  <tr className="text-left text-white border-b border-white/20">
+                    <th className="py-3 px-4 w-[10%]">ID</th>
+                    <th className="py-3 px-4 w-[30%]">NAME</th>
+                    <th className="py-3 px-4 w-[20%]">POSITION</th>
+                    <th className="py-3 px-4 w-[15%]">YEAR EMPLOYED</th>
+                    {activeTab === "inactive" && <th className="py-3 px-4 w-[15%]">YEAR RESIGNED</th>}
+                    {activeTab === "active" && <th className="py-3 px-4 w-[10%]">STATUS</th>}
+                    {activeTab === "active" && <th className="py-3 px-4 w-[15%]">ACTIONS</th>}
+                  </tr>
+                </thead>
+                <tbody className="text-white">
+                  {currentEmployees.map((employee) => (
+                    <tr key={employee.id} className="border-b border-white/10">
                       <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
-                        {getYearFromDate(employee.resignation_date) || "-"}
+                        {employee.employee_number}
                       </td>
-                    )}
-
-                    {/* Status column - only for active tab */}
-                    {activeTab === "active" && (
-                      <td className="py-3 px-4">
-                        <span className="px-4 py-1 bg-green-100 text-green-800 rounded-full font-medium whitespace-nowrap">
-                          Active
-                        </span>
+                      <td
+                        className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={`${employee.first_name} ${employee.last_name}`}
+                      >
+                        {(() => {
+                          const fullName = `${employee.first_name} ${employee.last_name}`
+                          return fullName.length > 60 ? fullName.substring(0, 57) + "..." : fullName
+                        })()}
                       </td>
-                    )}
-
-                    {/* Actions column - only for active tab */}
-                    {activeTab === "active" && (
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleDeleteClick(employee)}
-                            className="bg-red-600 text-white px-4 py-1 rounded-md hover:bg-red-700 transition-colors"
-                          >
-                            Delete
-                          </button>
-                          <button
-                            onClick={() => handleEditClick(employee)}
-                            className="bg-[#5C7346] text-white px-4 py-1 rounded-md hover:bg-[#4a5c38] transition-colors"
-                          >
-                            Edit
-                          </button>
-                        </div>
+                      <td
+                        className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={employee.position}
+                      >
+                        {employee.position}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {getYearFromDate(employee.hire_date)}
+                      </td>
 
-                {/* Empty rows for consistent height */}
-                {[...Array(Math.max(0, employeesPerPage - currentEmployees.length))].map((_, index) => (
-                  <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
-                    <td colSpan={activeTab === "inactive" ? "5" : "7"}></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      {/* Show Year Resigned only for inactive employees */}
+                      {activeTab === "inactive" && (
+                        <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                          {getYearFromDate(employee.resignation_date) || "-"}
+                        </td>
+                      )}
+
+                      {/* Status column - only for active tab */}
+                      {activeTab === "active" && (
+                        <td className="py-3 px-4">
+                          <span className="px-4 py-1 bg-green-100 text-green-800 rounded-full font-medium whitespace-nowrap">
+                            Active
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Actions column - only for active tab */}
+                      {activeTab === "active" && (
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleDeleteClick(employee)}
+                              className="bg-red-600 text-white px-2 py-1 md:px-4 md:py-1 rounded-md hover:bg-red-700 transition-colors text-xs md:text-sm"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              onClick={() => handleEditClick(employee)}
+                              className="bg-[#5C7346] text-white px-2 py-1 md:px-4 md:py-1 rounded-md hover:bg-[#4a5c38] transition-colors text-xs md:text-sm"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+
+                  {/* Empty rows for consistent height */}
+                  {[...Array(Math.max(0, employeesPerPage - currentEmployees.length))].map((_, index) => (
+                    <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
+                      <td colSpan={activeTab === "inactive" ? "5" : "7"}></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* Footer Section */}
-          <div className="flex justify-between items-center mt-4">
+          {/* Footer Section - Responsive layout */}
+          <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:justify-between md:items-center mt-6">
             {activeTab === "active" && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="bg-[#5C7346] text-white px-6 py-2 rounded-md hover:bg-[#4a5c38] transition-colors font-medium"
+                className="bg-[#5C7346] text-white px-6 py-2 rounded-md hover:bg-[#4a5c38] transition-colors font-medium w-full md:w-auto"
               >
                 Add Account
               </button>
             )}
-            <div className={`flex space-x-2 ${activeTab === "inactive" ? "ml-auto" : ""}`}>
+            <div
+              className={`flex justify-center space-x-2 ${activeTab === "inactive" ? "md:ml-auto" : ""} ${activeTab === "active" ? "w-full md:w-auto" : ""}`}
+            >
               <button
                 onClick={prevPage}
                 disabled={currentPage === 1}
@@ -369,7 +379,7 @@ function AdminEmployeePage() {
               >
                 Previous
               </button>
-              <div className="bg-white text-[#5C7346] px-4 py-2 rounded-md">
+              <div className="bg-white text-[#5C7346] px-4 py-2 rounded-md min-w-[80px] text-center">
                 {currentPage} of {totalPages}
               </div>
               <button
