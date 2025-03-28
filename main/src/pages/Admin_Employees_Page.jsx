@@ -23,40 +23,40 @@ function AdminEmployeePage() {
   const [employeeToDelete, setEmployeeToDelete] = useState(null)
   const employeesPerPage = 5
 
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      setLoading(true)
-      setError(null)
+  const fetchEmployees = async () => {
+    setLoading(true)
+    setError(null)
 
-      try {
-        const accessToken = localStorage.getItem("access_token")
-        const response = await fetch(`${API_BASE_URL}/employment-info/`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const response = await fetch(`${API_BASE_URL}/employment-info/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
 
-        const data = await response.json()
-        console.log("Fetched employee data:", data)
+      const data = await response.json()
+      console.log("Fetched employee data:", data)
 
-        if (response.ok) {
-          if (Array.isArray(data)) {
-            setEmployees(data)
-          } else {
-            setError("Unexpected data format received from the server.")
-          }
+      if (response.ok) {
+        if (Array.isArray(data)) {
+          setEmployees(data)
         } else {
-          setError(data.message || "Failed to fetch employee data. Please try again.")
+          setError("Unexpected data format received from the server.")
         }
-      } catch (error) {
-        console.error("Error fetching employees:", error)
-        setError("An error occurred while fetching employee data. Please try again later.")
-      } finally {
-        setLoading(false)
+      } else {
+        setError(data.message || "Failed to fetch employee data. Please try again.")
       }
+    } catch (error) {
+      console.error("Error fetching employees:", error)
+      setError("An error occurred while fetching employee data. Please try again later.")
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchEmployees()
   }, [])
 
@@ -83,9 +83,20 @@ function AdminEmployeePage() {
 
   const handleUpdateEmployee = async (updatedEmployee) => {
     try {
+      console.log("Updated employee data:", updatedEmployee)
+
+      // First update the local state
       setEmployees((prevEmployees) =>
         prevEmployees.map((emp) => (emp.id === updatedEmployee.id ? updatedEmployee : emp)),
       )
+
+      // Then fetch fresh data from the server to ensure everything is in sync
+      await fetchEmployees()
+
+      // If this was a resignation, switch to the inactive tab
+      if (updatedEmployee.resignation_date && !updatedEmployee.active) {
+        setActiveTab("inactive")
+      }
     } catch (error) {
       console.error("Error updating employee state:", error)
     }

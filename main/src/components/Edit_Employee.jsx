@@ -65,12 +65,18 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
   }, [employeeData])
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    if (e) e.preventDefault()
     setError("")
     setIsSubmitting(true)
 
     try {
       const accessToken = localStorage.getItem("access_token")
+
+      // For resignation, we use a different approach
+      if (!formData.active && formData.resignation_date) {
+        // If this is a resignation, use the dedicated function
+        return submitResignationForm(formData)
+      }
 
       // Create FormData object for file upload
       const formDataToSend = new FormData()
@@ -216,8 +222,70 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 
   // Handle resignation confirm
   const handleResignationConfirm = () => {
+    if (!formData.resignation_date) {
+      setError("Resignation date is required")
+      return
+    }
+
+    // Update form data with inactive status
+    const updatedFormData = {
+      ...formData,
+      active: false,
+    }
+
+    setFormData(updatedFormData)
     setShowResignationModal(false)
-    handleSubmit() // Submit the form with the resignation date
+
+    // Submit the form with the updated data
+    submitResignationForm(updatedFormData)
+  }
+
+  // New function to handle resignation form submission
+  const submitResignationForm = async (data) => {
+    setIsSubmitting(true)
+    setError("")
+
+    try {
+      const accessToken = localStorage.getItem("access_token")
+
+      // Create a simple object with just the necessary fields for resignation
+      const resignationData = {
+        active: false,
+        resignation_date: data.resignation_date,
+      }
+
+      console.log("Submitting resignation data:", resignationData)
+
+      // Use a direct JSON request instead of FormData for this specific update
+      const response = await fetch(`${API_BASE_URL}/employment-info/${employeeData.id}/`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(resignationData),
+      })
+
+      const responseData = await response.json()
+      console.log("Resignation response:", responseData)
+
+      if (!response.ok) {
+        throw new Error(responseData.detail || "Failed to update resignation status")
+      }
+
+      // Update the employee data with the response
+      onUpdate({
+        ...employeeData,
+        ...responseData,
+      })
+
+      onClose()
+    } catch (error) {
+      console.error("Error updating resignation status:", error)
+      setError(error.message || "Failed to update resignation status")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (!isOpen || !employeeData) return null
