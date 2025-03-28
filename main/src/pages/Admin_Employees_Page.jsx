@@ -72,7 +72,11 @@ function AdminEmployeePage() {
   }
 
   const handleAddEmployee = (newEmployee) => {
-    setEmployees((prev) => [...prev, newEmployee])
+    // Add the new employee to the beginning of the array instead of the end
+    setEmployees((prev) => [newEmployee, ...prev])
+
+    // Reset to the first page to ensure the new employee is visible
+    setCurrentPage(1)
   }
 
   const handleEditClick = (employee) => {
