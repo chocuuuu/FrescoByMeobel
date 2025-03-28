@@ -204,23 +204,20 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
     }))
   }
 
-  // Handle resignation confirmation
-  const handleResignationConfirm = () => {
-    setFormData((prev) => ({
-      ...prev,
-      active: false,
-    }))
-    setShowResignationModal(false)
-  }
-
-  // Handle resignation cancellation
+  // Handle resignation cancel
   const handleResignationCancel = () => {
     setShowResignationModal(false)
-    // Reset the active status to true since the user cancelled
     setFormData((prev) => ({
       ...prev,
       active: true,
+      resignation_date: "",
     }))
+  }
+
+  // Handle resignation confirm
+  const handleResignationConfirm = () => {
+    setShowResignationModal(false)
+    handleSubmit() // Submit the form with the resignation date
   }
 
   if (!isOpen || !employeeData) return null
@@ -485,6 +482,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
             <p className="mb-4">You are about to mark this employee as inactive. Please enter the resignation date:</p>
 
             <div className="mb-6">
+              <label className="block text-sm text-gray-700">Resignation Date</label>
               <Calendar
                 label="Resignation Date"
                 value={formData.resignation_date}
