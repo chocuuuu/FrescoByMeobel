@@ -1,6 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Calendar from "./Calendar"
+import dayjs from "dayjs"
+import { API_BASE_URL } from "../config/api"
 
 function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
   // Initial form state with flattened structure
@@ -16,6 +19,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
     other_info: "",
     profile_picture: null,
     active: true,
+    resignation_date: "",
     role: "",
     email: "",
     password: "",
@@ -25,6 +29,8 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [previewImage, setPreviewImage] = useState(null)
+  const [showResignationModal, setShowResignationModal] = useState(false)
+  const [previousActiveState, setPreviousActiveState] = useState(true)
 
   // Populate form when employeeData changes
   useEffect(() => {
@@ -41,10 +47,13 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
         other_info: employeeData.other_info || "",
         profile_picture: null, // Will be set if user uploads a new one
         active: employeeData.active ?? true,
+        resignation_date: employeeData.resignation_date || "",
         role: employeeData.user?.role || "",
         email: "", // Start empty for optional update
         password: "", // Start empty for optional update
       })
+
+      setPreviousActiveState(employeeData.active ?? true)
 
       // Set profile picture preview if available
       if (employeeData.profile_picture) {
@@ -84,6 +93,11 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
       formDataToSend.append("address", formData.address)
       formDataToSend.append("active", String(formData.active))
 
+      // Add resignation date if employee is inactive
+      if (!formData.active && formData.resignation_date) {
+        formDataToSend.append("resignation_date", formData.resignation_date)
+      }
+
       // Add new fields
       if (formData.birth_date) {
         formDataToSend.append("birth_date", formData.birth_date)
@@ -100,7 +114,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 
       console.log("Update Request Payload:", Object.fromEntries(formDataToSend))
 
-      const response = await fetch(`http://localhost:8000/api/v1/employment-info/${employeeData.id}/`, {
+      const response = await fetch(`${API_BASE_URL}/employment-info/${employeeData.id}/`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -162,11 +176,17 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
         }))
       }
     } else if (type === "checkbox") {
-      // Handle checkbox
-      setFormData((prev) => ({
-        ...prev,
-        [name]: checked,
-      }))
+      // Handle checkbox for active status
+      if (name === "active" && previousActiveState && !checked) {
+        // If changing from active to inactive, show resignation modal
+        setShowResignationModal(true)
+      } else {
+        // For other checkboxes or when changing from inactive to active
+        setFormData((prev) => ({
+          ...prev,
+          [name]: checked,
+        }))
+      }
     } else {
       // Handle other form fields
       setFormData((prev) => ({
@@ -174,6 +194,33 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
         [name]: value,
       }))
     }
+  }
+
+  // Handle date changes
+  const handleDateChange = (name, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }))
+  }
+
+  // Handle resignation confirmation
+  const handleResignationConfirm = () => {
+    setFormData((prev) => ({
+      ...prev,
+      active: false,
+    }))
+    setShowResignationModal(false)
+  }
+
+  // Handle resignation cancellation
+  const handleResignationCancel = () => {
+    setShowResignationModal(false)
+    // Reset the active status to true since the user cancelled
+    setFormData((prev) => ({
+      ...prev,
+      active: true,
+    }))
   }
 
   if (!isOpen || !employeeData) return null
@@ -303,16 +350,12 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Hire Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    value={formData.hire_date}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed pr-10"
-                    disabled
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  </div>
-                </div>
+                <Calendar
+                  label="Hire Date"
+                  value={formData.hire_date}
+                  onChange={(value) => handleDateChange("hire_date", value)}
+                  disabled={true}
+                />
               </div>
             </div>
           </div>
@@ -323,18 +366,13 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Birth Date</label>
-                <div className="relative">
-                  <input
-                    type="date"
-                    name="birth_date"
-                    value={formData.birth_date}
-                    onChange={handleChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 cursor-not-allowed pr-10"
-                    disabled
-                  />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  </div>
-                </div>
+                <Calendar
+                  label="Birth Date"
+                  value={formData.birth_date}
+                  onChange={(value) => handleDateChange("birth_date", value)}
+                  maxDate={dayjs().format("YYYY-MM-DD")}
+                  disabled={true} // Make birth date non-editable
+                />
               </div>
 
               <div className="space-y-1">
@@ -369,6 +407,18 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                   </span>
                 </label>
               </div>
+
+              {!formData.active && (
+                <div className="space-y-1">
+                  <label className="block text-sm text-gray-700">Resignation Date</label>
+                  <Calendar
+                    label="Resignation Date"
+                    value={formData.resignation_date}
+                    onChange={(value) => handleDateChange("resignation_date", value)}
+                    maxDate={dayjs().format("YYYY-MM-DD")}
+                  />
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Other Information</label>
@@ -419,13 +469,50 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
             <button
               type="submit"
               className="px-6 py-2 text-sm font-medium text-white bg-[#5C7346] rounded-md hover:bg-[#4a5c38] focus:outline-none focus:ring-2 focus:ring-[#5C7346] disabled:opacity-50"
-              disabled={isSubmitting}
+              disabled={isSubmitting || (showResignationModal && !formData.resignation_date)}
             >
               {isSubmitting ? "Updating..." : "Update Employee"}
             </button>
           </div>
         </form>
       </div>
+
+      {/* Resignation Confirmation Modal */}
+      {showResignationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[60]">
+          <div className="bg-white rounded-lg w-full max-w-md p-6">
+            <h3 className="text-xl font-bold mb-4">Confirm Employee Resignation</h3>
+            <p className="mb-4">You are about to mark this employee as inactive. Please enter the resignation date:</p>
+
+            <div className="mb-6">
+              <Calendar
+                label="Resignation Date"
+                value={formData.resignation_date}
+                onChange={(value) => handleDateChange("resignation_date", value)}
+                maxDate={dayjs().format("YYYY-MM-DD")}
+                required
+              />
+              {!formData.resignation_date && <p className="text-red-500 text-sm mt-1">Resignation date is required</p>}
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={handleResignationCancel}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleResignationConfirm}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50"
+                disabled={!formData.resignation_date}
+              >
+                Confirm Resignation
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
