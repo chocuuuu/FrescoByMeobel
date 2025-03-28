@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Calendar from "./Calendar"
 
 function AddEmployee({ isOpen, onClose, onAdd }) {
   // Initial form state - flattened structure to match API
@@ -141,14 +140,6 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
     }
   }
 
-  // Handle date changes
-  const handleDateChange = (name, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
   // Reset form when modal is closed
   const handleClose = () => {
     resetForm()
@@ -281,12 +272,30 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
 
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Hire Date*</label>
-                <Calendar
-                  label="Hire Date"
-                  value={formData.hire_date}
-                  onChange={(value) => handleDateChange("hire_date", value)}
-                  disabled={false}
-                />
+                <div className="relative">
+                  <input
+                    type="date"
+                    name="hire_date"
+                    value={formData.hire_date}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346] bg-white pr-10"
+                    required
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg
+                      className="w-5 h-5 text-gray-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                        clipRule="evenodd"
+                      ></path>
+                    </svg>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -297,12 +306,29 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Birth Date</label>
-                <Calendar
-                  label="Birth Date"
-                  value={formData.birth_date}
-                  onChange={(value) => handleDateChange("birth_date", value)}
-                  disabled={false}
-                />
+                <div className="relative">
+                  <input
+                    type="date"
+                    name="birth_date"
+                    value={formData.birth_date}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346] bg-white pr-10"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg
+                      className="w-5 h-5 text-gray-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                        clipRule="evenodd"
+                      ></path>
+                    </svg>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1">
