@@ -3,33 +3,34 @@
 import { useState } from "react"
 
 function AddEmployee({ isOpen, onClose, onAdd }) {
-  // Initial form state - moved to a constant so we can reuse it
-  const initialFormState = {
-    user: {
-      role: "",
-      email: "",
-      password: "",
-    },
-    employment_info: {
-      employee_number: "",
-      first_name: "",
-      last_name: "",
-      position: "",
-      address: "",
-      hire_date: "",
-      status: "ACTIVE",
-      active: true,
-    },
+  // Initial form state - flattened structure to match API
+  const FormState = {
+    employee_number: "",
+    first_name: "",
+    last_name: "",
+    position: "",
+    address: "",
+    hire_date: "",
+    birth_date: "",
+    marital_status: "",
+    other_info: "",
+    profile_picture: null,
+    active: true,
+    role: "",
+    email: "",
+    password: "",
   }
 
-  const [formData, setFormData] = useState(initialFormState)
+  const [formData, setFormData] = useState(FormState)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [previewImage, setPreviewImage] = useState(null)
 
   // Function to reset the form to its initial state
   const resetForm = () => {
-    setFormData(initialFormState)
+    setFormData(FormState)
     setError("")
+    setPreviewImage(null)
   }
 
   const handleSubmit = async (e) => {
@@ -40,29 +41,35 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
     try {
       const accessToken = localStorage.getItem("access_token")
 
-      const requestPayload = {
-        email: formData.user.email,
-        password: formData.user.password,
-        role: formData.user.role,
-        employee_number: Number.parseInt(formData.employment_info.employee_number),
-        first_name: formData.employment_info.first_name,
-        last_name: formData.employment_info.last_name,
-        position: formData.employment_info.position,
-        address: formData.employment_info.address,
-        hire_date: formData.employment_info.hire_date,
-        status: formData.employment_info.status,
-        active: formData.employment_info.active,
-      }
+      // Create FormData object for file upload
+      const formDataToSend = new FormData()
 
-      console.log("Request Payload:", requestPayload)
+      // Add all form fields to FormData
+      Object.keys(formData).forEach((key) => {
+        if (key === "profile_picture" && formData[key]) {
+          // Handle file upload
+          formDataToSend.append(key, formData[key])
+        } else if (key === "employee_number") {
+          // Convert employee_number to number
+          formDataToSend.append(key, Number.parseInt(formData[key]))
+        } else if (key === "active") {
+          // Convert active to string 'true' or 'false'
+          formDataToSend.append(key, String(formData[key]))
+        } else if (formData[key] !== null && formData[key] !== "") {
+          // Add other fields
+          formDataToSend.append(key, formData[key])
+        }
+      })
+
+      console.log("Submitting employee data...")
 
       const response = await fetch("http://localhost:8000/api/v1/employment-info/", {
         method: "POST",
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
+          // Don't set Content-Type when using FormData, the browser will set it with the boundary
         },
-        body: JSON.stringify(requestPayload),
+        body: formDataToSend,
       })
 
       const responseText = await response.text()
@@ -102,16 +109,35 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
     }
   }
 
-  const handleChange = (e, section) => {
-    const { name, value, type, checked } = e.target
+  const handleChange = (e) => {
+    const { name, value, type, checked, files } = e.target
 
-    setFormData((prev) => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [name]: type === "checkbox" ? checked : value,
-      },
-    }))
+    if (type === "file") {
+      // Handle file upload for profile picture
+      if (files && files[0]) {
+        // Create a preview URL for the image
+        const previewUrl = URL.createObjectURL(files[0])
+        setPreviewImage(previewUrl)
+
+        // Update form data with the file
+        setFormData((prev) => ({
+          ...prev,
+          [name]: files[0],
+        }))
+      }
+    } else if (type === "checkbox") {
+      // Handle checkbox
+      setFormData((prev) => ({
+        ...prev,
+        [name]: checked,
+      }))
+    } else {
+      // Handle other form fields
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }))
+    }
   }
 
   // Reset form when modal is closed
@@ -124,7 +150,7 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg w-full max-w-2xl p-8 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg w-full max-w-4xl p-8 max-h-[90vh] overflow-y-auto">
         <h2 className="text-2xl font-bold mb-6">Add New Employee</h2>
 
         {error && (
@@ -136,14 +162,14 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* User Information Section */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">User Information</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="text-lg font-semibold border-b pb-2">User Information</h3>
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Role*</label>
                 <select
                   name="role"
-                  value={formData.user.role}
-                  onChange={(e) => handleChange(e, "user")}
+                  value={formData.role}
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
                   required
                 >
@@ -159,8 +185,8 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                 <input
                   type="email"
                   name="email"
-                  value={formData.user.email}
-                  onChange={(e) => handleChange(e, "user")}
+                  value={formData.email}
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
                   required
                 />
@@ -171,8 +197,8 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                 <input
                   type="password"
                   name="password"
-                  value={formData.user.password}
-                  onChange={(e) => handleChange(e, "user")}
+                  value={formData.password}
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
                   required
                 />
@@ -180,17 +206,17 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
             </div>
           </div>
 
-          {/* Employment Information Section */}
+          {/* Basic Employment Information Section */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Employment Information</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <h3 className="text-lg font-semibold border-b pb-2">Basic Employment Information</h3>
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Employee Number*</label>
                 <input
                   type="number"
                   name="employee_number"
-                  value={formData.employment_info.employee_number}
-                  onChange={(e) => handleChange(e, "employment_info")}
+                  value={formData.employee_number}
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
                   required
                 />
@@ -201,8 +227,8 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                 <input
                   type="text"
                   name="first_name"
-                  value={formData.employment_info.first_name}
-                  onChange={(e) => handleChange(e, "employment_info")}
+                  value={formData.first_name}
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
                   required
                 />
@@ -213,8 +239,8 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                 <input
                   type="text"
                   name="last_name"
-                  value={formData.employment_info.last_name}
-                  onChange={(e) => handleChange(e, "employment_info")}
+                  value={formData.last_name}
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
                   required
                 />
@@ -225,8 +251,8 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                 <input
                   type="text"
                   name="position"
-                  value={formData.employment_info.position}
-                  onChange={(e) => handleChange(e, "employment_info")}
+                  value={formData.position}
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
                   required
                 />
@@ -237,8 +263,8 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                 <input
                   type="text"
                   name="address"
-                  value={formData.employment_info.address}
-                  onChange={(e) => handleChange(e, "employment_info")}
+                  value={formData.address}
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
                   required
                 />
@@ -246,42 +272,129 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
 
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Hire Date*</label>
-                <input
-                  type="date"
-                  name="hire_date"
-                  value={formData.employment_info.hire_date}
-                  onChange={(e) => handleChange(e, "employment_info")}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type="date"
+                    name="hire_date"
+                    value={formData.hire_date}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346] bg-white pr-10"
+                    required
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg
+                      className="w-5 h-5 text-gray-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                        clipRule="evenodd"
+                      ></path>
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Information Section */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold border-b pb-2">Additional Information</h3>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="block text-sm text-gray-700">Birth Date</label>
+                <div className="relative">
+                  <input
+                    type="date"
+                    name="birth_date"
+                    value={formData.birth_date}
+                    onChange={handleChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346] bg-white pr-10"
+                  />
+                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                    <svg
+                      className="w-5 h-5 text-gray-500"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                      xmlns="http://www.w3.org/2000/svg"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
+                        clipRule="evenodd"
+                      ></path>
+                    </svg>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1">
-                <label className="block text-sm text-gray-700">Status*</label>
+                <label className="block text-sm text-gray-700">Marital Status</label>
                 <select
-                  name="status"
-                  value={formData.employment_info.status}
-                  onChange={(e) => handleChange(e, "employment_info")}
+                  name="marital_status"
+                  value={formData.marital_status}
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
-                  required
                 >
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
-                  <option value="ON_LEAVE">On Leave</option>
+                  <option value="">Select Status</option>
+                  <option value="single">Single</option>
+                  <option value="married">Married</option>
+                  <option value="divorced">Divorced</option>
+                  <option value="widowed">Widowed</option>
                 </select>
               </div>
 
-              <div className="space-y-1 flex items-center">
-                <label className="flex items-center space-x-2">
+              <div className="space-y-1">
+                <label className="block text-sm text-gray-700 mb-1">Employee Status</label>
+                <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     name="active"
-                    checked={formData.employment_info.active}
-                    onChange={(e) => handleChange(e, "employment_info")}
-                    className="h-4 w-4 text-[#5C7346] border-gray-300 rounded focus:ring-[#5C7346]"
+                    checked={formData.active}
+                    onChange={handleChange}
+                    className="sr-only peer"
                   />
-                  <span className="text-sm text-gray-700">Active Employee</span>
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5C7346] rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5C7346]"></div>
+                  <span className="ms-3 text-sm font-medium text-gray-700">
+                    {formData.active ? "Active" : "Inactive"}
+                  </span>
                 </label>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-sm text-gray-700">Other Information</label>
+                <textarea
+                  name="other_info"
+                  value={formData.other_info}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346] h-16 resize-none"
+                  placeholder="Add any additional information here"
+                />
+              </div>
+
+              <div className="space-y-1 col-span-2">
+                <label className="block text-sm text-gray-700 mb-2">Profile Picture</label>
+                <div className="flex flex-col items-center space-y-4">
+                  {previewImage && (
+                    <div className="h-24 w-24 rounded-full overflow-hidden border border-gray-300 shadow-md">
+                      <img
+                        src={previewImage || "/placeholder.svg"}
+                        alt="Profile preview"
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    name="profile_picture"
+                    accept="image/*"
+                    onChange={handleChange}
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-[#5C7346] file:text-white hover:file:bg-[#4a5c38]"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -290,7 +403,7 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
           <div className="flex justify-end space-x-4 pt-4">
             <button
               type="button"
-              onClick={handleClose} // Use handleClose instead of onClose
+              onClick={handleClose}
               className="px-6 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-400"
               disabled={isSubmitting}
             >
@@ -311,3 +424,4 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
 }
 
 export default AddEmployee
+
