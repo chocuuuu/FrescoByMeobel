@@ -5,7 +5,7 @@ import NavBar from "../components/Nav_Bar"
 import AddEmployee from "../components/Add_Employee"
 import EditEmployee from "../components/Edit_Employee"
 import DeleteEmployee from "../components/Delete_Employee"
-import { API_BASE_URL } from "../config/api";
+import { API_BASE_URL } from "../config/api"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -22,7 +22,7 @@ function AdminEmployeePage() {
   const [employeeToEdit, setEmployeeToEdit] = useState(null)
   const [employeeToDelete, setEmployeeToDelete] = useState(null)
   const employeesPerPage = 5
-  
+
   useEffect(() => {
     const fetchEmployees = async () => {
       setLoading(true)
@@ -291,7 +291,7 @@ function AdminEmployeePage() {
                     {/* Show Year Resigned only for inactive employees */}
                     {activeTab === "inactive" && (
                       <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
-                        {getYearFromDate(employee.inactive_date) || "-"}
+                        {getYearFromDate(employee.resignation_date) || "-"}
                       </td>
                     )}
 
