@@ -228,20 +228,20 @@ function AdminEmployeePage() {
             </div>
 
             {/* Search and Filters - Stack on mobile, side by side on larger screens */}
-            <div className="flex flex-col space-y-2 md:flex-row md:space-y-0 md:space-x-4 md:items-center">
+            <div className="flex flex-row md:flex-row md:space-y-0 md:space-x-2 md:items-center">
               <input
                 type="search"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full md:w-64"
+                className="px-4 py-2 mr-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full md:w-54"
               />
               {activeTab === "active" && (
                 <div className="flex space-x-2">
                   <select
                     value={yearFilter}
                     onChange={(e) => setYearFilter(e.target.value)}
-                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white flex-1 md:flex-none"
+                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
                   >
                     <option value="all">All Years</option>
                     {years.map((year) => (
@@ -253,7 +253,7 @@ function AdminEmployeePage() {
                   <select
                     value={roleFilter}
                     onChange={(e) => setRoleFilter(e.target.value)}
-                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white flex-1 md:flex-none"
+                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white md:flex-none"
                   >
                     <option value="all">All Roles</option>
                     {roles.map((role) => (
@@ -332,13 +332,13 @@ function AdminEmployeePage() {
                           <div className="flex space-x-2">
                             <button
                               onClick={() => handleDeleteClick(employee)}
-                              className="bg-red-600 text-white px-2 py-1 md:px-4 md:py-1 rounded-md hover:bg-red-700 transition-colors text-xs md:text-sm"
+                              className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-md md:text-lg"
                             >
                               Delete
                             </button>
                             <button
                               onClick={() => handleEditClick(employee)}
-                              className="bg-[#5C7346] text-white px-2 py-1 md:px-4 md:py-1 rounded-md hover:bg-[#4a5c38] transition-colors text-xs md:text-sm"
+                              className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors text-md md:text-lg"
                             >
                               Edit
                             </button>
