@@ -10,6 +10,8 @@ import AdminDashboardPage from './pages/Admin_Dashboard_Page'
 import AdminEmployeePayrollPage from './pages/Admin_Employee_Payroll_Page'
 import AdminEmployeePage from './pages/Admin_Employees_Page'
 import PayslipPage from "./pages/Payslip_Page"
+import AdminEmployeeAttendancePage from './pages/Admin_Employee_Attendance_Page';
+
 
 function LoginPage() {
   const navigate = useNavigate()
@@ -164,6 +166,7 @@ function App() {
         <Route path="/payslip" element={<PayslipPage />} />
         <Route path="/employee" element={<AdminEmployeePage />} />
         <Route path="/payroll" element={<AdminEmployeePayrollPage />} />
+        <Route path="/attendance" element={<AdminEmployeeAttendancePage />} />
           
       </Routes>
     </Router>
