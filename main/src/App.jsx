@@ -1,17 +1,18 @@
+"use client"
+
 import { useState, useEffect } from "react"
 import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom"
 
-
-import logo from './assets/Login_Page/fresco_logo_black.png'
-import leaf_1 from './assets/Login_Page/leaf-1.png'
-import leaf_2 from './assets/Login_Page/leaf-2.png'
-import leaf_3 from './assets/Login_Page/leaf-3.png'
-import AdminDashboardPage from './pages/Admin_Dashboard_Page'
-import AdminEmployeePayrollPage from './pages/Admin_Employee_Payroll_Page'
-import AdminEmployeePage from './pages/Admin_Employees_Page'
+import logo from "./assets/Login_Page/fresco_logo_black.png"
+import leaf_1 from "./assets/Login_Page/leaf-1.png"
+import leaf_2 from "./assets/Login_Page/leaf-2.png"
+import leaf_3 from "./assets/Login_Page/leaf-3.png"
+import AdminDashboardPage from "./pages/Admin_Dashboard_Page"
+import AdminEmployeePayrollPage from "./pages/Admin_Employee_Payroll_Page"
+import AdminEmployeePage from "./pages/Admin_Employees_Page"
 import PayslipPage from "./pages/Payslip_Page"
-import AdminEmployeeAttendancePage from './pages/Admin_Employee_Attendance_Page';
-
+import Admin_Employee_Edit_Schedule_Page from "./pages/Admin_Employee_Edit_Schedule_Page"
+import AdminEmployeeAttendancePage from './pages/Admin_Employee_Attendance_Page'
 
 function LoginPage() {
   const navigate = useNavigate()
@@ -119,7 +120,7 @@ function LoginPage() {
                   onChange={handleChange}
                   required
                   className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400
-                            focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 />
               </div>
               <div>
@@ -134,7 +135,7 @@ function LoginPage() {
                   onChange={handleChange}
                   required
                   className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400
-                            focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 />
               </div>
               {error && <div className="text-red-600 text-sm">{error}</div>}
@@ -166,8 +167,8 @@ function App() {
         <Route path="/payslip" element={<PayslipPage />} />
         <Route path="/employee" element={<AdminEmployeePage />} />
         <Route path="/payroll" element={<AdminEmployeePayrollPage />} />
+        <Route path="/employee/schedule/:employeeId" element={<Admin_Employee_Edit_Schedule_Page />} />
         <Route path="/attendance" element={<AdminEmployeeAttendancePage />} />
-          
       </Routes>
     </Router>
   )
