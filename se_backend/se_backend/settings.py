@@ -30,14 +30,32 @@ SECRET_KEY = config("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config("DEBUG", cast=bool)
 
-ALLOWED_HOSTS = ["localhost"]
-
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "http://localhost:5173",
+ALLOWED_HOSTS = [
+    ".techsauce5.win",  # add this to main repo
+    "techsauce5.win",
+    "localhost",
+    "127.0.0.1",
+    '8'
 ]
 
+CORS_ALLOWED_ORIGINS = [ # just add all of this
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://localhost:8001",
+    "http://localhost:5173",
+    "https://techsauce5.win", # add this to main repo
+]
+CORS_ALLOWED_ORIGIN_REGEXES = [ # this too
+    "http://127.0.0.1:5173",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:63342",
+    r"https://[A-Za-z0-9]+\.techsauce5\.win$"
+]
+
+CSRF_TRUSTED_ORIGINS = [  # this
+     'https://dev.techsauce5.win'
+]
 # Application definition
 
 INSTALLED_APPS = [
@@ -50,6 +68,7 @@ INSTALLED_APPS = [
     "drf_yasg",
     "django_filters",
     "corsheaders",
+    "django_celery_beat",
 
     # Rest-Framework
     "rest_framework",
@@ -69,6 +88,14 @@ INSTALLED_APPS = [
     "attendance_summary",
     "shift",
     "schedule",
+    "overtimebase",
+    "overtimehours",
+    "totalovertime",
+    "earnings",
+    "deductions",
+    "salary",
+    "payroll",
+    "payslip",
 
 ]
 
@@ -189,3 +216,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# Celery Configuration
+CELERY_BROKER_URL = 'redis://redis:6379/0'
+CELERY_RESULT_BACKEND = "redis://redis:6379/0"
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'

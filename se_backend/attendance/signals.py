@@ -2,7 +2,7 @@ import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils.timezone import now
-from datetime import timedelta
+from datetime import timedelta, date
 from .models import Attendance
 from attendance_summary.models import AttendanceSummary
 from shift.models import Shift
@@ -23,15 +23,22 @@ def calculate_minutes(check_in, check_out):
     return worked_minutes
 
 
+def get_biweekly_period(date):
+    """Determine the biweekly period start date."""
+    if date.day < 15:
+        prev_month = date.month - 1 if date.month > 1 else 12
+        prev_year = date.year if date.month > 1 else date.year - 1
+        last_day_prev_month = (date.replace(day=1) - timedelta(days=1)).day
+        return date.replace(month=prev_month, year=prev_year, day=last_day_prev_month)
+    else:
+        return date.replace(day=15)
+
+
 def get_shift_details(user, date):
     """Retrieve shift details for the given user and date."""
     biweekly_start = get_biweekly_period(date)
 
     logger.debug(f"[get_shift_details] Searching for Schedule with User ID: {user}, Biweekly Start: {biweekly_start}")
-
-    schedules = Schedule.objects.filter(user_id=user).values('id', 'bi_weekly_start')
-    logger.debug(f"[get_shift_details] Available schedules for User {user}: {list(schedules)}")
-
 
     schedule = Schedule.objects.filter(
         user_id=user,
@@ -39,26 +46,17 @@ def get_shift_details(user, date):
     ).order_by('-id').first()
 
     if not schedule:
-        logger.warning(f"[get_shift_details] No schedule for User: {user}, Date: {date}, Biweekly Start: {biweekly_start}")
+        logger.warning(
+            f"[get_shift_details] No schedule for User: {user}, Date: {date}, Biweekly Start: {biweekly_start}")
         return None
 
     shift = Shift.objects.filter(date=date, id__in=schedule.shift_ids.all()).first()
 
     if not shift:
-        logger.warning(f"[get_shift_details] No shift found for User: {user}, Date: {date}, Biweekly Start: {biweekly_start}")
+        logger.warning(
+            f"[get_shift_details] No shift found for User: {user}, Date: {date}, Biweekly Start: {biweekly_start}")
 
     return shift
-
-
-
-def get_biweekly_period(date):
-    """Determine the biweekly period start date."""
-    first_day = date.replace(day=1)
-    if date.day < 16:
-        return first_day
-    else:
-        return first_day + timedelta(days=15)
-
 
 
 @receiver(post_save, sender=Attendance)
@@ -128,7 +126,7 @@ def generate_attendance_summary(sender, instance, **kwargs):
             'actual_hours': total_actual_minutes // 60,
             'overtime_hours': total_overtime_minutes // 60,
             'late_minutes': total_late_minutes,
-            'undertime': total_undertime_minutes,
+            'undertime': total_undertime_minutes // 60,
             'attendance_id': instance
         }
     )

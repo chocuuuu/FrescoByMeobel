@@ -29,6 +29,7 @@ class Schedule(models.Model):
     payroll_period = models.DateField()
     hours = models.IntegerField()
     bi_weekly_start = models.DateField()
+    restday = models.IntegerField(null=True, blank=True)
 
     def __str__(self):
         return f"Schedule {self.id} for User {self.user_id}"

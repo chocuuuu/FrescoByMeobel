@@ -12,6 +12,7 @@ import AdminEmployeePayrollPage from "./pages/Admin_Employee_Payroll_Page"
 import AdminEmployeePage from "./pages/Admin_Employees_Page"
 import PayslipPage from "./pages/Payslip_Page"
 import Admin_Employee_Edit_Schedule_Page from "./pages/Admin_Employee_Edit_Schedule_Page"
+import AdminEmployeeAttendancePage from './pages/Admin_Employee_Attendance_Page'
 
 function LoginPage() {
   const navigate = useNavigate()
@@ -167,6 +168,7 @@ function App() {
         <Route path="/employee" element={<AdminEmployeePage />} />
         <Route path="/payroll" element={<AdminEmployeePayrollPage />} />
         <Route path="/employee/schedule/:employeeId" element={<Admin_Employee_Edit_Schedule_Page />} />
+        <Route path="/attendance" element={<AdminEmployeeAttendancePage />} />
       </Routes>
     </Router>
   )
