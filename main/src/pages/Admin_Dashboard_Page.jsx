@@ -1,5 +1,5 @@
-import React from "react";
-import NavBar from "../components/Nav_Bar";
+"use client"
+import NavBar from "../components/Nav_Bar"
 import { useNavigate } from "react-router-dom"
 
 function AdminDashboardPage() {
@@ -45,7 +45,7 @@ function AdminDashboardPage() {
       rate: "₱300/DAY",
       status: "Paid",
     },
-  ];
+  ]
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -70,10 +70,7 @@ function AdminDashboardPage() {
               </div>
               <div className="space-y-4">
                 {transaction_history.map((transaction) => (
-                  <div
-                    key={transaction.id}
-                    className="flex items-center justify-between space-x-4"
-                  >
+                  <div key={transaction.id} className="flex items-center justify-between space-x-4">
                     {/* Name and Role */}
                     <div className="flex items-center space-x-4 flex-1 min-w-0 max-w-[25%]">
                       <div className="bg-white rounded-full h-10 w-10"></div>
@@ -115,9 +112,7 @@ function AdminDashboardPage() {
               </div>
               <div className="flex justify-between items-center">
                 <p className="text-4xl font-bold">₱120,000</p>
-                <span className="inline-block bg-[#5C7346] text-white rounded-full px-4 py-1 text-sm">
-                  Paid
-                </span>
+                <span className="inline-block bg-[#5C7346] text-white rounded-full px-4 py-1 text-sm">Paid</span>
               </div>
             </div>
 
@@ -129,9 +124,7 @@ function AdminDashboardPage() {
               </div>
               <div className="flex justify-between items-center">
                 <p className="text-4xl font-bold">₱168,000</p>
-                <span className="inline-block bg-[#5C7346] text-white rounded-full px-4 py-1 text-sm">
-                  Pending
-                </span>
+                <span className="inline-block bg-[#5C7346] text-white rounded-full px-4 py-1 text-sm">Pending</span>
               </div>
             </div>
           </div>
@@ -139,16 +132,15 @@ function AdminDashboardPage() {
 
         {/* Bottom Buttons */}
         <div className="flex gap-4 mt-12">
-          <button className="bg-gray-800 text-white px-6 py-2 rounded-md w-32">
-            Attendance
-          </button>
+          <button className="bg-gray-800 text-white px-6 py-2 rounded-md w-32">Attendance</button>
           <button onClick={() => navigate("/payslip")} className="bg-gray-800 text-white px-6 py-2 rounded-md w-32">
             Payslip
           </button>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
-export default AdminDashboardPage;
+export default AdminDashboardPage
+

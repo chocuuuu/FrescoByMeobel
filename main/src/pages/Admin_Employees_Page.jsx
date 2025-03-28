@@ -5,6 +5,7 @@ import NavBar from "../components/Nav_Bar"
 import AddEmployee from "../components/Add_Employee"
 import EditEmployee from "../components/Edit_Employee"
 import DeleteEmployee from "../components/Delete_Employee"
+import { API_BASE_URL } from "../config/api"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -22,40 +23,40 @@ function AdminEmployeePage() {
   const [employeeToDelete, setEmployeeToDelete] = useState(null)
   const employeesPerPage = 5
 
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      setLoading(true)
-      setError(null)
+  const fetchEmployees = async () => {
+    setLoading(true)
+    setError(null)
 
-      try {
-        const accessToken = localStorage.getItem("access_token")
-        const response = await fetch("http://localhost:8000/api/v1/employment-info/", {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const response = await fetch(`${API_BASE_URL}/employment-info/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
 
-        const data = await response.json()
-        console.log("Fetched employee data:", data)
+      const data = await response.json()
+      console.log("Fetched employee data:", data)
 
-        if (response.ok) {
-          if (Array.isArray(data)) {
-            setEmployees(data)
-          } else {
-            setError("Unexpected data format received from the server.")
-          }
+      if (response.ok) {
+        if (Array.isArray(data)) {
+          setEmployees(data)
         } else {
-          setError(data.message || "Failed to fetch employee data. Please try again.")
+          setError("Unexpected data format received from the server.")
         }
-      } catch (error) {
-        console.error("Error fetching employees:", error)
-        setError("An error occurred while fetching employee data. Please try again later.")
-      } finally {
-        setLoading(false)
+      } else {
+        setError(data.message || "Failed to fetch employee data. Please try again.")
       }
+    } catch (error) {
+      console.error("Error fetching employees:", error)
+      setError("An error occurred while fetching employee data. Please try again later.")
+    } finally {
+      setLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchEmployees()
   }, [])
 
@@ -71,7 +72,11 @@ function AdminEmployeePage() {
   }
 
   const handleAddEmployee = (newEmployee) => {
-    setEmployees((prev) => [...prev, newEmployee])
+    // Add the new employee to the beginning of the array instead of the end
+    setEmployees((prev) => [newEmployee, ...prev])
+
+    // Reset to the first page to ensure the new employee is visible
+    setCurrentPage(1)
   }
 
   const handleEditClick = (employee) => {
@@ -82,9 +87,20 @@ function AdminEmployeePage() {
 
   const handleUpdateEmployee = async (updatedEmployee) => {
     try {
+      console.log("Updated employee data:", updatedEmployee)
+
+      // First update the local state
       setEmployees((prevEmployees) =>
         prevEmployees.map((emp) => (emp.id === updatedEmployee.id ? updatedEmployee : emp)),
       )
+
+      // Then fetch fresh data from the server to ensure everything is in sync
+      await fetchEmployees()
+
+      // If this was a resignation, switch to the inactive tab
+      if (updatedEmployee.resignation_date && !updatedEmployee.active) {
+        setActiveTab("inactive")
+      }
     } catch (error) {
       console.error("Error updating employee state:", error)
     }
@@ -154,7 +170,7 @@ function AdminEmployeePage() {
       if (!employeeToDelete) return
 
       const accessToken = localStorage.getItem("access_token")
-      const response = await fetch(`http://localhost:8000/api/v1/employment-info/${employeeToDelete.id}/`, {
+      const response = await fetch(`${API_BASE_URL}/employment-info/${employeeToDelete.id}/`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -188,12 +204,13 @@ function AdminEmployeePage() {
       <NavBar />
 
       <div className="container mx-auto px-4 pt-24">
-        <div className="bg-[#A7BC8F] rounded-lg p-6">
-          {/* Header Section */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="space-x-2">
+        <div className="bg-[#A7BC8F] rounded-lg p-4 md:p-6">
+          {/* Header Section - Responsive Layout */}
+          <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:justify-between md:items-center mb-6">
+            {/* Tab Buttons - Always at the top on mobile */}
+            <div className="flex space-x-2">
               <button
-                className={`px-6 py-2 rounded-md ${
+                className={`px-4 py-2 md:px-6 md:py-2 rounded-md ${
                   activeTab === "active" ? "bg-[#5C7346] text-white font-semibold" : "bg-[#D1DBC4] text-gray-700"
                 }`}
                 onClick={() => handleTabChange("active")}
@@ -201,7 +218,7 @@ function AdminEmployeePage() {
                 ACTIVE
               </button>
               <button
-                className={`px-6 py-2 rounded-md ${
+                className={`px-4 py-2 md:px-6 md:py-2 rounded-md ${
                   activeTab === "inactive" ? "bg-[#5C7346] text-white font-semibold" : "bg-[#D1DBC4] text-gray-700"
                 }`}
                 onClick={() => handleTabChange("inactive")}
@@ -209,16 +226,18 @@ function AdminEmployeePage() {
                 INACTIVE
               </button>
             </div>
-            <div className="flex items-center space-x-4">
+
+            {/* Search and Filters - Stack on mobile, side by side on larger screens */}
+            <div className="flex flex-row md:flex-row md:space-y-0 md:space-x-2 md:items-center">
               <input
                 type="search"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-64"
+                className="px-4 py-2 mr-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full md:w-54"
               />
               {activeTab === "active" && (
-                <>
+                <div className="flex space-x-2">
                   <select
                     value={yearFilter}
                     onChange={(e) => setYearFilter(e.target.value)}
@@ -234,7 +253,7 @@ function AdminEmployeePage() {
                   <select
                     value={roleFilter}
                     onChange={(e) => setRoleFilter(e.target.value)}
-                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
+                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white md:flex-none"
                   >
                     <option value="all">All Roles</option>
                     {roles.map((role) => (
@@ -243,109 +262,116 @@ function AdminEmployeePage() {
                       </option>
                     ))}
                   </select>
-                </>
+                </div>
               )}
             </div>
           </div>
 
           {/* Title */}
-          <h2 className="text-2xl font-semibold text-white mb-4">Employees</h2>
+          <h2 className="text-xl md:text-2xl font-semibold text-white mb-4">Employees</h2>
 
-          {/* Employee Table */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-fixed">
-              <thead>
-                <tr className="text-left text-white border-b border-white/20">
-                  <th className="py-3 px-4 w-[10%]">ID</th>
-                  <th className="py-3 px-4 w-[30%]">NAME</th>
-                  <th className="py-3 px-4 w-[20%]">POSITION</th>
-                  <th className="py-3 px-4 w-[15%]">YEAR EMPLOYED</th>
-                  {activeTab === "inactive" && <th className="py-3 px-4 w-[15%]">YEAR RESIGNED</th>}
-                  {activeTab === "active" && <th className="py-3 px-4 w-[10%]">STATUS</th>}
-                  {activeTab === "active" && <th className="py-3 px-4 w-[15%]">ACTIONS</th>}
-                </tr>
-              </thead>
-              <tbody className="text-white">
-                {currentEmployees.map((employee) => (
-                  <tr key={employee.id} className="border-b border-white/10">
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
-                      {employee.employee_number}
-                    </td>
-                    <td
-                      className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap"
-                      title={`${employee.first_name} ${employee.last_name}`}
-                    >
-                      {(() => {
-                        const fullName = `${employee.first_name} ${employee.last_name}`
-                        return fullName.length > 60 ? fullName.substring(0, 57) + "..." : fullName
-                      })()}
-                    </td>
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap" title={employee.position}>
-                      {employee.position}
-                    </td>
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
-                      {getYearFromDate(employee.hire_date)}
-                    </td>
-
-                    {/* Show Year Resigned only for inactive employees */}
-                    {activeTab === "inactive" && (
+          {/* Employee Table - Responsive with horizontal scroll on small screens */}
+          <div className="overflow-x-auto -mx-4 md:mx-0">
+            <div className="min-w-[800px] md:min-w-0 px-4 md:px-0">
+              <table className="w-full table-fixed">
+                <thead>
+                  <tr className="text-left text-white border-b border-white/20">
+                    <th className="py-3 px-4 w-[10%]">ID</th>
+                    <th className="py-3 px-4 w-[30%]">NAME</th>
+                    <th className="py-3 px-4 w-[20%]">POSITION</th>
+                    <th className="py-3 px-4 w-[15%]">YEAR EMPLOYED</th>
+                    {activeTab === "inactive" && <th className="py-3 px-4 w-[15%]">YEAR RESIGNED</th>}
+                    {activeTab === "active" && <th className="py-3 px-4 w-[10%]">STATUS</th>}
+                    {activeTab === "active" && <th className="py-3 px-4 w-[15%]">ACTIONS</th>}
+                  </tr>
+                </thead>
+                <tbody className="text-white">
+                  {currentEmployees.map((employee) => (
+                    <tr key={employee.id} className="border-b border-white/10">
                       <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
-                        {getYearFromDate(employee.inactive_date) || "-"}
+                        {employee.employee_number}
                       </td>
-                    )}
-
-                    {/* Status column - only for active tab */}
-                    {activeTab === "active" && (
-                      <td className="py-3 px-4">
-                        <span className="px-4 py-1 bg-green-100 text-green-800 rounded-full font-medium whitespace-nowrap">
-                          Active
-                        </span>
+                      <td
+                        className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={`${employee.first_name} ${employee.last_name}`}
+                      >
+                        {(() => {
+                          const fullName = `${employee.first_name} ${employee.last_name}`
+                          return fullName.length > 60 ? fullName.substring(0, 57) + "..." : fullName
+                        })()}
                       </td>
-                    )}
-
-                    {/* Actions column - only for active tab */}
-                    {activeTab === "active" && (
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleDeleteClick(employee)}
-                            className="bg-red-600 text-white px-4 py-1 rounded-md hover:bg-red-700 transition-colors"
-                          >
-                            Delete
-                          </button>
-                          <button
-                            onClick={() => handleEditClick(employee)}
-                            className="bg-[#5C7346] text-white px-4 py-1 rounded-md hover:bg-[#4a5c38] transition-colors"
-                          >
-                            Edit
-                          </button>
-                        </div>
+                      <td
+                        className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap"
+                        title={employee.position}
+                      >
+                        {employee.position}
                       </td>
-                    )}
-                  </tr>
-                ))}
+                      <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                        {getYearFromDate(employee.hire_date)}
+                      </td>
 
-                {/* Empty rows for consistent height */}
-                {[...Array(Math.max(0, employeesPerPage - currentEmployees.length))].map((_, index) => (
-                  <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
-                    <td colSpan={activeTab === "inactive" ? "5" : "7"}></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      {/* Show Year Resigned only for inactive employees */}
+                      {activeTab === "inactive" && (
+                        <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
+                          {getYearFromDate(employee.resignation_date) || "-"}
+                        </td>
+                      )}
+
+                      {/* Status column - only for active tab */}
+                      {activeTab === "active" && (
+                        <td className="py-3 px-4">
+                          <span className="px-4 py-1 bg-green-100 text-green-800 rounded-full font-medium whitespace-nowrap">
+                            Active
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Actions column - only for active tab */}
+                      {activeTab === "active" && (
+                        <td className="py-3 px-4 whitespace-nowrap">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleDeleteClick(employee)}
+                              className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-md md:text-lg"
+                            >
+                              Delete
+                            </button>
+                            <button
+                              onClick={() => handleEditClick(employee)}
+                              className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors text-md md:text-lg"
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+
+                  {/* Empty rows for consistent height */}
+                  {[...Array(Math.max(0, employeesPerPage - currentEmployees.length))].map((_, index) => (
+                    <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
+                      <td colSpan={activeTab === "inactive" ? "5" : "7"}></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {/* Footer Section */}
-          <div className="flex justify-between items-center mt-4">
+          {/* Footer Section - Responsive layout */}
+          <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:justify-between md:items-center mt-6">
             {activeTab === "active" && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="bg-[#5C7346] text-white px-6 py-2 rounded-md hover:bg-[#4a5c38] transition-colors font-medium"
+                className="bg-[#5C7346] text-white px-6 py-2 rounded-md hover:bg-[#4a5c38] transition-colors font-medium w-full md:w-auto"
               >
                 Add Account
               </button>
             )}
-            <div className={`flex space-x-2 ${activeTab === "inactive" ? "ml-auto" : ""}`}>
+            <div
+              className={`flex justify-center space-x-2 ${activeTab === "inactive" ? "md:ml-auto" : ""} ${activeTab === "active" ? "w-full md:w-auto" : ""}`}
+            >
               <button
                 onClick={prevPage}
                 disabled={currentPage === 1}
@@ -353,7 +379,7 @@ function AdminEmployeePage() {
               >
                 Previous
               </button>
-              <div className="bg-white text-[#5C7346] px-4 py-2 rounded-md">
+              <div className="bg-white text-[#5C7346] px-4 py-2 rounded-md min-w-[80px] text-center">
                 {currentPage} of {totalPages}
               </div>
               <button
