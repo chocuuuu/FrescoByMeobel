@@ -13,6 +13,7 @@ import AdminEmployeePage from "./pages/Admin_Employees_Page"
 import PayslipPage from "./pages/Payslip_Page"
 import Admin_Employee_Edit_Schedule_Page from "./pages/Admin_Employee_Edit_Schedule_Page"
 import AdminEmployeeAttendancePage from './pages/Admin_Employee_Attendance_Page'
+import { API_BASE_URL } from "./config/api"
 
 function LoginPage() {
   const navigate = useNavigate()
@@ -28,7 +29,7 @@ function LoginPage() {
 
     try {
       // Sending the POST request to the API
-      const response = await fetch("http://localhost:8000/api/v1/auth/login/", {
+      const response = await fetch(`${API_BASE_URL}/auth/login/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
