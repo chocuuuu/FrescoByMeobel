@@ -5,18 +5,19 @@ import NavBar from "../components/Nav_Bar.jsx"
 import { API_BASE_URL } from "../config/api"
 
 function AdminEmployeeAttendancePage() {
+  // Calculate biweekly date range (today to 14 days from today)
+  const today = new Date()
+  const twoWeeksLater = new Date(today)
+  twoWeeksLater.setDate(today.getDate() + 14)
+
   const [attendanceData, setAttendanceData] = useState([])
+  const [rawAttendanceData, setRawAttendanceData] = useState([])
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const [selectedEmployee, setSelectedEmployee] = useState(null)
-  const [dateRange, setDateRange] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0], // First day of current month
-    endDate: new Date().toISOString().split("T")[0], // Today
-  })
-  const recordsPerPage = 10
+  const recordsPerPage = 7
 
   // Fetch employees for the dropdown
   useEffect(() => {
@@ -36,6 +37,7 @@ function AdminEmployeeAttendancePage() {
 
         const data = await response.json()
         setEmployees(data)
+        console.log("Employees fetched:", data.length)
       } catch (error) {
         console.error("Error fetching employees:", error)
         setError("An error occurred while fetching employees. Please try again later.")
@@ -57,21 +59,11 @@ function AdminEmployeeAttendancePage() {
         let url = `${API_BASE_URL}/attendance/`
         const params = new URLSearchParams()
 
-        if (selectedEmployee) {
-          params.append("user", selectedEmployee)
-        }
-
-        if (dateRange.startDate) {
-          params.append("date_after", dateRange.startDate)
-        }
-
-        if (dateRange.endDate) {
-          params.append("date_before", dateRange.endDate)
-        }
-
         if (params.toString()) {
           url += `?${params.toString()}`
         }
+
+        console.log("Fetching attendance data from:", url)
 
         const response = await fetch(url, {
           headers: {
@@ -81,14 +73,14 @@ function AdminEmployeeAttendancePage() {
         })
 
         if (!response.ok) {
-          throw new Error("Failed to fetch attendance data")
+          throw new Error(`Failed to fetch attendance data: ${response.status} ${response.statusText}`)
         }
 
         const data = await response.json()
+        console.log("Attendance data fetched:", data.length, data)
 
-        // Process the attendance data to include employee names
-        const processedData = await enrichAttendanceData(data)
-        setAttendanceData(processedData)
+        // Store the raw data
+        setRawAttendanceData(data)
       } catch (error) {
         console.error("Error fetching attendance data:", error)
         setError("An error occurred while fetching attendance data. Please try again later.")
@@ -98,17 +90,50 @@ function AdminEmployeeAttendancePage() {
     }
 
     fetchAttendanceData()
-  }, [selectedEmployee, dateRange])
+  }, [])
+
+  // Process attendance data whenever raw data or employees change
+  useEffect(() => {
+    const processAttendanceData = async () => {
+      if (rawAttendanceData.length > 0 && employees.length > 0) {
+        const processedData = await enrichAttendanceData(rawAttendanceData)
+
+        // Sort the processed data by date in descending order (newest first)
+        const sortedData = [...processedData].sort((a, b) => {
+          // Convert dates to timestamps for comparison
+          const dateA = new Date(a.date).getTime()
+          const dateB = new Date(b.date).getTime()
+
+          // Sort in descending order (newest first)
+          return dateB - dateA
+        })
+
+        setAttendanceData(sortedData)
+      }
+    }
+
+    processAttendanceData()
+  }, [rawAttendanceData, employees])
 
   // Enrich attendance data with employee names
   const enrichAttendanceData = async (attendanceRecords) => {
-    // If no employees or attendance records, return empty array
-    if (!employees.length || !attendanceRecords.length) {
-      return attendanceRecords
+    // If no attendance records, return empty array
+    if (!attendanceRecords || !Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
+      console.log("No attendance records to process")
+      return []
     }
 
-    console.log("Employees data:", employees)
-    console.log("Attendance records:", attendanceRecords)
+    // If no employees data, return records with placeholders
+    if (!employees || employees.length === 0) {
+      console.log("No employee data available for mapping")
+      return attendanceRecords.map((record) => ({
+        ...record,
+        employee_name: `Loading... (ID: ${record.user})`,
+        employee_id: "Loading...",
+        time_in: formatTime(record.check_in_time),
+        time_out: formatTime(record.check_out_time),
+      }))
+    }
 
     // Create a map of user IDs to employee information
     const employeeMap = new Map()
@@ -121,19 +146,15 @@ function AdminEmployeeAttendancePage() {
           name: `${employee.first_name} ${employee.last_name}`,
           employeeNumber: employee.employee_number,
         })
-        console.log(`Mapped user ID ${userId} to employee ${employee.first_name} ${employee.last_name}`)
       }
     })
 
-    console.log("Employee map:", Array.from(employeeMap.entries()))
+    console.log("Employee map created with", employeeMap.size, "entries")
 
     // Enrich attendance records with employee names
-    const enrichedRecords = attendanceRecords.map((record) => {
+    return attendanceRecords.map((record) => {
       const userId = record.user
-      console.log(`Looking up user ID ${userId} in employee map`)
-
       const employeeInfo = employeeMap.get(userId)
-      console.log(`Found employee info:`, employeeInfo)
 
       return {
         ...record,
@@ -144,9 +165,6 @@ function AdminEmployeeAttendancePage() {
         time_out: formatTime(record.check_out_time),
       }
     })
-
-    console.log("Enriched records:", enrichedRecords)
-    return enrichedRecords
   }
 
   // Helper function to format time from "HH:MM:SS" to "HH:MM AM/PM"
@@ -169,26 +187,6 @@ function AdminEmployeeAttendancePage() {
       console.error("Error formatting time:", error)
       return timeString // Return original if parsing fails
     }
-  }
-
-  // Log employees data when it changes
-  useEffect(() => {
-    if (employees.length > 0) {
-      console.log("Employees loaded:", employees.length)
-      console.log("Sample employee structure:", employees[0])
-    }
-  }, [employees])
-
-  const handleEmployeeChange = (e) => {
-    setSelectedEmployee(e.target.value)
-  }
-
-  const handleDateRangeChange = (e) => {
-    const { name, value } = e.target
-    setDateRange((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
   }
 
   const filteredAttendanceData = attendanceData.filter(
@@ -215,13 +213,13 @@ function AdminEmployeeAttendancePage() {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case "present":
-        return "bg-green-500"
+        return "bg-green-100 text-green-800"
       case "late":
-        return "bg-yellow-500"
+        return "bg-yellow-400 text-yellow-800"
       case "absent":
-        return "bg-red-500"
+        return "bg-red-500 text-white"
       default:
-        return "bg-gray-500"
+        return "bg-gray-500 text-white"
     }
   }
 
@@ -235,99 +233,46 @@ function AdminEmployeeAttendancePage() {
       <div className="container mx-auto px-4 pt-24">
         <div className="bg-[#A7BC8F] rounded-lg p-6">
           {/* Header Section */}
-          <div className="flex justify-between items-center mb-6">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <h2 className="text-2xl font-semibold text-white">Attendance Records</h2>
-            <div className="flex items-center space-x-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <input
                 type="search"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
+                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full sm:w-auto"
               />
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="bg-white p-4 rounded-lg mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label htmlFor="employee" className="block text-sm font-medium text-gray-700 mb-1">
-                  Employee
-                </label>
-                <select
-                  id="employee"
-                  value={selectedEmployee || ""}
-                  onChange={handleEmployeeChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#5C7346] focus:border-[#5C7346]"
-                >
-                  <option value="">All Employees</option>
-                  {employees.map((employee) => {
-                    // Only include employees with a user ID
-                    if (employee.user?.id) {
-                      return (
-                        <option key={employee.id} value={employee.user.id}>
-                          {employee.first_name} {employee.last_name}
-                        </option>
-                      )
-                    }
-                    return null
-                  })}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  id="startDate"
-                  name="startDate"
-                  value={dateRange.startDate}
-                  onChange={handleDateRangeChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#5C7346] focus:border-[#5C7346]"
-                />
-              </div>
-              <div>
-                <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  id="endDate"
-                  name="endDate"
-                  value={dateRange.endDate}
-                  onChange={handleDateRangeChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#5C7346] focus:border-[#5C7346]"
-                />
-              </div>
             </div>
           </div>
 
           {/* Attendance Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full table-fixed">
-              <thead>
+            <thead>
                 <tr className="text-left text-white border-b border-white/20">
-                  <th className="py-3 px-4 w-[15%]">DATE</th>
+                  
+                  <th className="py-3 px-4 w-[10%]">DATE</th>
                   <th className="py-3 px-4 w-[15%]">EMPLOYEE ID</th>
-                  <th className="py-3 px-4 w-[20%]">NAME</th>
+                  <th className="py-3 px-4 w-[30%]">NAME</th>
                   <th className="py-3 px-4 w-[15%]">TIME IN</th>
                   <th className="py-3 px-4 w-[15%]">TIME OUT</th>
-                  <th className="py-3 px-4 w-[20%]">STATUS</th>
+                  <th className="py-3 px-4 w-[15%]">STATUS</th>
+
                 </tr>
               </thead>
               <tbody className="text-white">
                 {currentRecords.length > 0 ? (
                   currentRecords.map((record) => (
-                    <tr key={record.id} className="border-b border-white/10">
+                    <tr key={record.id} className="border-b border-white/10 text-md">
                       <td className="py-3 px-4">{new Date(record.date).toLocaleDateString()}</td>
                       <td className="py-3 px-4">{record.employee_id}</td>
                       <td className="py-3 px-4">{record.employee_name}</td>
                       <td className="py-3 px-4">{record.time_in}</td>
                       <td className="py-3 px-4">{record.time_out}</td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(record.status)}`}>
+                        <span className={`px-4 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(record.status)}`}>
+
                           {record.status || "Unknown"}
                         </span>
                       </td>
