@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar.jsx"
+import EditPayroll from "../components/Edit_Payroll.jsx"
 import { API_BASE_URL } from "../config/api"
 
 function AdminEmployeePayrollPage() {
@@ -11,7 +12,9 @@ function AdminEmployeePayrollPage() {
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
-  const recordsPerPage = 8
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedEmployee, setSelectedEmployee] = useState(null)
+  const recordsPerPage = 10
 
   // Fetch employees
   useEffect(() => {
@@ -73,15 +76,51 @@ function AdminEmployeePayrollPage() {
         id: employee.id,
         employee_id: employee.employee_number,
         employee_name: `${employee.first_name} ${employee.last_name}`,
-        department: employee.department || "General",
         position: employee.position || "Staff",
         base_salary: baseSalary,
         allowances: allowances,
         deductions: deductions,
         net_salary: netSalary,
         status: "Pending", // Placeholder status
+        // Add fields needed for the Edit_Payroll component
+        rate_per_month: baseSalary.toString(),
       }
     })
+  }
+
+  // Handle edit payroll - open modal with employee data
+  const handleEditPayroll = (employeeId) => {
+    const employee = payrollData.find((emp) => emp.id === employeeId)
+    if (employee) {
+      setSelectedEmployee(employee)
+      setIsEditModalOpen(true)
+    }
+  }
+
+  // Handle payroll update
+  const handlePayrollUpdate = (updatedData) => {
+    console.log("Updating payroll data:", updatedData)
+    // Here you would typically send the updated data to your API
+    // For now, we'll just update the local state
+
+    if (selectedEmployee) {
+      const updatedPayrollData = payrollData.map((emp) => {
+        if (emp.id === selectedEmployee.id) {
+          return {
+            ...emp,
+            base_salary: Number.parseFloat(updatedData.baseSalary),
+            deductions: Number.parseFloat(updatedData.totalDeductions),
+            net_salary: Number.parseFloat(updatedData.totalSalaryCompensation),
+            status: "Processing", // Change status after update
+          }
+        }
+        return emp
+      })
+
+      setPayrollData(updatedPayrollData)
+      setIsEditModalOpen(false)
+      setSelectedEmployee(null)
+    }
   }
 
   // Filter payroll data based on search term
@@ -89,8 +128,7 @@ function AdminEmployeePayrollPage() {
     return (
       record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.employee_id?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.position?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.department?.toLowerCase().includes(searchTerm.toLowerCase())
+      record.position?.toLowerCase().includes(searchTerm.toLowerCase())
     )
   })
 
@@ -176,13 +214,13 @@ function AdminEmployeePayrollPage() {
             <table className="min-w-full table-fixed">
               <thead>
                 <tr className="text-left text-white border-b border-white/20">
-                  <th className="py-3 px-4 w-[10%]">EMPLOYEE ID</th>
+                  <th className="py-3 px-4 w-[12%]">EMPLOYEE ID</th>
                   <th className="py-3 px-4 w-[20%]">NAME</th>
-                  <th className="py-3 px-4 w-[15%]">DEPARTMENT</th>
-                  <th className="py-3 px-4 w-[15%]">POSITION</th>
+                  <th className="py-3 px-4 w-[13%]">POSITION</th>
                   <th className="py-3 px-4 w-[15%]">GROSS SALARY</th>
                   <th className="py-3 px-4 w-[15%]">NET SALARY</th>
                   <th className="py-3 px-4 w-[10%]">STATUS</th>
+                  <th className="py-3 px-4 w-[15%]">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="text-white">
@@ -191,7 +229,6 @@ function AdminEmployeePayrollPage() {
                     <tr key={record.id} className="border-b border-white/10">
                       <td className="py-3 px-4">{record.employee_id}</td>
                       <td className="py-3 px-4">{record.employee_name}</td>
-                      <td className="py-3 px-4">{record.department}</td>
                       <td className="py-3 px-4">{record.position}</td>
                       <td className="py-3 px-4">{formatCurrency(record.base_salary)}</td>
                       <td className="py-3 px-4">{formatCurrency(record.net_salary)}</td>
@@ -199,6 +236,14 @@ function AdminEmployeePayrollPage() {
                         <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(record.status)}`}>
                           {record.status}
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => handleEditPayroll(record.id)}
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm transition-colors"
+                        >
+                          Edit Payroll
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -253,6 +298,17 @@ function AdminEmployeePayrollPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Payroll Modal */}
+      <EditPayroll
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedEmployee(null)
+        }}
+        employeeData={selectedEmployee}
+        onUpdate={handlePayrollUpdate}
+      />
     </div>
   )
 }
