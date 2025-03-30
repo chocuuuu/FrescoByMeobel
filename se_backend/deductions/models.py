@@ -8,8 +8,6 @@ class Deductions(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True)
     wtax = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     nowork = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    late = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    undertime = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     loan = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     charges = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     msfcloan =models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
