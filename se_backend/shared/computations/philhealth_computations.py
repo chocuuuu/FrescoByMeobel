@@ -6,6 +6,6 @@ def compute_philhealth_contribution(basic_salary):
     total_contribution = basic_salary * Decimal(.05)
 
     return {
-        "Basic Salary": Decimal(total_contribution),
+        "Basic Salary": Decimal(basic_salary),
         "Total Contribution": Decimal(total_contribution),
     }
