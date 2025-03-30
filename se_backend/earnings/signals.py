@@ -89,23 +89,20 @@ def update_pagibig_contribution(sender, instance, **kwargs):
 
         logger.info(f"Computed Pagibig Data: {pagibig_data}")
 
-        # Save or update the Pagibig contribution for the user
-        pagibig_record, created = Pagibig.objects.update_or_create(
-            user=instance.user,
-            basic_salary=instance.basic_rate,
-            defaults={
-                "employee_share": pagibig_data["Employee Share"],
-                "employer_share": pagibig_data["Employer Share"],
-                "total_contribution": pagibig_data["Total Contribution"],
-            }
-        )
+        # Ensure only one Pagibig record per user
+        pagibig_record, created = Pagibig.objects.get_or_create(user=instance.user)
+
+        # Update existing record
+        pagibig_record.basic_salary = instance.basic_rate
+        pagibig_record.employee_share = pagibig_data["Employee Share"]
+        pagibig_record.employer_share = pagibig_data["Employer Share"]
+        pagibig_record.total_contribution = pagibig_data["Total Contribution"]
+        pagibig_record.save()
 
         if created:
-            logger.info(
-                f"Created new Pagibig record for user: {instance.user.id}, Contribution ID: {pagibig_record.id}")
+            logger.info(f"Created new Pagibig record for user: {instance.user.id}, Contribution ID: {pagibig_record.id}")
         else:
-            logger.info(
-                f"Updated existing Pagibig record for user: {instance.user.id}, Contribution ID: {pagibig_record.id}")
+            logger.info(f"Updated existing Pagibig record for user: {instance.user.id}, Contribution ID: {pagibig_record.id}")
+
     else:
         logger.warning(f"Basic rate is None for user: {instance.user.id}, skipping computation.")
-
