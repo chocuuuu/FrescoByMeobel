@@ -14,7 +14,7 @@ function AdminEmployeePayrollPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
-  const recordsPerPage = 10
+  const recordsPerPage = 5
 
   // Fetch employees
   useEffect(() => {
@@ -81,7 +81,7 @@ function AdminEmployeePayrollPage() {
         allowances: allowances,
         deductions: deductions,
         net_salary: netSalary,
-        status: "Pending", // Placeholder status
+        status: "Paid", // Placeholder status
         // Add fields needed for the Edit_Payroll component
         rate_per_month: baseSalary.toString(),
       }
@@ -214,11 +214,11 @@ function AdminEmployeePayrollPage() {
             <table className="min-w-full table-fixed">
               <thead>
                 <tr className="text-left text-white border-b border-white/20">
-                  <th className="py-3 px-4 w-[12%]">EMPLOYEE ID</th>
-                  <th className="py-3 px-4 w-[20%]">NAME</th>
-                  <th className="py-3 px-4 w-[13%]">POSITION</th>
-                  <th className="py-3 px-4 w-[15%]">GROSS SALARY</th>
-                  <th className="py-3 px-4 w-[15%]">NET SALARY</th>
+                  <th className="py-3 px-4 w-[10%]">ID</th>
+                  <th className="py-3 px-4 w-[30%]">NAME</th>
+                  <th className="py-3 px-4 w-[15%]">POSITION</th>
+                  <th className="py-3 px-4 w-[12%]">GROSS SALARY</th>
+                  <th className="py-3 px-4 w-[12%]">NET SALARY</th>
                   <th className="py-3 px-4 w-[10%]">STATUS</th>
                   <th className="py-3 px-4 w-[15%]">ACTIONS</th>
                 </tr>
@@ -233,14 +233,14 @@ function AdminEmployeePayrollPage() {
                       <td className="py-3 px-4">{formatCurrency(record.base_salary)}</td>
                       <td className="py-3 px-4">{formatCurrency(record.net_salary)}</td>
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(record.status)}`}>
+                        <span className={`px-4 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(record.status)}`}>
                           {record.status}
                         </span>
                       </td>
                       <td className="py-3 px-4">
                         <button
                           onClick={() => handleEditPayroll(record.id)}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md text-sm transition-colors"
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
                         >
                           Edit Payroll
                         </button>
