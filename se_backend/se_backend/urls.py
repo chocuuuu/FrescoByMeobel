@@ -19,7 +19,6 @@ urlpatterns = [
     path(f"{api_prefix}attendance_summary/", include("attendance_summary.urls")),
     path(f"{api_prefix}shift/", include("shift.urls")),
     path(f"{api_prefix}schedule/", include("schedule.urls")),
-    path(f"{api_prefix}overtimebase/", include("overtimebase.urls")),
     path(f"{api_prefix}overtimehours/", include("overtimehours.urls")),
     path(f"{api_prefix}totalovertime/", include("totalovertime.urls")),
     path(f"{api_prefix}earnings/", include("earnings.urls")),
@@ -27,6 +26,7 @@ urlpatterns = [
     path(f"{api_prefix}salary/", include("salary.urls")),
     path(f"{api_prefix}payroll/", include("payroll.urls")),
     path(f"{api_prefix}payslip/", include("payslip.urls")),
+    path(f"{api_prefix}benefits/", include("benefits.urls")),
 ]
 
 
