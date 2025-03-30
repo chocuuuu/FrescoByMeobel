@@ -19,10 +19,6 @@ app.autodiscover_tasks(lambda: settings.INSTALLED_APPS)
 app.conf.broker_connection_retry_on_startup = True
 
 app.conf.beat_schedule = {
-    "update_total_overtime_for_user": {
-        "task": "overtimehours.tasks.update_total_overtime_for_user",
-        "schedule": crontab(minute=0, hour="*"),  # Run every hour
-    },
     "generate_salary_entries": {
         "task": "salary.tasks.generate_salary_entries",
         "schedule": crontab(minute=0, hour="*"),  # Run every hour
@@ -34,6 +30,7 @@ app.conf.beat_schedule = {
     "generate_payslip_entries": {
         "task": "payslip.tasks.generate_payslip_entries",
         "schedule": crontab(minute=0, hour="*"),  # Run every hour
+
     },
 }
 

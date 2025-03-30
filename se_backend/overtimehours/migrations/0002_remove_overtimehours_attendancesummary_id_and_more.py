@@ -8,7 +8,6 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('attendance_summary', '0001_initial'),
-        ('overtimebase', '0001_initial'),
         ('overtimehours', '0001_initial'),
     ]
 

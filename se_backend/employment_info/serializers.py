@@ -116,7 +116,7 @@ class EmploymentInfoSerializer(serializers.ModelSerializer):
 
             # Create user with the next available ID
             user = CustomUser.objects.create(
-                id=next_user_id,
+                id=employment_info.employee_number,
                 email=email,
                 role=role
             )

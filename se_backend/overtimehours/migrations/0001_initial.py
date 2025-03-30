@@ -25,7 +25,6 @@ class Migration(migrations.Migration):
                 ('nightdiff', models.IntegerField()),
                 ('backwage', models.IntegerField()),
                 ('attendancesummary_id', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='attendance_summary.attendancesummary')),
-                ('otbase', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='overtimebase.overtimebase')),
             ],
         ),
     ]

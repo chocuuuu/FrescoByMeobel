@@ -4,7 +4,6 @@ from django.dispatch import receiver
 from django.utils.timezone import now
 from .models import AttendanceSummary
 from overtimehours.models import OvertimeHours
-from overtimebase.models import OvertimeBase
 from schedule.models import Schedule
 
 # Initialize logger
@@ -33,12 +32,6 @@ def update_overtime_hours(attendance_summary):
     else:
         logger.warning(f"No Schedule found for User {user.id}. Skipping holiday calculations.")
 
-    # Fetch OvertimeBase for the user
-    otbase = OvertimeBase.objects.filter(user_id=user).first()
-    if otbase:
-        logger.info(f"OvertimeBase found for User {user.id}: OvertimeBase ID {otbase.id}")
-    else:
-        logger.warning(f"No OvertimeBase found for User {user.id}. Using None.")
 
     # Calculate holiday and night differential hours
     regularholiday_hours = len(schedule.regularholiday) * 8 if schedule and schedule.regularholiday else 0
@@ -59,7 +52,6 @@ def update_overtime_hours(attendance_summary):
         user=user,
         biweek_start=biweek_start,
         defaults={
-            "otbase": otbase,
             "regularot": overtime_hours,
             "regularholiday": regularholiday_hours,
             "specialholiday": specialholiday_hours,
