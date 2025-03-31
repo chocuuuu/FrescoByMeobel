@@ -19,7 +19,7 @@ from shared.utils.email import send_email
 from users.models import CustomUser, UserPasswordReset
 
 from shared.auth.serializers import ChangeEmailSerializer, ChangePasswordSerializer, LoginSerializer, ResetPasswordRequestSerializer, ResetPasswordSerializer
-
+from shared.tasks import send_reset_email
 
 
 class LoginView(TokenObtainPairView):
@@ -71,34 +71,21 @@ class SendResetPasswordLink(generics.GenericAPIView):
         email = request.data["email"]
         user = get_object_or_404(CustomUser, email=email)
 
-        # Generate password reset token and encoded user ID
         token = PasswordResetTokenGenerator().make_token(user)
         uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
 
-        # Save reset token in the database (optional, if you store tokens)
         reset = UserPasswordReset(email=email, token=token)
         reset.save()
 
-        # Generate the backend reset link
+        # Generate the backend reset link (Reusing this)
         reset_link = request.build_absolute_uri(
             reverse("reset-password", kwargs={"token": token})
         )
 
-        # Send the reset email
-        send_email(
-            subject="[Fresco]: Password Reset Request",
-            recipient=user.email,
-            html=render_to_string(
-                "reset_password_email.html",
-                {
-                    "reset_link": reset_link,
-                    "id": user.id,
-                },
-            ),
-        )
+        # Call Celery task asynchronously and pass reset_link
+        send_reset_email.delay(email, reset_link, user.id)
 
         return render(request, "reset_password_sent.html", {"email": email})
-
 
 class ResetPasswordView(generics.GenericAPIView):
     serializer_class = ResetPasswordSerializer
