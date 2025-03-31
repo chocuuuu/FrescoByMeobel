@@ -2,7 +2,6 @@ from django.contrib import admin
 from django.urls import include, path
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib.auth import views as auth_views
 
 
 api_prefix = "api/v1/"
@@ -12,12 +11,6 @@ urlpatterns = [
 
     # Auth
     path(f"{api_prefix}auth/", include("shared.auth.urls")),
-    path(f"{api_prefix}auth/password_reset/",
-         auth_views.PasswordResetView.as_view(template_name="reset_password.html",),
-         name="password_reset"),
-    path(f"{api_prefix}auth/password_reset/done/", auth_views.PasswordResetDoneView.as_view(), name="password_reset_done"),
-    path(f"{api_prefix}auth/reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(), name="password_reset_confirm"),
-    path(f"{api_prefix}auth/reset/done/", auth_views.PasswordResetCompleteView.as_view(), name="password_reset_complete"),
     # Apps
     path(f"{api_prefix}user/", include("users.urls")),
     path(f"{api_prefix}employment-info/", include("employment_info.urls")),
