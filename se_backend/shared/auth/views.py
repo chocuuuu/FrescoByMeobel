@@ -70,7 +70,6 @@ class SendResetPasswordLink(generics.GenericAPIView):
         serializer = self.serializer_class(data=request.data)
         email = request.data["email"]
         user = get_object_or_404(CustomUser, email=email)
-        employee = get_object_or_404(EmploymentInfo, employee_number=user.id)
 
         # Generate password reset token and encoded user ID
         token = PasswordResetTokenGenerator().make_token(user)
@@ -93,7 +92,6 @@ class SendResetPasswordLink(generics.GenericAPIView):
                 "reset_password_email.html",
                 {
                     "reset_link": reset_link,
-                    "user_name": employee.first_name.capitalize(),
                     "id": user.id,
                 },
             ),
