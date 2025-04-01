@@ -55,6 +55,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const [deductionsId, setDeductionsId] = useState(null)
   const [totalOvertimeId, setTotalOvertimeId] = useState(null)
   const [userId, setUserId] = useState(null)
+  const [overtimeRecords, setOvertimeRecords] = useState({
+    regularOT: null,
+    restDay: null,
+    nightDiff: null,
+  })
 
   // Fetch employee data from APIs when the modal opens
   useEffect(() => {
@@ -120,6 +125,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Earnings data:", earningsData)
       console.log("Deductions data:", deductionsData)
       console.log("Total overtime data:", totalOvertimeData)
+      console.log("Overtime hours data:", overtimeData)
 
       // Store record IDs for updates
       if (earningsData.length > 0) {
@@ -133,6 +139,25 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       if (totalOvertimeData.length > 0) {
         setTotalOvertimeId(totalOvertimeData[0].id)
       }
+
+      // Store overtime record IDs for updates
+      const newOvertimeRecords = { regularOT: null, restDay: null, nightDiff: null }
+
+      if (overtimeData.length > 0) {
+        // Find and store the IDs for each overtime type
+        overtimeData.forEach((record) => {
+          if (record.type === "regular") {
+            newOvertimeRecords.regularOT = record.id
+          } else if (record.type === "rest_day") {
+            newOvertimeRecords.restDay = record.id
+          } else if (record.type === "night_diff") {
+            newOvertimeRecords.nightDiff = record.id
+          }
+        })
+      }
+
+      setOvertimeRecords(newOvertimeRecords)
+      console.log("Overtime record IDs:", newOvertimeRecords)
 
       // Check if employee has any payroll data
       const hasData =
@@ -215,24 +240,23 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
     // Update overtime data if available
     if (overtime && overtime.length > 0) {
-      // Sum up regular overtime hours
-      const regularOTHours = overtime
-        .filter((ot) => ot.type === "regular")
-        .reduce((sum, ot) => sum + (Number.parseFloat(ot.hours) || 0), 0)
+      // Find regular overtime hours
+      const regularOT = overtime.find((ot) => ot.type === "regular")
+      if (regularOT) {
+        newFormData.regularOT.hours = regularOT.hours?.toString() || newFormData.regularOT.hours
+      }
 
-      // Sum up rest day hours
-      const restDayHours = overtime
-        .filter((ot) => ot.type === "rest_day")
-        .reduce((sum, ot) => sum + (Number.parseFloat(ot.hours) || 0), 0)
+      // Find rest day hours
+      const restDay = overtime.find((ot) => ot.type === "rest_day")
+      if (restDay) {
+        newFormData.restDay.hours = restDay.hours?.toString() || newFormData.restDay.hours
+      }
 
-      // Sum up night differential hours
-      const nightDiffHours = overtime
-        .filter((ot) => ot.type === "night_diff")
-        .reduce((sum, ot) => sum + (Number.parseFloat(ot.hours) || 0), 0)
-
-      newFormData.regularOT.hours = regularOTHours.toString() || newFormData.regularOT.hours
-      newFormData.restDay.hours = restDayHours.toString() || newFormData.restDay.hours
-      newFormData.nightDiff.hours = nightDiffHours.toString() || newFormData.nightDiff.hours
+      // Find night differential hours
+      const nightDiff = overtime.find((ot) => ot.type === "night_diff")
+      if (nightDiff) {
+        newFormData.nightDiff.hours = nightDiff.hours?.toString() || newFormData.nightDiff.hours
+      }
     }
 
     // Update overtime rates if available
@@ -340,7 +364,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     // Only filter non-numeric characters if the user is actively typing
     // (not when we're setting initial values from API)
     if (e.nativeEvent) {
-      value = value.replace(/[^\d.]/g, "") // Only allow numbers and decimal point
+      // Remove any non-numeric characters except decimal point
+      value = value.replace(/[^\d.]/g, "")
+
+      // Ensure only one decimal point
+      const parts = value.split(".")
+      if (parts.length > 2) {
+        value = parts[0] + "." + parts.slice(1).join("")
+      }
     }
 
     const newFormData = { ...formData }
@@ -365,15 +396,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     setFormData({ ...newFormData, ...totals })
   }
 
-  // Format for display only, not for the actual input value
-  const formatValue = (value) => {
-    // Format to exactly 2 decimal places
-    if (value === undefined || value === null) return "0.00"
+  // Format for display with Peso sign and 2 decimal places
+  const formatCurrency = (value) => {
+    if (value === undefined || value === null) return "₱0.00"
 
     const numValue = Number.parseFloat(value)
-    if (isNaN(numValue)) return "0.00"
+    if (isNaN(numValue)) return "₱0.00"
 
-    return numValue.toFixed(2)
+    return `₱${numValue.toFixed(2)}`
   }
 
   const handleSubmit = async (e) => {
@@ -442,14 +472,34 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         biweek_start: new Date().toISOString().split("T")[0],
       }
 
+      // Prepare overtime hours data
+      const overtimeHoursData = {
+        regularOT: {
+          user: userId,
+          type: "regular",
+          hours: Number.parseFloat(formData.regularOT.hours).toFixed(2),
+          date: new Date().toISOString().split("T")[0],
+        },
+        restDay: {
+          user: userId,
+          type: "rest_day",
+          hours: Number.parseFloat(formData.restDay.hours).toFixed(2),
+          date: new Date().toISOString().split("T")[0],
+        },
+        nightDiff: {
+          user: userId,
+          type: "night_diff",
+          hours: Number.parseFloat(formData.nightDiff.hours).toFixed(2),
+          date: new Date().toISOString().split("T")[0],
+        },
+      }
+
       console.log("Updating earnings with data:", earningsData)
       console.log("Updating deductions with data:", deductionsData)
       console.log("Updating total overtime with data:", totalOvertimeData)
+      console.log("Updating overtime hours with data:", overtimeHoursData)
       console.log("User ID:", userId)
-
-      if (earningsId) console.log("Earnings ID", earningsId)
-      if (deductionsId) console.log("Deductions ID", deductionsId)
-      if (totalOvertimeId) console.log("Total Overtime ID", totalOvertimeId)
+      console.log("Overtime record IDs:", overtimeRecords)
 
       // Update or create earnings record
       let earningsResponse
@@ -553,6 +603,102 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         setTotalOvertimeId(totalOvertimeResult.id)
       }
 
+      // Update or create overtime hours records
+      const newOvertimeRecords = { ...overtimeRecords }
+
+      // Handle regular overtime hours
+      if (overtimeRecords.regularOT) {
+        // Update existing record
+        console.log(`Updating regular overtime hours record with ID ${overtimeRecords.regularOT}`)
+        const response = await fetch(`${API_BASE_URL}/overtimehours/${overtimeRecords.regularOT}/`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(overtimeHoursData.regularOT),
+        })
+
+        if (!response.ok) {
+          console.error("Failed to update regular overtime hours")
+        }
+      } else if (Number.parseFloat(formData.regularOT.hours) > 0) {
+        // Create new record only if hours > 0
+        console.log("Creating new regular overtime hours record")
+        const response = await fetch(`${API_BASE_URL}/overtimehours/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(overtimeHoursData.regularOT),
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          newOvertimeRecords.regularOT = result.id
+        } else {
+          console.error("Failed to create regular overtime hours")
+        }
+      }
+
+      // Handle rest day hours
+      if (overtimeRecords.restDay) {
+        // Update existing record
+        console.log(`Updating rest day hours record with ID ${overtimeRecords.restDay}`)
+        const response = await fetch(`${API_BASE_URL}/overtimehours/${overtimeRecords.restDay}/`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(overtimeHoursData.restDay),
+        })
+
+        if (!response.ok) {
+          console.error("Failed to update rest day hours")
+        }
+      } else if (Number.parseFloat(formData.restDay.hours) > 0) {
+        // Create new record only if hours > 0
+        console.log("Creating new rest day hours record")
+        const response = await fetch(`${API_BASE_URL}/overtimehours/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(overtimeHoursData.restDay),
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          newOvertimeRecords.restDay = result.id
+        } else {
+          console.error("Failed to create rest day hours")
+        }
+      }
+
+      // Handle night diff hours
+      if (overtimeRecords.nightDiff) {
+        // Update existing record
+        console.log(`Updating night diff hours record with ID ${overtimeRecords.nightDiff}`)
+        const response = await fetch(`${API_BASE_URL}/overtimehours/${overtimeRecords.nightDiff}/`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(overtimeHoursData.nightDiff),
+        })
+
+        if (!response.ok) {
+          console.error("Failed to update night diff hours")
+        }
+      } else if (Number.parseFloat(formData.nightDiff.hours) > 0) {
+        // Create new record only if hours > 0
+        console.log("Creating new night diff hours record")
+        const response = await fetch(`${API_BASE_URL}/overtimehours/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(overtimeHoursData.nightDiff),
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          newOvertimeRecords.nightDiff = result.id
+        } else {
+          console.error("Failed to create night diff hours")
+        }
+      }
+
+      // Update overtime records state
+      setOvertimeRecords(newOvertimeRecords)
+
       // Set hasPayrollData to true since we've now saved data
       setHasPayrollData(true)
 
@@ -646,6 +792,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       onChange={(e) => handleInputChange(e, "basicRate")}
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
+                    <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.basicRate)}</div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 mb-1 uppercase">Basic (Bi-weekly)</label>
@@ -655,6 +802,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       onChange={(e) => handleInputChange(e, "basic")}
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
+                    <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.basic)}</div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 mb-1 uppercase">Allowance</label>
@@ -664,6 +812,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       onChange={(e) => handleInputChange(e, "allowance")}
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
+                    <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.allowance)}</div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 mb-1 uppercase">Non-Taxable</label>
@@ -673,6 +822,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       onChange={(e) => handleInputChange(e, "ntax")}
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
+                    <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.ntax)}</div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 mb-1 uppercase">Vacation Leave</label>
@@ -682,6 +832,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       onChange={(e) => handleInputChange(e, "vacationleave")}
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
+                    <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.vacationleave)}</div>
                   </div>
                   <div>
                     <label className="block text-sm text-gray-600 mb-1 uppercase">Sick Leave</label>
@@ -691,6 +842,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       onChange={(e) => handleInputChange(e, "sickleave")}
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
+                    <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.sickleave)}</div>
                   </div>
                 </div>
               </div>
@@ -717,6 +869,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.regularOT.rate)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Regular Holiday</label>
@@ -726,6 +879,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "regularHoliday", "rate")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.regularHoliday.rate)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Special Holiday</label>
@@ -735,6 +889,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "specialHoliday", "rate")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.specialHoliday.rate)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Rest Day</label>
@@ -753,6 +908,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.restDay.rate)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Night Diff</label>
@@ -771,6 +927,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.nightDiff.rate)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Backwage</label>
@@ -780,6 +937,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "backwage", "rate")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.backwage.rate)}</div>
                 </div>
               </div>
             </div>
@@ -796,6 +954,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "sss", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.sss.amount)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">PhilHealth</label>
@@ -805,6 +964,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "philhealth", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.philhealth.amount)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Pag IBIG</label>
@@ -814,6 +974,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "pagibig", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.pagibig.amount)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Late</label>
@@ -823,6 +984,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "late", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.late.amount)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">WTAX</label>
@@ -832,6 +994,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "wtax", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.wtax.amount)}</div>
                 </div>
               </div>
             </div>
@@ -848,6 +1011,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "nowork", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.nowork.amount)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Loan</label>
@@ -857,6 +1021,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "loan", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.loan.amount)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Charges</label>
@@ -866,6 +1031,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "charges", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.charges.amount)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Undertime</label>
@@ -875,6 +1041,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "undertime", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.undertime.amount)}</div>
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">MSFC Loan</label>
@@ -884,6 +1051,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     onChange={(e) => handleInputChange(e, "msfcloan", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
+                  <div className="text-xs text-gray-500 mt-1">{formatCurrency(formData.msfcloan.amount)}</div>
                 </div>
               </div>
             </div>
@@ -897,7 +1065,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                 <label className="block text-sm text-gray-600 mb-1 uppercase">Total Gross</label>
                 <input
                   type="text"
-                  value={formatValue(formData.totalGross)}
+                  value={formatCurrency(formData.totalGross)}
                   readOnly
                   className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                 />
@@ -906,7 +1074,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                 <label className="block text-sm text-gray-600 mb-1 uppercase">Total Deductions</label>
                 <input
                   type="text"
-                  value={formatValue(formData.totalDeductions)}
+                  value={formatCurrency(formData.totalDeductions)}
                   readOnly
                   className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                 />
@@ -915,7 +1083,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                 <label className="block text-sm text-gray-600 mb-1 uppercase">Total Salary</label>
                 <input
                   type="text"
-                  value={formatValue(formData.totalSalaryCompensation)}
+                  value={formatCurrency(formData.totalSalaryCompensation)}
                   readOnly
                   className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                 />
