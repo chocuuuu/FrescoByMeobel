@@ -11,11 +11,12 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     payDate: "11/15/2024",
 
     // Earnings
-    baseSalary: 0,
+    basicRate: 0,
+    basic: 0,
     allowance: 0,
-    otherEarningsNTax: 0,
+    ntax: 0,
     vacationleave: 0,
-    sickLeave: 0,
+    sickleave: 0,
     bereavementLeave: 0,
 
     // Overtime
@@ -27,18 +28,18 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     backwage: { rate: "0" },
 
     // Deductions
-    sss: { percentage: "10", amount: 0 },
-    philhealth: { percentage: "10", amount: 0 },
-    pagibig: { percentage: "10", amount: 0 },
+    sss: { amount: 0 },
+    philhealth: { amount: 0 },
+    pagibig: { amount: 0 },
     late: { amount: 0 },
     wtax: { amount: 0 },
 
     // Additional Deductions
-    noWorkDay: { amount: 0 },
+    nowork: { amount: 0 },
     loan: { amount: 0 },
     charges: { amount: 0 },
     undertime: { amount: 0 },
-    msfcLoan: { amount: 0 },
+    msfcloan: { amount: 0 },
 
     // Totals (calculated)
     totalGross: 0,
@@ -73,29 +74,33 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       // Check if employee has salary data
-      const salaryResponse = await fetch(`${API_BASE_URL}/salary/?employee=${employeeId}`, { headers })
+      const salaryResponse = await fetch(`${API_BASE_URL}/salary/?user=${employeeId}`, { headers })
       if (!salaryResponse.ok) throw new Error("Failed to fetch salary data")
       const salaryData = await salaryResponse.json()
 
       // Check if employee has total overtime data
-      const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/?employee=${employeeId}`, { headers })
+      const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/?user=${employeeId}`, { headers })
       if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
       const totalOvertimeData = await totalOvertimeResponse.json()
 
       // Fetch earnings data
-      const earningsResponse = await fetch(`${API_BASE_URL}/earnings/?employee=${employeeId}`, { headers })
+      const earningsResponse = await fetch(`${API_BASE_URL}/earnings/?user=${employeeId}`, { headers })
       if (!earningsResponse.ok) throw new Error("Failed to fetch earnings data")
       const earningsData = await earningsResponse.json()
 
       // Fetch deductions data
-      const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/?employee=${employeeId}`, { headers })
+      const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/?user=${employeeId}`, { headers })
       if (!deductionsResponse.ok) throw new Error("Failed to fetch deductions data")
       const deductionsData = await deductionsResponse.json()
 
       // Fetch overtime hours data
-      const overtimeResponse = await fetch(`${API_BASE_URL}/overtimehours/?employee=${employeeId}`, { headers })
+      const overtimeResponse = await fetch(`${API_BASE_URL}/overtimehours/?user=${employeeId}`, { headers })
       if (!overtimeResponse.ok) throw new Error("Failed to fetch overtime data")
       const overtimeData = await overtimeResponse.json()
+
+      console.log("Earnings data:", earningsData)
+      console.log("Deductions data:", deductionsData)
+      console.log("Total overtime data:", totalOvertimeData)
 
       // Check if employee has any payroll data
       const hasData =
@@ -122,7 +127,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         // If no data, reset to default values with employee's base salary if available
         const defaultFormData = { ...formData }
         if (employeeData?.rate_per_month) {
-          defaultFormData.baseSalary = employeeData.rate_per_month
+          defaultFormData.basicRate = employeeData.rate_per_month
+          defaultFormData.basic = employeeData.rate_per_month / 2 // Assuming bi-weekly pay
         }
         setFormData(defaultFormData)
       }
@@ -134,7 +140,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       if (employeeData?.rate_per_month) {
         setFormData((prevData) => ({
           ...prevData,
-          baseSalary: employeeData.rate_per_month,
+          basicRate: employeeData.rate_per_month,
+          basic: employeeData.rate_per_month / 2, // Assuming bi-weekly pay
         }))
       }
     } finally {
@@ -148,36 +155,30 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
     // Update earnings data if available
     if (earnings) {
-      newFormData.baseSalary = earnings.base_salary?.toString() || newFormData.baseSalary
+      newFormData.basicRate = earnings.basic_rate?.toString() || newFormData.basicRate
+      newFormData.basic = earnings.basic?.toString() || newFormData.basic
       newFormData.allowance = earnings.allowance?.toString() || newFormData.allowance
-      newFormData.otherEarningsNTax = earnings.other_earnings?.toString() || newFormData.otherEarningsNTax
+      newFormData.ntax = earnings.ntax?.toString() || newFormData.ntax
       newFormData.vacationleave = earnings.vacationleave?.toString() || newFormData.vacationleave
-      newFormData.sickLeave = earnings.sick_leave?.toString() || newFormData.sickLeave
-      newFormData.bereavementLeave = earnings.bereavement_leave?.toString() || newFormData.bereavementLeave
+      newFormData.sickleave = earnings.sickleave?.toString() || newFormData.sickleave
     } else if (employeeData?.rate_per_month) {
-      // If no earnings data but we have rate_per_month, use that for base salary
-      newFormData.baseSalary = employeeData.rate_per_month.toString()
+      // If no earnings data but we have rate_per_month, use that for basic rate
+      newFormData.basicRate = employeeData.rate_per_month.toString()
+      newFormData.basic = (employeeData.rate_per_month / 2).toString() // Assuming bi-weekly pay
     }
 
     // Update deductions data if available
     if (deductions) {
-      newFormData.sss.percentage = deductions.sss_percentage?.toString() || newFormData.sss.percentage
       newFormData.sss.amount = deductions.sss?.toString() || newFormData.sss.amount
-
-      newFormData.philhealth.percentage =
-        deductions.philhealth_percentage?.toString() || newFormData.philhealth.percentage
       newFormData.philhealth.amount = deductions.philhealth?.toString() || newFormData.philhealth.amount
-
-      newFormData.pagibig.percentage = deductions.pagibig_percentage?.toString() || newFormData.pagibig.percentage
       newFormData.pagibig.amount = deductions.pagibig?.toString() || newFormData.pagibig.amount
-
       newFormData.late.amount = deductions.late?.toString() || newFormData.late.amount
       newFormData.wtax.amount = deductions.wtax?.toString() || newFormData.wtax.amount
-      newFormData.noWorkDay.amount = deductions.no_work_day?.toString() || newFormData.noWorkDay.amount
+      newFormData.nowork.amount = deductions.nowork?.toString() || newFormData.nowork.amount
       newFormData.loan.amount = deductions.loan?.toString() || newFormData.loan.amount
       newFormData.charges.amount = deductions.charges?.toString() || newFormData.charges.amount
       newFormData.undertime.amount = deductions.undertime?.toString() || newFormData.undertime.amount
-      newFormData.msfcLoan.amount = deductions.msfc_loan?.toString() || newFormData.msfcLoan.amount
+      newFormData.msfcloan.amount = deductions.msfcloan?.toString() || newFormData.msfcloan.amount
     }
 
     // Update overtime data if available
@@ -204,11 +205,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
     // Update overtime rates if available
     if (totalOvertime) {
-      newFormData.regularOT.rate = totalOvertime.regular_ot?.toString() || newFormData.regularOT.rate
-      newFormData.regularHoliday.rate = totalOvertime.regular_holiday?.toString() || newFormData.regularHoliday.rate
-      newFormData.specialHoliday.rate = totalOvertime.special_holiday?.toString() || newFormData.specialHoliday.rate
-      newFormData.restDay.rate = totalOvertime.rest_day?.toString() || newFormData.restDay.rate
-      newFormData.nightDiff.rate = totalOvertime.night_diff?.toString() || newFormData.nightDiff.rate
+      newFormData.regularOT.rate = totalOvertime.total_regularot?.toString() || newFormData.regularOT.rate
+      newFormData.regularHoliday.rate =
+        totalOvertime.total_regularholiday?.toString() || newFormData.regularHoliday.rate
+      newFormData.specialHoliday.rate =
+        totalOvertime.total_specialholiday?.toString() || newFormData.specialHoliday.rate
+      newFormData.restDay.rate = totalOvertime.total_restday?.toString() || newFormData.restDay.rate
+      newFormData.nightDiff.rate = totalOvertime.total_nightdiff?.toString() || newFormData.nightDiff.rate
+      newFormData.backwage.rate = totalOvertime.total_backwage?.toString() || newFormData.backwage.rate
     }
 
     // Calculate totals
@@ -221,12 +225,18 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const calculateTotals = (data) => {
     // Calculate total gross
     const totalGross =
-      Number.parseFloat(data.baseSalary) +
+      Number.parseFloat(data.basic) +
       Number.parseFloat(data.allowance) +
-      Number.parseFloat(data.otherEarningsNTax) +
+      Number.parseFloat(data.ntax) +
       Number.parseFloat(data.vacationleave) +
-      Number.parseFloat(data.sickLeave) +
-      Number.parseFloat(data.bereavementLeave)
+      Number.parseFloat(data.sickleave) +
+      Number.parseFloat(data.bereavementLeave) +
+      Number.parseFloat(data.regularOT.rate) +
+      Number.parseFloat(data.regularHoliday.rate) +
+      Number.parseFloat(data.specialHoliday.rate) +
+      Number.parseFloat(data.restDay.rate) +
+      Number.parseFloat(data.nightDiff.rate) +
+      Number.parseFloat(data.backwage.rate)
 
     // Calculate total deductions
     const totalDeductions =
@@ -235,11 +245,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       Number.parseFloat(data.pagibig.amount) +
       Number.parseFloat(data.late.amount) +
       Number.parseFloat(data.wtax.amount) +
-      Number.parseFloat(data.noWorkDay.amount) +
+      Number.parseFloat(data.nowork.amount) +
       Number.parseFloat(data.loan.amount) +
       Number.parseFloat(data.charges.amount) +
       Number.parseFloat(data.undertime.amount) +
-      Number.parseFloat(data.msfcLoan.amount)
+      Number.parseFloat(data.msfcloan.amount)
 
     // Calculate total salary compensation
     const totalSalaryCompensation = totalGross - totalDeductions
@@ -252,7 +262,46 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }
 
-  const handleInputChange = (e, section, field, subfield = null) => {
+  // Calculate SSS, PhilHealth, and Pag-IBIG contributions based on salary
+  const calculateBenefits = async (basicRate) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
+
+      // Calculate SSS contribution
+      const sssResponse = await fetch(`${API_BASE_URL}/sss/?salary=${basicRate}`, { headers })
+      if (!sssResponse.ok) throw new Error("Failed to calculate SSS contribution")
+      const sssData = await sssResponse.json()
+
+      // Calculate PhilHealth contribution
+      const philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/?salary=${basicRate}`, { headers })
+      if (!philhealthResponse.ok) throw new Error("Failed to calculate PhilHealth contribution")
+      const philhealthData = await philhealthResponse.json()
+
+      // Calculate Pag-IBIG contribution
+      const pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/?salary=${basicRate}`, { headers })
+      if (!pagibigResponse.ok) throw new Error("Failed to calculate Pag-IBIG contribution")
+      const pagibigData = await pagibigResponse.json()
+
+      return {
+        sss: sssData.contribution || 0,
+        philhealth: philhealthData.contribution || 0,
+        pagibig: pagibigData.contribution || 0,
+      }
+    } catch (error) {
+      console.error("Error calculating benefits:", error)
+      return {
+        sss: 0,
+        philhealth: 0,
+        pagibig: 0,
+      }
+    }
+  }
+
+  const handleInputChange = async (e, section, field, subfield = null) => {
     const value = e.target.value.replace(/[^\d.]/g, "") // Only allow numbers and decimal point
     const newFormData = { ...formData }
 
@@ -262,6 +311,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       newFormData[section][field] = value
     } else {
       newFormData[section] = value
+    }
+
+    // If basic rate is changed, recalculate SSS, PhilHealth, and Pag-IBIG
+    if (section === "basicRate") {
+      const benefits = await calculateBenefits(value)
+      newFormData.sss.amount = benefits.sss.toString()
+      newFormData.philhealth.amount = benefits.philhealth.toString()
+      newFormData.pagibig.amount = benefits.pagibig.toString()
     }
 
     const totals = calculateTotals(newFormData)
@@ -292,55 +349,62 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       // Prepare earnings data
       const earningsData = {
-        employee: employeeData.id,
-        base_salary: Number.parseFloat(formData.baseSalary),
+        user: employeeData.id,
+        basic_rate: Number.parseFloat(formData.basicRate),
+        basic: Number.parseFloat(formData.basic),
         allowance: Number.parseFloat(formData.allowance),
-        other_earnings: Number.parseFloat(formData.otherEarningsNTax),
+        ntax: Number.parseFloat(formData.ntax),
         vacationleave: Number.parseFloat(formData.vacationleave),
-        sick_leave: Number.parseFloat(formData.sickLeave),
-        bereavement_leave: Number.parseFloat(formData.bereavementLeave),
+        sickleave: Number.parseFloat(formData.sickleave),
       }
 
       // Prepare deductions data
       const deductionsData = {
-        employee: employeeData.id,
+        user: employeeData.id,
         sss: Number.parseFloat(formData.sss.amount),
-        sss_percentage: Number.parseFloat(formData.sss.percentage),
         philhealth: Number.parseFloat(formData.philhealth.amount),
-        philhealth_percentage: Number.parseFloat(formData.philhealth.percentage),
         pagibig: Number.parseFloat(formData.pagibig.amount),
-        pagibig_percentage: Number.parseFloat(formData.pagibig.percentage),
         late: Number.parseFloat(formData.late.amount),
         wtax: Number.parseFloat(formData.wtax.amount),
-        no_work_day: Number.parseFloat(formData.noWorkDay.amount),
+        nowork: Number.parseFloat(formData.nowork.amount),
         loan: Number.parseFloat(formData.loan.amount),
         charges: Number.parseFloat(formData.charges.amount),
         undertime: Number.parseFloat(formData.undertime.amount),
-        msfc_loan: Number.parseFloat(formData.msfcLoan.amount),
+        msfcloan: Number.parseFloat(formData.msfcloan.amount),
       }
 
       // Prepare total overtime data
       const totalOvertimeData = {
-        employee: employeeData.id,
-        regular_ot: Number.parseFloat(formData.regularOT.rate),
-        regular_holiday: Number.parseFloat(formData.regularHoliday.rate),
-        special_holiday: Number.parseFloat(formData.specialHoliday.rate),
-        rest_day: Number.parseFloat(formData.restDay.rate),
-        night_diff: Number.parseFloat(formData.nightDiff.rate),
+        user: employeeData.id,
+        total_regularot: Number.parseFloat(formData.regularOT.rate),
+        total_regularholiday: Number.parseFloat(formData.regularHoliday.rate),
+        total_specialholiday: Number.parseFloat(formData.specialHoliday.rate),
+        total_restday: Number.parseFloat(formData.restDay.rate),
+        total_nightdiff: Number.parseFloat(formData.nightDiff.rate),
+        total_backwage: Number.parseFloat(formData.backwage.rate),
+        total_overtime:
+          Number.parseFloat(formData.regularOT.rate) +
+          Number.parseFloat(formData.regularHoliday.rate) +
+          Number.parseFloat(formData.specialHoliday.rate) +
+          Number.parseFloat(formData.restDay.rate) +
+          Number.parseFloat(formData.nightDiff.rate),
+        total_late: Number.parseFloat(formData.late.amount),
+        total_undertime: Number.parseFloat(formData.undertime.amount),
+        biweek_start: new Date().toISOString().split("T")[0],
       }
 
       // Check if earnings record exists for this employee
-      const earningsCheckResponse = await fetch(`${API_BASE_URL}/earnings/?employee=${employeeData.id}`, { headers })
+      const earningsCheckResponse = await fetch(`${API_BASE_URL}/earnings/?user=${employeeData.id}`, { headers })
       const earningsCheckData = await earningsCheckResponse.json()
 
       // Check if deductions record exists for this employee
-      const deductionsCheckResponse = await fetch(`${API_BASE_URL}/deductions/?employee=${employeeData.id}`, {
+      const deductionsCheckResponse = await fetch(`${API_BASE_URL}/deductions/?user=${employeeData.id}`, {
         headers,
       })
       const deductionsCheckData = await deductionsCheckResponse.json()
 
       // Check if total overtime record exists for this employee
-      const totalOvertimeCheckResponse = await fetch(`${API_BASE_URL}/totalovertime/?employee=${employeeData.id}`, {
+      const totalOvertimeCheckResponse = await fetch(`${API_BASE_URL}/totalovertime/?user=${employeeData.id}`, {
         headers,
       })
       const totalOvertimeCheckData = await totalOvertimeCheckResponse.json()
@@ -412,7 +476,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       onUpdate({
         ...formData,
         id: employeeData.id,
-        baseSalary: formData.baseSalary,
+        baseSalary: formData.basic,
         totalDeductions: formData.totalDeductions,
         totalSalaryCompensation: formData.totalSalaryCompensation,
       })
@@ -491,11 +555,20 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                 <h3 className="font-medium text-base mb-2 uppercase">Earnings</h3>
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1 uppercase">Base Salary</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Basic Rate (Monthly)</label>
                     <input
                       type="text"
-                      value={formatValue(formData.baseSalary)}
-                      onChange={(e) => handleInputChange(e, "baseSalary")}
+                      value={formatValue(formData.basicRate)}
+                      onChange={(e) => handleInputChange(e, "basicRate")}
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Basic (Bi-weekly)</label>
+                    <input
+                      type="text"
+                      value={formatValue(formData.basic)}
+                      onChange={(e) => handleInputChange(e, "basic")}
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
@@ -509,11 +582,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1 uppercase">Other Earnings N-TAX</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Non-Taxable</label>
                     <input
                       type="text"
-                      value={formatValue(formData.otherEarningsNTax)}
-                      onChange={(e) => handleInputChange(e, "otherEarningsNTax")}
+                      value={formatValue(formData.ntax)}
+                      onChange={(e) => handleInputChange(e, "ntax")}
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
@@ -530,17 +603,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     <label className="block text-sm text-gray-600 mb-1 uppercase">Sick Leave</label>
                     <input
                       type="text"
-                      value={formatValue(formData.sickLeave)}
-                      onChange={(e) => handleInputChange(e, "sickLeave")}
-                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-600 mb-1 uppercase">Bereavement Leave</label>
-                    <input
-                      type="text"
-                      value={formatValue(formData.bereavementLeave)}
-                      onChange={(e) => handleInputChange(e, "bereavementLeave")}
+                      value={formatValue(formData.sickleave)}
+                      onChange={(e) => handleInputChange(e, "sickleave")}
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
@@ -642,54 +706,30 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
               <div className="space-y-2">
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">SSS</label>
-                  <div className="flex gap-1">
-                    <input
-                      type="text"
-                      value={`${formData.sss.percentage}%`}
-                      onChange={(e) => handleInputChange(e, "sss", "percentage")}
-                      className="w-14 px-2 py-1.5 text-sm border rounded bg-gray-100"
-                    />
-                    <input
-                      type="text"
-                      value={formatValue(formData.sss.amount)}
-                      onChange={(e) => handleInputChange(e, "sss", "amount")}
-                      className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={formatValue(formData.sss.amount)}
+                    onChange={(e) => handleInputChange(e, "sss", "amount")}
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">PhilHealth</label>
-                  <div className="flex gap-1">
-                    <input
-                      type="text"
-                      value={`${formData.philhealth.percentage}%`}
-                      onChange={(e) => handleInputChange(e, "philhealth", "percentage")}
-                      className="w-14 px-2 py-1.5 text-sm border rounded bg-gray-100"
-                    />
-                    <input
-                      type="text"
-                      value={formatValue(formData.philhealth.amount)}
-                      onChange={(e) => handleInputChange(e, "philhealth", "amount")}
-                      className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={formatValue(formData.philhealth.amount)}
+                    onChange={(e) => handleInputChange(e, "philhealth", "amount")}
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Pag IBIG</label>
-                  <div className="flex gap-1">
-                    <input
-                      type="text"
-                      value={`${formData.pagibig.percentage}%`}
-                      onChange={(e) => handleInputChange(e, "pagibig", "percentage")}
-                      className="w-14 px-2 py-1.5 text-sm border rounded bg-gray-100"
-                    />
-                    <input
-                      type="text"
-                      value={formatValue(formData.pagibig.amount)}
-                      onChange={(e) => handleInputChange(e, "pagibig", "amount")}
-                      className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    value={formatValue(formData.pagibig.amount)}
+                    onChange={(e) => handleInputChange(e, "pagibig", "amount")}
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm text-gray-600 mb-1 uppercase">Late</label>
@@ -701,7 +741,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1 uppercase">WTAX (S)</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">WTAX</label>
                   <input
                     type="text"
                     value={formatValue(formData.wtax.amount)}
@@ -720,8 +760,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                   <label className="block text-sm text-gray-600 mb-1 uppercase">No Work Day</label>
                   <input
                     type="text"
-                    value={formatValue(formData.noWorkDay.amount)}
-                    onChange={(e) => handleInputChange(e, "noWorkDay", "amount")}
+                    value={formatValue(formData.nowork.amount)}
+                    onChange={(e) => handleInputChange(e, "nowork", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
@@ -756,8 +796,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                   <label className="block text-sm text-gray-600 mb-1 uppercase">MSFC Loan</label>
                   <input
                     type="text"
-                    value={formatValue(formData.msfcLoan.amount)}
-                    onChange={(e) => handleInputChange(e, "msfcLoan", "amount")}
+                    value={formatValue(formData.msfcloan.amount)}
+                    onChange={(e) => handleInputChange(e, "msfcloan", "amount")}
                     className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
