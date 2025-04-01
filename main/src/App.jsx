@@ -7,6 +7,8 @@ import logo from "./assets/Login_Page/fresco_logo_black.png"
 import leaf_1 from "./assets/Login_Page/leaf-1.png"
 import leaf_2 from "./assets/Login_Page/leaf-2.png"
 import leaf_3 from "./assets/Login_Page/leaf-3.png"
+import ForgotPasswordPage from "./pages/Forgot_Password_Page"
+import ResetPasswordPage from "./pages/Reset_Password_Page"
 import AdminDashboardPage from "./pages/Admin_Dashboard_Page"
 import AdminEmployeePayrollPage from "./pages/Admin_Employee_Payroll_Page"
 import AdminEmployeePage from "./pages/Admin_Employees_Page"
@@ -147,7 +149,7 @@ function LoginPage() {
                 Log In
               </button>
               <div className="text-sm underline text-center">
-                <a href="#" className="font-medium text-gray-600 hover:text-gray-900">
+                <a href="/forgot-password" className="font-medium text-gray-600 hover:text-gray-900">
                   Forgot password?
                 </a>
               </div>
@@ -164,6 +166,8 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
         <Route path="/dashboard" element={<AdminDashboardPage />} />
         <Route path="/payslip" element={<PayslipPage />} />
         <Route path="/employee" element={<AdminEmployeePage />} />
