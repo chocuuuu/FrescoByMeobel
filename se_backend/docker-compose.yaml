@@ -21,6 +21,9 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       DEBUG: ${DEBUG}
       CELERY_BROKER_URL: redis://redis:6379/0
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      RESEND_HOST: ${RESEND_HOST}
+      FRONTEND_DOMAIN: ${FRONTEND_DOMAIN}
     depends_on:
       backend_db:
         condition: service_healthy
