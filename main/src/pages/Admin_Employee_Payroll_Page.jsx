@@ -273,10 +273,6 @@ function AdminEmployeePayrollPage() {
       setIsEditModalOpen(false)
       setSelectedEmployee(null)
 
-      // Refresh data from server after a short delay to ensure changes are saved
-      setTimeout(() => {
-        fetchPayrollData()
-      }, 2000)
     }
   }
 
@@ -347,15 +343,6 @@ function AdminEmployeePayrollPage() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <h2 className="text-2xl font-semibold text-white">Employee Payroll</h2>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <button
-                onClick={() => {
-                  // Refresh payroll data
-                  fetchPayrollData()
-                }}
-                className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
-              >
-                Refresh Payroll
-              </button>
               <input
                 type="search"
                 placeholder="Search..."
