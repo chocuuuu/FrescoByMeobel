@@ -3,6 +3,17 @@
 import { useState, useEffect } from "react"
 import { API_BASE_URL } from "../config/api"
 
+// Add this function at the top of the component, before the useState declarations
+const formatToTwoDecimals = (value) => {
+  if (value === undefined || value === null || value === "") return "0.00"
+
+  // Convert to number and ensure it has exactly 2 decimal places
+  const numValue = Number.parseFloat(value)
+  if (isNaN(numValue)) return "0.00"
+
+  return numValue.toFixed(2)
+}
+
 function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const [formData, setFormData] = useState({
     // Payroll Dates
@@ -278,37 +289,60 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     return { ...newFormData, ...totals }
   }
 
+  // Replace the calculateTotals function with this improved version
   const calculateTotals = (data) => {
+    // Parse all values to ensure they're numbers
+    const basic = Number.parseFloat(data.basic) || 0
+    const allowance = Number.parseFloat(data.allowance) || 0
+    const ntax = Number.parseFloat(data.ntax) || 0
+    const vacationleave = Number.parseFloat(data.vacationleave) || 0
+    const sickleave = Number.parseFloat(data.sickleave) || 0
+    const bereavementLeave = Number.parseFloat(data.bereavementLeave) || 0
+
+    const regularOT = Number.parseFloat(data.regularOT.rate) || 0
+    const regularHoliday = Number.parseFloat(data.regularHoliday.rate) || 0
+    const specialHoliday = Number.parseFloat(data.specialHoliday.rate) || 0
+    const restDay = Number.parseFloat(data.restDay.rate) || 0
+    const nightDiff = Number.parseFloat(data.nightDiff.rate) || 0
+    const backwage = Number.parseFloat(data.backwage.rate) || 0
+
+    const sss = Number.parseFloat(data.sss.amount) || 0
+    const philhealth = Number.parseFloat(data.philhealth.amount) || 0
+    const pagibig = Number.parseFloat(data.pagibig.amount) || 0
+    const late = Number.parseFloat(data.late.amount) || 0
+    const wtax = Number.parseFloat(data.wtax.amount) || 0
+    const nowork = Number.parseFloat(data.nowork.amount) || 0
+    const loan = Number.parseFloat(data.loan.amount) || 0
+    const charges = Number.parseFloat(data.charges.amount) || 0
+    const undertime = Number.parseFloat(data.undertime.amount) || 0
+    const msfcloan = Number.parseFloat(data.msfcloan.amount) || 0
+
     // Calculate total gross
     const totalGross =
-      Number.parseFloat(data.basic) +
-      Number.parseFloat(data.allowance) +
-      Number.parseFloat(data.ntax) +
-      Number.parseFloat(data.vacationleave) +
-      Number.parseFloat(data.sickleave) +
-      Number.parseFloat(data.bereavementLeave) +
-      Number.parseFloat(data.regularOT.rate) +
-      Number.parseFloat(data.regularHoliday.rate) +
-      Number.parseFloat(data.specialHoliday.rate) +
-      Number.parseFloat(data.restDay.rate) +
-      Number.parseFloat(data.nightDiff.rate) +
-      Number.parseFloat(data.backwage.rate)
+      basic +
+      allowance +
+      ntax +
+      vacationleave +
+      sickleave +
+      bereavementLeave +
+      regularOT +
+      regularHoliday +
+      specialHoliday +
+      restDay +
+      nightDiff +
+      backwage
 
     // Calculate total deductions
-    const totalDeductions =
-      Number.parseFloat(data.sss.amount) +
-      Number.parseFloat(data.philhealth.amount) +
-      Number.parseFloat(data.pagibig.amount) +
-      Number.parseFloat(data.late.amount) +
-      Number.parseFloat(data.wtax.amount) +
-      Number.parseFloat(data.nowork.amount) +
-      Number.parseFloat(data.loan.amount) +
-      Number.parseFloat(data.charges.amount) +
-      Number.parseFloat(data.undertime.amount) +
-      Number.parseFloat(data.msfcloan.amount)
+    const totalDeductions = sss + philhealth + pagibig + late + wtax + nowork + loan + charges + undertime + msfcloan
 
     // Calculate total salary compensation
     const totalSalaryCompensation = totalGross - totalDeductions
+
+    console.log("Calculated totals:", {
+      totalGross,
+      totalDeductions,
+      totalSalaryCompensation,
+    })
 
     return {
       totalGross: totalGross.toFixed(2),
@@ -357,12 +391,12 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }
 
+  // Replace the handleInputChange function with this improved version
   const handleInputChange = async (e, section, field, subfield = null) => {
-    // Allow user to edit the value directly
+    // Get the raw input value
     let value = e.target.value
 
-    // Only filter non-numeric characters if the user is actively typing
-    // (not when we're setting initial values from API)
+    // Allow typing decimal points and numbers
     if (e.nativeEvent) {
       // Remove any non-numeric characters except decimal point
       value = value.replace(/[^\d.]/g, "")
@@ -371,6 +405,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const parts = value.split(".")
       if (parts.length > 2) {
         value = parts[0] + "." + parts.slice(1).join("")
+      }
+
+      // Limit to 2 decimal places only if there's a decimal point and user has typed past it
+      if (parts.length === 2 && parts[1].length > 2) {
+        value = parts[0] + "." + parts[1].substring(0, 2)
       }
     }
 

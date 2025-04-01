@@ -16,79 +16,211 @@ function AdminEmployeePayrollPage() {
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const recordsPerPage = 5
 
-  // Fetch employees
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        setLoading(true)
-        const accessToken = localStorage.getItem("access_token")
-        const response = await fetch(`${API_BASE_URL}/employment-info/`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
+  // Fetch payroll data from API
+  const fetchPayrollData = async () => {
+    try {
+      setLoading(true)
+      const accessToken = localStorage.getItem("access_token")
+
+      // Fetch employees first
+      const employeeResponse = await fetch(`${API_BASE_URL}/employment-info/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!employeeResponse.ok) {
+        throw new Error("Failed to fetch employees")
+      }
+
+      const employeeData = await employeeResponse.json()
+      const activeEmployees = employeeData.filter((employee) => employee.active !== false)
+      setEmployees(activeEmployees)
+
+      // Create a map to store payroll data
+      const payrollMap = new Map()
+
+      // Fetch earnings data for all employees
+      const earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (earningsResponse.ok) {
+        const earningsData = await earningsResponse.json()
+
+        // Process earnings data
+        earningsData.forEach((earning) => {
+          const userId = earning.user
+          if (!payrollMap.has(userId)) {
+            payrollMap.set(userId, {
+              userId,
+              base_salary: Number.parseFloat(earning.basic_rate) || 0,
+              earnings: earning,
+            })
+          } else {
+            payrollMap.get(userId).base_salary = Number.parseFloat(earning.basic_rate) || 0
+            payrollMap.get(userId).earnings = earning
+          }
         })
+      }
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch employees")
+      // Fetch deductions data
+      const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (deductionsResponse.ok) {
+        const deductionsData = await deductionsResponse.json()
+
+        // Process deductions data
+        deductionsData.forEach((deduction) => {
+          const userId = deduction.user
+          if (!payrollMap.has(userId)) {
+            payrollMap.set(userId, {
+              userId,
+              deductions:
+                Number.parseFloat(deduction.sss) +
+                  Number.parseFloat(deduction.philhealth) +
+                  Number.parseFloat(deduction.pagibig) +
+                  Number.parseFloat(deduction.late) +
+                  Number.parseFloat(deduction.wtax) +
+                  Number.parseFloat(deduction.nowork) +
+                  Number.parseFloat(deduction.loan) +
+                  Number.parseFloat(deduction.charges) +
+                  Number.parseFloat(deduction.undertime) +
+                  Number.parseFloat(deduction.msfcloan) || 0,
+              deductionsData: deduction,
+            })
+          } else {
+            const totalDeductions =
+              Number.parseFloat(deduction.sss) +
+                Number.parseFloat(deduction.philhealth) +
+                Number.parseFloat(deduction.pagibig) +
+                Number.parseFloat(deduction.late) +
+                Number.parseFloat(deduction.wtax) +
+                Number.parseFloat(deduction.nowork) +
+                Number.parseFloat(deduction.loan) +
+                Number.parseFloat(deduction.charges) +
+                Number.parseFloat(deduction.undertime) +
+                Number.parseFloat(deduction.msfcloan) || 0
+
+            payrollMap.get(userId).deductions = totalDeductions
+            payrollMap.get(userId).deductionsData = deduction
+          }
+        })
+      }
+
+      // Fetch total overtime data
+      const overtimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (overtimeResponse.ok) {
+        const overtimeData = await overtimeResponse.json()
+
+        // Process overtime data
+        overtimeData.forEach((overtime) => {
+          const userId = overtime.user
+          if (payrollMap.has(userId)) {
+            const payrollEntry = payrollMap.get(userId)
+
+            // Add overtime to base salary for gross calculation
+            const overtimeTotal = Number.parseFloat(overtime.total_overtime) || 0
+            payrollEntry.base_salary = (payrollEntry.base_salary || 0) + overtimeTotal
+            payrollEntry.overtimeData = overtime
+          }
+        })
+      }
+
+      // Convert payroll map to array and match with employees
+      const payrollData = []
+
+      activeEmployees.forEach((employee) => {
+        const userId = employee.user?.id
+
+        if (userId && payrollMap.has(userId)) {
+          // Employee has payroll data
+          const payrollInfo = payrollMap.get(userId)
+          const grossSalary = payrollInfo.base_salary || 0
+          const deductions = payrollInfo.deductions || 0
+          const netSalary = grossSalary - deductions
+
+          payrollData.push({
+            id: employee.id,
+            employee_id: employee.employee_number,
+            employee_name: `${employee.first_name} ${employee.last_name}`,
+            position: employee.position || "Staff",
+            base_salary: grossSalary,
+            deductions: deductions,
+            net_salary: netSalary,
+            status: "Paid", // Default status
+            rate_per_month: grossSalary.toString(),
+            user: employee.user,
+            // Store the raw data for editing
+            earnings: payrollInfo.earnings,
+            deductionsData: payrollInfo.deductionsData,
+            overtimeData: payrollInfo.overtimeData,
+          })
+        } else {
+          // Employee has no payroll data - use zeros instead of random values
+          payrollData.push({
+            id: employee.id,
+            employee_id: employee.employee_number,
+            employee_name: `${employee.first_name} ${employee.last_name}`,
+            position: employee.position || "Staff",
+            base_salary: 0,
+            allowances: 0,
+            deductions: 0,
+            net_salary: 0,
+            status: "Paid", // Default status
+            rate_per_month: "0",
+            user: employee.user,
+          })
         }
+      })
 
-        const data = await response.json()
+      setPayrollData(payrollData)
+      console.log("Payroll data loaded:", payrollData)
+    } catch (error) {
+      console.error("Error fetching payroll data:", error)
+      setError("An error occurred while fetching payroll data. Please try again later.")
 
-        // Filter for active employees only
-        const activeEmployees = data.filter((employee) => employee.active !== false)
-        setEmployees(activeEmployees)
-
-        // Generate placeholder payroll data for each employee
-        const placeholderPayroll = generatePlaceholderPayroll(activeEmployees)
-        setPayrollData(placeholderPayroll)
-
-        console.log("Active employees fetched:", activeEmployees.length)
-      } catch (error) {
-        console.error("Error fetching employees:", error)
-        setError("An error occurred while fetching employees. Please try again later.")
-      } finally {
-        setLoading(false)
+      // Fall back to zeros for all employees if API fails
+      if (employees.length > 0) {
+        const zeroPayroll = employees.map((employee) => ({
+          id: employee.id,
+          employee_id: employee.employee_number,
+          employee_name: `${employee.first_name} ${employee.last_name}`,
+          position: employee.position || "Staff",
+          base_salary: 0,
+          allowances: 0,
+          deductions: 0,
+          net_salary: 0,
+          status: "Paid", // Default status
+          rate_per_month: "0",
+          user: employee.user,
+        }))
+        setPayrollData(zeroPayroll)
       }
+    } finally {
+      setLoading(false)
     }
-
-    fetchEmployees()
-  }, [])
-
-  // Generate placeholder payroll data
-  const generatePlaceholderPayroll = (employeeList) => {
-    return employeeList.map((employee) => {
-      // Calculate a random base salary between 20,000 and 50,000
-      const baseSalary = Math.floor(Math.random() * 30000) + 20000
-
-      // Calculate random deductions (10-15% of base salary)
-      const deductionRate = (Math.random() * 5 + 10) / 100
-      const deductions = Math.round(baseSalary * deductionRate)
-
-      // Calculate random allowances (5-10% of base salary)
-      const allowanceRate = (Math.random() * 5 + 5) / 100
-      const allowances = Math.round(baseSalary * allowanceRate)
-
-      // Calculate net salary
-      const netSalary = baseSalary + allowances - deductions
-
-      return {
-        id: employee.id,
-        employee_id: employee.employee_number,
-        employee_name: `${employee.first_name} ${employee.last_name}`,
-        position: employee.position || "Staff",
-        base_salary: baseSalary,
-        allowances: allowances,
-        deductions: deductions,
-        net_salary: netSalary,
-        status: "Paid", // Placeholder status
-        // Add fields needed for the Edit_Payroll component
-        rate_per_month: baseSalary.toString(),
-        // Include the user object with ID
-        user: employee.user,
-      }
-    })
   }
+
+  // Fetch data on component mount
+  useEffect(() => {
+    fetchPayrollData()
+  }, [])
 
   // Handle edit payroll - open modal with employee data
   const handleEditPayroll = (employeeId) => {
@@ -110,18 +242,27 @@ function AdminEmployeePayrollPage() {
 
   // Handle payroll update
   const handlePayrollUpdate = (updatedData) => {
-    console.log("Updating payroll data:", updatedData)
-    // Here you would typically send the updated data to your API
-    // For now, we'll just update the local state
+    console.log("Updating payroll data with:", updatedData)
 
     if (selectedEmployee) {
       const updatedPayrollData = payrollData.map((emp) => {
         if (emp.id === selectedEmployee.id) {
+          // Parse values to ensure they're numbers
+          const totalGross = Number.parseFloat(updatedData.totalGross)
+          const totalDeductions = Number.parseFloat(updatedData.totalDeductions)
+          const totalSalaryCompensation = Number.parseFloat(updatedData.totalSalaryCompensation)
+
+          console.log("Parsed values:", {
+            totalGross,
+            totalDeductions,
+            totalSalaryCompensation,
+          })
+
           return {
             ...emp,
-            base_salary: Number.parseFloat(updatedData.baseSalary),
-            deductions: Number.parseFloat(updatedData.totalDeductions),
-            net_salary: Number.parseFloat(updatedData.totalSalaryCompensation),
+            base_salary: totalGross,
+            deductions: totalDeductions,
+            net_salary: totalSalaryCompensation,
             status: "Processing", // Change status after update
           }
         }
@@ -131,6 +272,11 @@ function AdminEmployeePayrollPage() {
       setPayrollData(updatedPayrollData)
       setIsEditModalOpen(false)
       setSelectedEmployee(null)
+
+      // Refresh data from server after a short delay to ensure changes are saved
+      setTimeout(() => {
+        fetchPayrollData()
+      }, 2000)
     }
   }
 
@@ -203,12 +349,12 @@ function AdminEmployeePayrollPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <button
                 onClick={() => {
-                  // Placeholder for generating payroll
-                  alert("Payroll generation functionality will be implemented later")
+                  // Refresh payroll data
+                  fetchPayrollData()
                 }}
                 className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
               >
-                Generate Payroll
+                Refresh Payroll
               </button>
               <input
                 type="search"
