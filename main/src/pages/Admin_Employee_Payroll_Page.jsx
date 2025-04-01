@@ -84,6 +84,8 @@ function AdminEmployeePayrollPage() {
         status: "Paid", // Placeholder status
         // Add fields needed for the Edit_Payroll component
         rate_per_month: baseSalary.toString(),
+        // Include the user object with ID
+        user: employee.user,
       }
     })
   }
@@ -92,7 +94,16 @@ function AdminEmployeePayrollPage() {
   const handleEditPayroll = (employeeId) => {
     const employee = payrollData.find((emp) => emp.id === employeeId)
     if (employee) {
-      setSelectedEmployee(employee)
+      // Find the original employee data to get the user ID
+      const originalEmployee = employees.find((emp) => emp.id === employeeId)
+
+      // Combine the payroll data with the user ID from the original employee data
+      const employeeWithUserId = {
+        ...employee,
+        user: originalEmployee?.user || null,
+      }
+
+      setSelectedEmployee(employeeWithUserId)
       setIsEditModalOpen(true)
     }
   }
@@ -233,7 +244,9 @@ function AdminEmployeePayrollPage() {
                       <td className="py-3 px-4">{formatCurrency(record.base_salary)}</td>
                       <td className="py-3 px-4">{formatCurrency(record.net_salary)}</td>
                       <td className="py-3 px-4">
-                        <span className={`px-4 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(record.status)}`}>
+                        <span
+                          className={`px-4 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(record.status)}`}
+                        >
                           {record.status}
                         </span>
                       </td>
