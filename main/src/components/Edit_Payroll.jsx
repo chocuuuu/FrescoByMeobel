@@ -51,6 +51,9 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [hasPayrollData, setHasPayrollData] = useState(false)
+  const [earningsId, setEarningsId] = useState(null)
+  const [deductionsId, setDeductionsId] = useState(null)
+  const [totalOvertimeId, setTotalOvertimeId] = useState(null)
 
   // Fetch employee data from APIs when the modal opens
   useEffect(() => {
@@ -101,6 +104,19 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Earnings data:", earningsData)
       console.log("Deductions data:", deductionsData)
       console.log("Total overtime data:", totalOvertimeData)
+
+      // Store record IDs for updates
+      if (earningsData.length > 0) {
+        setEarningsId(earningsData[0].id)
+      }
+
+      if (deductionsData.length > 0) {
+        setDeductionsId(deductionsData[0].id)
+      }
+
+      if (totalOvertimeData.length > 0) {
+        setTotalOvertimeId(totalOvertimeData[0].id)
+      }
 
       // Check if employee has any payroll data
       const hasData =
@@ -272,7 +288,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       // Calculate SSS contribution
-      const sssResponse = await fetch(`${API_BASE_URL}/sss/?salary=${basicRate}`, { headers })
+      const sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/?salary=${basicRate}`, { headers })
       if (!sssResponse.ok) throw new Error("Failed to calculate SSS contribution")
       const sssData = await sssResponse.json()
 
@@ -326,7 +342,13 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   }
 
   const formatValue = (value) => {
-    return value
+    // Format to exactly 2 decimal places
+    if (value === undefined || value === null) return "0.00"
+
+    const numValue = Number.parseFloat(value)
+    if (isNaN(numValue)) return "0.00"
+
+    return numValue.toFixed(2)
   }
 
   const handleSubmit = async (e) => {
@@ -350,76 +372,68 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       // Prepare earnings data
       const earningsData = {
         user: employeeData.id,
-        basic_rate: Number.parseFloat(formData.basicRate),
-        basic: Number.parseFloat(formData.basic),
-        allowance: Number.parseFloat(formData.allowance),
-        ntax: Number.parseFloat(formData.ntax),
-        vacationleave: Number.parseFloat(formData.vacationleave),
-        sickleave: Number.parseFloat(formData.sickleave),
+        basic_rate: Number.parseFloat(formData.basicRate).toFixed(2),
+        basic: Number.parseFloat(formData.basic).toFixed(2),
+        allowance: Number.parseFloat(formData.allowance).toFixed(2),
+        ntax: Number.parseFloat(formData.ntax).toFixed(2),
+        vacationleave: Number.parseFloat(formData.vacationleave).toFixed(2),
+        sickleave: Number.parseFloat(formData.sickleave).toFixed(2),
       }
 
       // Prepare deductions data
       const deductionsData = {
         user: employeeData.id,
-        sss: Number.parseFloat(formData.sss.amount),
-        philhealth: Number.parseFloat(formData.philhealth.amount),
-        pagibig: Number.parseFloat(formData.pagibig.amount),
-        late: Number.parseFloat(formData.late.amount),
-        wtax: Number.parseFloat(formData.wtax.amount),
-        nowork: Number.parseFloat(formData.nowork.amount),
-        loan: Number.parseFloat(formData.loan.amount),
-        charges: Number.parseFloat(formData.charges.amount),
-        undertime: Number.parseFloat(formData.undertime.amount),
-        msfcloan: Number.parseFloat(formData.msfcloan.amount),
+        sss: Number.parseFloat(formData.sss.amount).toFixed(2),
+        philhealth: Number.parseFloat(formData.philhealth.amount).toFixed(2),
+        pagibig: Number.parseFloat(formData.pagibig.amount).toFixed(2),
+        late: Number.parseFloat(formData.late.amount).toFixed(2),
+        wtax: Number.parseFloat(formData.wtax.amount).toFixed(2),
+        nowork: Number.parseFloat(formData.nowork.amount).toFixed(2),
+        loan: Number.parseFloat(formData.loan.amount).toFixed(2),
+        charges: Number.parseFloat(formData.charges.amount).toFixed(2),
+        undertime: Number.parseFloat(formData.undertime.amount).toFixed(2),
+        msfcloan: Number.parseFloat(formData.msfcloan.amount).toFixed(2),
       }
 
       // Prepare total overtime data
       const totalOvertimeData = {
         user: employeeData.id,
-        total_regularot: Number.parseFloat(formData.regularOT.rate),
-        total_regularholiday: Number.parseFloat(formData.regularHoliday.rate),
-        total_specialholiday: Number.parseFloat(formData.specialHoliday.rate),
-        total_restday: Number.parseFloat(formData.restDay.rate),
-        total_nightdiff: Number.parseFloat(formData.nightDiff.rate),
-        total_backwage: Number.parseFloat(formData.backwage.rate),
-        total_overtime:
+        total_regularot: Number.parseFloat(formData.regularOT.rate).toFixed(2),
+        total_regularholiday: Number.parseFloat(formData.regularHoliday.rate).toFixed(2),
+        total_specialholiday: Number.parseFloat(formData.specialHoliday.rate).toFixed(2),
+        total_restday: Number.parseFloat(formData.restDay.rate).toFixed(2),
+        total_nightdiff: Number.parseFloat(formData.nightDiff.rate).toFixed(2),
+        total_backwage: Number.parseFloat(formData.backwage.rate).toFixed(2),
+        total_overtime: (
           Number.parseFloat(formData.regularOT.rate) +
           Number.parseFloat(formData.regularHoliday.rate) +
           Number.parseFloat(formData.specialHoliday.rate) +
           Number.parseFloat(formData.restDay.rate) +
-          Number.parseFloat(formData.nightDiff.rate),
-        total_late: Number.parseFloat(formData.late.amount),
-        total_undertime: Number.parseFloat(formData.undertime.amount),
+          Number.parseFloat(formData.nightDiff.rate)
+        ).toFixed(2),
+        total_late: Number.parseFloat(formData.late.amount).toFixed(2),
+        total_undertime: Number.parseFloat(formData.undertime.amount).toFixed(2),
         biweek_start: new Date().toISOString().split("T")[0],
       }
 
-      // Check if earnings record exists for this employee
-      const earningsCheckResponse = await fetch(`${API_BASE_URL}/earnings/?user=${employeeData.id}`, { headers })
-      const earningsCheckData = await earningsCheckResponse.json()
+      console.log("Updating earnings with data:", earningsData)
+      console.log("Updating deductions with data:", deductionsData)
+      console.log("Updating total overtime with data:", totalOvertimeData)
 
-      // Check if deductions record exists for this employee
-      const deductionsCheckResponse = await fetch(`${API_BASE_URL}/deductions/?user=${employeeData.id}`, {
-        headers,
-      })
-      const deductionsCheckData = await deductionsCheckResponse.json()
-
-      // Check if total overtime record exists for this employee
-      const totalOvertimeCheckResponse = await fetch(`${API_BASE_URL}/totalovertime/?user=${employeeData.id}`, {
-        headers,
-      })
-      const totalOvertimeCheckData = await totalOvertimeCheckResponse.json()
-
+      console.log("Earnings ID", earningsId)
       // Update or create earnings record
       let earningsResponse
-      if (earningsCheckData.length > 0) {
+      if (earningsId) {
         // Update existing record
-        earningsResponse = await fetch(`${API_BASE_URL}/earnings/${earningsCheckData[0].id}/`, {
+        console.log(`Updating earnings record with ID ${earningsId}`)
+        earningsResponse = await fetch(`${API_BASE_URL}/earnings/${earningsId}/`, {
           method: "PUT",
           headers,
           body: JSON.stringify(earningsData),
         })
       } else {
         // Create new record
+        console.log("Creating new earnings record")
         earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
           method: "POST",
           headers,
@@ -427,19 +441,33 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         })
       }
 
-      if (!earningsResponse.ok) throw new Error("Failed to update earnings data")
+      if (!earningsResponse.ok) {
+        const errorData = await earningsResponse.json()
+        console.error("Earnings update error:", errorData)
+        throw new Error(`Failed to update earnings data: ${JSON.stringify(errorData)}`)
+      }
+
+      const earningsResult = await earningsResponse.json()
+      console.log("Earnings update result:", earningsResult)
+
+      // If we created a new record, store its ID
+      if (!earningsId && earningsResult.id) {
+        setEarningsId(earningsResult.id)
+      }
 
       // Update or create deductions record
       let deductionsResponse
-      if (deductionsCheckData.length > 0) {
+      if (deductionsId) {
         // Update existing record
-        deductionsResponse = await fetch(`${API_BASE_URL}/deductions/${deductionsCheckData[0].id}/`, {
+        console.log(`Updating deductions record with ID ${deductionsId}`)
+        deductionsResponse = await fetch(`${API_BASE_URL}/deductions/${deductionsId}/`, {
           method: "PUT",
           headers,
           body: JSON.stringify(deductionsData),
         })
       } else {
         // Create new record
+        console.log("Creating new deductions record")
         deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, {
           method: "POST",
           headers,
@@ -447,19 +475,33 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         })
       }
 
-      if (!deductionsResponse.ok) throw new Error("Failed to update deductions data")
+      if (!deductionsResponse.ok) {
+        const errorData = await deductionsResponse.json()
+        console.error("Deductions update error:", errorData)
+        throw new Error(`Failed to update deductions data: ${JSON.stringify(errorData)}`)
+      }
+
+      const deductionsResult = await deductionsResponse.json()
+      console.log("Deductions update result:", deductionsResult)
+
+      // If we created a new record, store its ID
+      if (!deductionsId && deductionsResult.id) {
+        setDeductionsId(deductionsResult.id)
+      }
 
       // Update or create total overtime record
       let totalOvertimeResponse
-      if (totalOvertimeCheckData.length > 0) {
+      if (totalOvertimeId) {
         // Update existing record
-        totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/${totalOvertimeCheckData[0].id}/`, {
+        console.log(`Updating total overtime record with ID ${totalOvertimeId}`)
+        totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/${totalOvertimeId}/`, {
           method: "PUT",
           headers,
           body: JSON.stringify(totalOvertimeData),
         })
       } else {
         // Create new record
+        console.log("Creating new total overtime record")
         totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, {
           method: "POST",
           headers,
@@ -467,7 +509,19 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         })
       }
 
-      if (!totalOvertimeResponse.ok) throw new Error("Failed to update total overtime data")
+      if (!totalOvertimeResponse.ok) {
+        const errorData = await totalOvertimeResponse.json()
+        console.error("Total overtime update error:", errorData)
+        throw new Error(`Failed to update total overtime data: ${JSON.stringify(errorData)}`)
+      }
+
+      const totalOvertimeResult = await totalOvertimeResponse.json()
+      console.log("Total overtime update result:", totalOvertimeResult)
+
+      // If we created a new record, store its ID
+      if (!totalOvertimeId && totalOvertimeResult.id) {
+        setTotalOvertimeId(totalOvertimeResult.id)
+      }
 
       // Set hasPayrollData to true since we've now saved data
       setHasPayrollData(true)
@@ -482,7 +536,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       })
     } catch (error) {
       console.error("Error updating payroll data:", error)
-      setError("Failed to update payroll data. Please try again.")
+      setError(`Failed to update payroll data: ${error.message}`)
     } finally {
       setLoading(false)
     }
