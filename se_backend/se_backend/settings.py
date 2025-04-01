@@ -70,6 +70,7 @@ INSTALLED_APPS = [
     "django_filters",
     "corsheaders",
     "django_celery_beat",
+    "easyaudit",
 
     # Rest-Framework
     "rest_framework",
@@ -98,6 +99,7 @@ INSTALLED_APPS = [
     "payroll",
     "payslip",
     "benefits",
+    "activity_log",
 
 ]
 
@@ -110,6 +112,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "easyaudit.middleware.easyaudit.EasyAuditMiddleware",
 ]
 
 ROOT_URLCONF = "se_backend.urls"
