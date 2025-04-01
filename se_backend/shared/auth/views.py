@@ -12,14 +12,10 @@ from rest_framework import generics, permissions, status, views
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
-from django.http import HttpResponseRedirect
-
-from employment_info.models import EmploymentInfo
-from shared.utils.email import send_email
 from users.models import CustomUser, UserPasswordReset
 
 from shared.auth.serializers import ChangeEmailSerializer, ChangePasswordSerializer, LoginSerializer, ResetPasswordRequestSerializer, ResetPasswordSerializer
-from shared.tasks import send_reset_email
+from shared.tasks import send_resend_email
 
 
 class LoginView(TokenObtainPairView):
@@ -61,68 +57,65 @@ class ChangePasswordView(generics.UpdateAPIView):
 class SendResetPasswordLink(generics.GenericAPIView):
     permission_classes = [AllowAny]
     serializer_class = ResetPasswordRequestSerializer
-    template_name = "reset_password.html"
-
-    def get(self, request):
-        return render(request, self.template_name)
 
     def post(self, request):
         serializer = self.serializer_class(data=request.data)
-        email = request.data["email"]
+        serializer.is_valid(raise_exception=True)
+
+        email = serializer.validated_data["email"]
         user = get_object_or_404(CustomUser, email=email)
-
         token = PasswordResetTokenGenerator().make_token(user)
-        uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-
         reset = UserPasswordReset(email=email, token=token)
         reset.save()
 
-        # Generate the backend reset link (Reusing this)
-        reset_link = request.build_absolute_uri(
-            reverse("reset-password", kwargs={"token": token})
+        reset_link = f"{settings.FRONTEND_DOMAIN}reset-password/{token}"
+
+        # Call Celery task to send email asynchronously
+        send_resend_email.delay(
+            "[Fresco]: Password Reset Request",
+            user.email,
+            render_to_string(
+                "reset_password_email.html",
+                {
+                    "reset_link": reset_link,
+                    "id": user.id,
+                },
+            ),
         )
 
-        # Call Celery task asynchronously and pass reset_link
-        send_reset_email.delay(email, reset_link, user.id)
-
-        return render(request, "reset_password_sent.html", {"email": email})
-
+        return Response({"message": "Reset link has been sent to your email."})
 class ResetPasswordView(generics.GenericAPIView):
     serializer_class = ResetPasswordSerializer
     permission_classes = []
 
-    def get(self, request, token):
-        """Render the password reset form."""
-        return render(request, "password_reset_confirm.html", {"token": token})
-
     def post(self, request, token):
-        """Handle password reset form submission."""
-        new_password = request.POST.get("new_password")
-        confirm_password = request.POST.get("confirm_password")
+        print(f"Received request with token: {token}")  # Debugging
+        print(f"Request data: {request.data}")  # Debugging
 
-        if new_password != confirm_password:
-            messages.error(request, "Passwords do not match.")
-            return render(request, "password_reset_confirm.html", {"token": token})
+        serializer = self.get_serializer(data=request.data)
+        if not serializer.is_valid():
+            print(f"Serializer Errors: {serializer.errors}")  # Debugging
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         reset_obj = UserPasswordReset.objects.filter(token=token).first()
         if not reset_obj:
-            messages.error(request, "Invalid token.")
-            return render(request, "password_reset_confirm.html", {"token": token})
+            return Response(
+                {"error": "Invalid token."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         user = CustomUser.objects.filter(email=reset_obj.email).first()
         if not user:
-            messages.error(request, "No user found.")
-            return render(request, "password_reset_confirm.html", {"token": token})
+            return Response(
+                {"error": "No user found."}, status=status.HTTP_404_NOT_FOUND
+            )
 
-        # Update user password
-        user.set_password(new_password)
-        user.save()
+        serializer.update(user, serializer.validated_data)
         reset_obj.delete()
 
-        messages.success(request, "Password has been updated successfully.")
-        # Redirect dynamically based on settings
-        frontend_domain = settings.FRONTEND_DOMAIN.rstrip("/")
-        return HttpResponseRedirect(frontend_domain)
+        return Response(
+            {"success": "Password has been updated."}, status=status.HTTP_200_OK
+        )
 
 class ValidateResetPasswordTokenView(views.APIView):
     def post(self, request):

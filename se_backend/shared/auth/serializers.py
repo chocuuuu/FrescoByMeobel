@@ -84,11 +84,7 @@ class ResetPasswordRequestSerializer(serializers.Serializer):
 
 
 class ResetPasswordSerializer(serializers.ModelSerializer):
-    new_password = serializers.RegexField(
-        regex=r".{8,}$",
-        write_only=True,
-        error_messages={"invalid": "Password must be at least 8 characters long"},
-    )
+    new_password = serializers.CharField(write_only=True, required=True)
     confirm_password = serializers.CharField(write_only=True, required=True)
 
     class Meta:
@@ -105,4 +101,3 @@ class ResetPasswordSerializer(serializers.ModelSerializer):
         instance.set_password(validated_data["new_password"])
         instance.save()
         return instance
-
