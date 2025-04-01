@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import NavBar from "../components/Nav_Bar"
-import EditPayroll from "../components/Edit_Payroll"
+import NavBar from "../components/Nav_Bar.jsx"
+import EditPayroll from "../components/Edit_Payroll.jsx"
+import { API_BASE_URL } from "../config/api"
 
 function AdminEmployeePayrollPage() {
+  const [employees, setEmployees] = useState([])
   const [payrollData, setPayrollData] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -12,101 +14,135 @@ function AdminEmployeePayrollPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
-  const employeesPerPage = 5
+  const recordsPerPage = 5
 
+  // Fetch employees
   useEffect(() => {
-    // Simulating API call to fetch payroll data
-    const fetchPayrollData = async () => {
-      setLoading(true)
-      setError(null)
+    const fetchEmployees = async () => {
       try {
-        // Replace this with actual API call when available
-        const data = [
-          {
-            id: 1,
-            name: "Raceli Sincioco",
-            rate_per_month: "19000",
-            deductions: "3927",
-            pay_date: "2024-11-15",
+        setLoading(true)
+        const accessToken = localStorage.getItem("access_token")
+        const response = await fetch(`${API_BASE_URL}/employment-info/`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
           },
-          {
-            id: 2,
-            name: "Nicolai Alcaraz",
-            rate_per_month: "19000",
-            deductions: "3927",
-            pay_date: "2024-11-15",
-          },
-          {
-            id: 3,
-            name: "Cyrus Canape",
-            rate_per_month: "19000",
-            deductions: "3927",
-            pay_date: "2024-11-15",
-          },
-          {
-            id: 4,
-            name: "Eli Dizon",
-            rate_per_month: "19000",
-            deductions: "3927",
-            pay_date: "2024-11-15",
-          },
-          {
-            id: 5,
-            name: "John Doe",
-            rate_per_month: "20000",
-            deductions: "4000",
-            pay_date: "2024-11-15",
-          },
-          {
-            id: 6,
-            name: "Jane Smith",
-            rate_per_month: "18000",
-            deductions: "3800",
-            pay_date: "2024-11-15",
-          },
-        ]
-        setPayrollData(data)
+        })
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch employees")
+        }
+
+        const data = await response.json()
+
+        // Filter for active employees only
+        const activeEmployees = data.filter((employee) => employee.active !== false)
+        setEmployees(activeEmployees)
+
+        // Generate placeholder payroll data for each employee
+        const placeholderPayroll = generatePlaceholderPayroll(activeEmployees)
+        setPayrollData(placeholderPayroll)
+
+        console.log("Active employees fetched:", activeEmployees.length)
       } catch (error) {
-        console.error("Error fetching payroll data:", error)
-        setError("An error occurred while fetching payroll data. Please try again later.")
+        console.error("Error fetching employees:", error)
+        setError("An error occurred while fetching employees. Please try again later.")
       } finally {
         setLoading(false)
       }
     }
 
-    fetchPayrollData()
+    fetchEmployees()
   }, [])
 
-  const handleEditClick = (employee) => {
-    setSelectedEmployee(employee)
-    setIsEditModalOpen(true)
+  // Generate placeholder payroll data
+  const generatePlaceholderPayroll = (employeeList) => {
+    return employeeList.map((employee) => {
+      // Calculate a random base salary between 20,000 and 50,000
+      const baseSalary = Math.floor(Math.random() * 30000) + 20000
+
+      // Calculate random deductions (10-15% of base salary)
+      const deductionRate = (Math.random() * 5 + 10) / 100
+      const deductions = Math.round(baseSalary * deductionRate)
+
+      // Calculate random allowances (5-10% of base salary)
+      const allowanceRate = (Math.random() * 5 + 5) / 100
+      const allowances = Math.round(baseSalary * allowanceRate)
+
+      // Calculate net salary
+      const netSalary = baseSalary + allowances - deductions
+
+      return {
+        id: employee.id,
+        employee_id: employee.employee_number,
+        employee_name: `${employee.first_name} ${employee.last_name}`,
+        position: employee.position || "Staff",
+        base_salary: baseSalary,
+        allowances: allowances,
+        deductions: deductions,
+        net_salary: netSalary,
+        status: "Paid", // Placeholder status
+        // Add fields needed for the Edit_Payroll component
+        rate_per_month: baseSalary.toString(),
+      }
+    })
   }
 
-  const handleUpdatePayroll = (formData) => {
-    setPayrollData((prevData) =>
-      prevData.map((employee) => {
-        if (employee.id === selectedEmployee.id) {
+  // Handle edit payroll - open modal with employee data
+  const handleEditPayroll = (employeeId) => {
+    const employee = payrollData.find((emp) => emp.id === employeeId)
+    if (employee) {
+      setSelectedEmployee(employee)
+      setIsEditModalOpen(true)
+    }
+  }
+
+  // Handle payroll update
+  const handlePayrollUpdate = (updatedData) => {
+    console.log("Updating payroll data:", updatedData)
+    // Here you would typically send the updated data to your API
+    // For now, we'll just update the local state
+
+    if (selectedEmployee) {
+      const updatedPayrollData = payrollData.map((emp) => {
+        if (emp.id === selectedEmployee.id) {
           return {
-            ...employee,
-            rate_per_month: formData.baseSalary,
-            deductions: formData.totalDeductions,
+            ...emp,
+            base_salary: Number.parseFloat(updatedData.baseSalary),
+            deductions: Number.parseFloat(updatedData.totalDeductions),
+            net_salary: Number.parseFloat(updatedData.totalSalaryCompensation),
+            status: "Processing", // Change status after update
           }
         }
-        return employee
-      }),
-    )
-    setIsEditModalOpen(false)
+        return emp
+      })
+
+      setPayrollData(updatedPayrollData)
+      setIsEditModalOpen(false)
+      setSelectedEmployee(null)
+    }
   }
 
-  const filteredPayrollData = payrollData.filter((employee) =>
-    employee.name.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Filter payroll data based on search term
+  const filteredPayrollData = payrollData.filter((record) => {
+    return (
+      record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.employee_id?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.position?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  })
+
+  // Sort by employee ID in descending order (assuming higher ID = newer employee)
+  const sortedPayrollData = [...filteredPayrollData].sort((a, b) => {
+    // Convert to numbers and sort in descending order
+    return Number.parseInt(b.employee_id) - Number.parseInt(a.employee_id)
+  })
 
   // Pagination logic
-  const indexOfLastEmployee = currentPage * employeesPerPage
-  const indexOfFirstEmployee = indexOfLastEmployee - employeesPerPage
-  const currentEmployees = filteredPayrollData.slice(indexOfFirstEmployee, indexOfLastEmployee)
-  const totalPages = Math.ceil(filteredPayrollData.length / employeesPerPage)
+  const indexOfLastRecord = currentPage * recordsPerPage
+  const indexOfFirstRecord = indexOfLastRecord - recordsPerPage
+  const currentRecords = sortedPayrollData.slice(indexOfFirstRecord, indexOfLastRecord)
+  const totalPages = Math.ceil(sortedPayrollData.length / recordsPerPage)
 
   const nextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
@@ -114,6 +150,31 @@ function AdminEmployeePayrollPage() {
 
   const prevPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1))
+  }
+
+  // Format currency
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat("en-PH", {
+      style: "currency",
+      currency: "PHP",
+      minimumFractionDigits: 2,
+    }).format(amount)
+  }
+
+  // Get status color
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case "paid":
+        return "bg-green-500"
+      case "processing":
+        return "bg-yellow-500"
+      case "pending":
+        return "bg-blue-500"
+      case "rejected":
+        return "bg-red-500"
+      default:
+        return "bg-gray-500"
+    }
   }
 
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>
@@ -126,15 +187,24 @@ function AdminEmployeePayrollPage() {
       <div className="container mx-auto px-4 pt-24">
         <div className="bg-[#A7BC8F] rounded-lg p-6">
           {/* Header Section */}
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-semibold text-white">Payroll</h2>
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <h2 className="text-2xl font-semibold text-white">Employee Payroll</h2>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <button
+                onClick={() => {
+                  // Placeholder for generating payroll
+                  alert("Payroll generation functionality will be implemented later")
+                }}
+                className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
+              >
+                Generate Payroll
+              </button>
               <input
                 type="search"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346]"
+                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full sm:w-auto"
               />
             </div>
           </div>
@@ -146,46 +216,62 @@ function AdminEmployeePayrollPage() {
                 <tr className="text-left text-white border-b border-white/20">
                   <th className="py-3 px-4 w-[10%]">ID</th>
                   <th className="py-3 px-4 w-[30%]">NAME</th>
-                  <th className="py-3 px-4 w-[20%]">RATE PER MONTH</th>
-                  <th className="py-3 px-4 w-[15%]">DEDUCTIONS</th>
-                  <th className="py-3 px-4 w-[15%]">PAY DATE</th>
-                  <th className="py-3 px-4 w-[10%]">ACTIONS</th>
+                  <th className="py-3 px-4 w-[15%]">POSITION</th>
+                  <th className="py-3 px-4 w-[12%]">GROSS SALARY</th>
+                  <th className="py-3 px-4 w-[12%]">NET SALARY</th>
+                  <th className="py-3 px-4 w-[10%]">STATUS</th>
+                  <th className="py-3 px-4 w-[15%]">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="text-white">
-                {currentEmployees.map((item) => (
-                  <tr key={item.id} className="border-b border-white/10">
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">{item.id}</td>
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap" title={item.name}>
-                      {item.name.length > 50 ? item.name.substring(0, 47) + "..." : item.name}
-                    </td>
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">
-                      ₱{item.rate_per_month}
-                    </td>
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">₱{item.deductions}</td>
-                    <td className="py-3 px-4 overflow-hidden text-ellipsis whitespace-nowrap">{item.pay_date}</td>
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <button
-                        onClick={() => handleEditClick(item)}
-                        className="bg-[#5C7346] text-white px-4 py-1 rounded-md hover:bg-[#4a5c38] transition-colors"
-                      >
-                        Edit
-                      </button>
+                {currentRecords.length > 0 ? (
+                  currentRecords.map((record) => (
+                    <tr key={record.id} className="border-b border-white/10">
+                      <td className="py-3 px-4">{record.employee_id}</td>
+                      <td className="py-3 px-4">{record.employee_name}</td>
+                      <td className="py-3 px-4">{record.position}</td>
+                      <td className="py-3 px-4">{formatCurrency(record.base_salary)}</td>
+                      <td className="py-3 px-4">{formatCurrency(record.net_salary)}</td>
+                      <td className="py-3 px-4">
+                        <span className={`px-4 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(record.status)}`}>
+                          {record.status}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <button
+                          onClick={() => handleEditPayroll(record.id)}
+                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
+                        >
+                          Edit Payroll
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="py-4 text-center">
+                      No payroll records found
                     </td>
                   </tr>
-                ))}
+                )}
                 {/* Add empty rows to maintain table height */}
-                {[...Array(Math.max(0, employeesPerPage - currentEmployees.length))].map((_, index) => (
-                  <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
-                    <td colSpan="6"></td>
-                  </tr>
-                ))}
+                {currentRecords.length > 0 &&
+                  [...Array(Math.max(0, recordsPerPage - currentRecords.length))].map((_, index) => (
+                    <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
+                      <td colSpan="7"></td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
 
           {/* Footer Section */}
-          <div className="flex justify-end items-center mt-4">
+          <div className="flex justify-between items-center mt-4">
+            <div>
+              <p className="text-white">
+                Showing {currentRecords.length} of {sortedPayrollData.length} employees
+              </p>
+            </div>
             <div className="flex space-x-2">
               <button
                 onClick={prevPage}
@@ -197,13 +283,13 @@ function AdminEmployeePayrollPage() {
                 Previous
               </button>
               <button className="bg-white text-[#5C7346] px-4 py-2 rounded-md">
-                {currentPage} of {totalPages}
+                {currentPage} of {totalPages || 1}
               </button>
               <button
                 onClick={nextPage}
-                disabled={currentPage === totalPages}
+                disabled={currentPage === totalPages || totalPages === 0}
                 className={`bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors ${
-                  currentPage === totalPages ? "opacity-50 cursor-not-allowed" : ""
+                  currentPage === totalPages || totalPages === 0 ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
                 Next
@@ -216,9 +302,12 @@ function AdminEmployeePayrollPage() {
       {/* Edit Payroll Modal */}
       <EditPayroll
         isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
+        onClose={() => {
+          setIsEditModalOpen(false)
+          setSelectedEmployee(null)
+        }}
         employeeData={selectedEmployee}
-        onUpdate={handleUpdatePayroll}
+        onUpdate={handlePayrollUpdate}
       />
     </div>
   )
