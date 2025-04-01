@@ -14,16 +14,16 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     baseSalary: 0,
     allowance: 0,
     otherEarningsNTax: 0,
-    vacationLeave: 0,
+    vacationleave: 0,
     sickLeave: 0,
     bereavementLeave: 0,
 
     // Overtime
-    regularOT: { hours: "3", rate: 0 },
+    regularOT: { hours: "0", rate: 0 },
     regularHoliday: { rate: 0 },
     specialHoliday: { rate: 0 },
-    restDay: { hours: "3", rate: 0 },
-    nightDiff: { hours: "3", rate: 0 },
+    restDay: { hours: "0", rate: 0 },
+    nightDiff: { hours: "0", rate: 0 },
     backwage: { rate: "0" },
 
     // Deductions
@@ -49,6 +49,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [hasPayrollData, setHasPayrollData] = useState(false)
 
   // Fetch employee data from APIs when the modal opens
   useEffect(() => {
@@ -62,6 +63,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
     setLoading(true)
     setError(null)
+    setHasPayrollData(false)
 
     try {
       const accessToken = localStorage.getItem("access_token")
@@ -69,6 +71,16 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         Authorization: `Bearer ${accessToken}`,
         "Content-Type": "application/json",
       }
+
+      // Check if employee has salary data
+      const salaryResponse = await fetch(`${API_BASE_URL}/salary/?employee=${employeeId}`, { headers })
+      if (!salaryResponse.ok) throw new Error("Failed to fetch salary data")
+      const salaryData = await salaryResponse.json()
+
+      // Check if employee has total overtime data
+      const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/?employee=${employeeId}`, { headers })
+      if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
+      const totalOvertimeData = await totalOvertimeResponse.json()
 
       // Fetch earnings data
       const earningsResponse = await fetch(`${API_BASE_URL}/earnings/?employee=${employeeId}`, { headers })
@@ -85,25 +97,52 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       if (!overtimeResponse.ok) throw new Error("Failed to fetch overtime data")
       const overtimeData = await overtimeResponse.json()
 
-      // Update form data with fetched values
-      const updatedFormData = createFormDataFromApi(earningsData[0], deductionsData[0], overtimeData, employeeData)
-      setFormData(updatedFormData)
+      // Check if employee has any payroll data
+      const hasData =
+        salaryData.length > 0 ||
+        totalOvertimeData.length > 0 ||
+        earningsData.length > 0 ||
+        deductionsData.length > 0 ||
+        overtimeData.length > 0
+
+      setHasPayrollData(hasData)
+
+      // If employee has data, update form with it
+      if (hasData) {
+        const updatedFormData = createFormDataFromApi(
+          earningsData[0],
+          deductionsData[0],
+          overtimeData,
+          totalOvertimeData[0],
+          salaryData[0],
+          employeeData,
+        )
+        setFormData(updatedFormData)
+      } else {
+        // If no data, reset to default values with employee's base salary if available
+        const defaultFormData = { ...formData }
+        if (employeeData?.rate_per_month) {
+          defaultFormData.baseSalary = employeeData.rate_per_month
+        }
+        setFormData(defaultFormData)
+      }
     } catch (error) {
       console.error("Error fetching payroll data:", error)
       setError("Failed to load payroll data. Using default values.")
 
       // Set default values from employeeData
-      setFormData((prevData) => ({
-        ...prevData,
-        baseSalary: employeeData.rate_per_month || prevData.baseSalary,
-        totalDeductions: employeeData.deductions?.toString() || prevData.totalDeductions,
-      }))
+      if (employeeData?.rate_per_month) {
+        setFormData((prevData) => ({
+          ...prevData,
+          baseSalary: employeeData.rate_per_month,
+        }))
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  const createFormDataFromApi = (earnings, deductions, overtime, employeeData) => {
+  const createFormDataFromApi = (earnings, deductions, overtime, totalOvertime, salary, employeeData) => {
     // Start with default form data
     const newFormData = { ...formData }
 
@@ -112,7 +151,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       newFormData.baseSalary = earnings.base_salary?.toString() || newFormData.baseSalary
       newFormData.allowance = earnings.allowance?.toString() || newFormData.allowance
       newFormData.otherEarningsNTax = earnings.other_earnings?.toString() || newFormData.otherEarningsNTax
-      newFormData.vacationLeave = earnings.vacation_leave?.toString() || newFormData.vacationLeave
+      newFormData.vacationleave = earnings.vacationleave?.toString() || newFormData.vacationleave
       newFormData.sickLeave = earnings.sick_leave?.toString() || newFormData.sickLeave
       newFormData.bereavementLeave = earnings.bereavement_leave?.toString() || newFormData.bereavementLeave
     } else if (employeeData?.rate_per_month) {
@@ -163,6 +202,15 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       newFormData.nightDiff.hours = nightDiffHours.toString() || newFormData.nightDiff.hours
     }
 
+    // Update overtime rates if available
+    if (totalOvertime) {
+      newFormData.regularOT.rate = totalOvertime.regular_ot?.toString() || newFormData.regularOT.rate
+      newFormData.regularHoliday.rate = totalOvertime.regular_holiday?.toString() || newFormData.regularHoliday.rate
+      newFormData.specialHoliday.rate = totalOvertime.special_holiday?.toString() || newFormData.specialHoliday.rate
+      newFormData.restDay.rate = totalOvertime.rest_day?.toString() || newFormData.restDay.rate
+      newFormData.nightDiff.rate = totalOvertime.night_diff?.toString() || newFormData.nightDiff.rate
+    }
+
     // Calculate totals
     const totals = calculateTotals(newFormData)
 
@@ -176,7 +224,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       Number.parseFloat(data.baseSalary) +
       Number.parseFloat(data.allowance) +
       Number.parseFloat(data.otherEarningsNTax) +
-      Number.parseFloat(data.vacationLeave) +
+      Number.parseFloat(data.vacationleave) +
       Number.parseFloat(data.sickLeave) +
       Number.parseFloat(data.bereavementLeave)
 
@@ -248,7 +296,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         base_salary: Number.parseFloat(formData.baseSalary),
         allowance: Number.parseFloat(formData.allowance),
         other_earnings: Number.parseFloat(formData.otherEarningsNTax),
-        vacation_leave: Number.parseFloat(formData.vacationLeave),
+        vacationleave: Number.parseFloat(formData.vacationleave),
         sick_leave: Number.parseFloat(formData.sickLeave),
         bereavement_leave: Number.parseFloat(formData.bereavementLeave),
       }
@@ -271,6 +319,16 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         msfc_loan: Number.parseFloat(formData.msfcLoan.amount),
       }
 
+      // Prepare total overtime data
+      const totalOvertimeData = {
+        employee: employeeData.id,
+        regular_ot: Number.parseFloat(formData.regularOT.rate),
+        regular_holiday: Number.parseFloat(formData.regularHoliday.rate),
+        special_holiday: Number.parseFloat(formData.specialHoliday.rate),
+        rest_day: Number.parseFloat(formData.restDay.rate),
+        night_diff: Number.parseFloat(formData.nightDiff.rate),
+      }
+
       // Check if earnings record exists for this employee
       const earningsCheckResponse = await fetch(`${API_BASE_URL}/earnings/?employee=${employeeData.id}`, { headers })
       const earningsCheckData = await earningsCheckResponse.json()
@@ -280,6 +338,12 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         headers,
       })
       const deductionsCheckData = await deductionsCheckResponse.json()
+
+      // Check if total overtime record exists for this employee
+      const totalOvertimeCheckResponse = await fetch(`${API_BASE_URL}/totalovertime/?employee=${employeeData.id}`, {
+        headers,
+      })
+      const totalOvertimeCheckData = await totalOvertimeCheckResponse.json()
 
       // Update or create earnings record
       let earningsResponse
@@ -321,6 +385,29 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       if (!deductionsResponse.ok) throw new Error("Failed to update deductions data")
 
+      // Update or create total overtime record
+      let totalOvertimeResponse
+      if (totalOvertimeCheckData.length > 0) {
+        // Update existing record
+        totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/${totalOvertimeCheckData[0].id}/`, {
+          method: "PUT",
+          headers,
+          body: JSON.stringify(totalOvertimeData),
+        })
+      } else {
+        // Create new record
+        totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(totalOvertimeData),
+        })
+      }
+
+      if (!totalOvertimeResponse.ok) throw new Error("Failed to update total overtime data")
+
+      // Set hasPayrollData to true since we've now saved data
+      setHasPayrollData(true)
+
       // Call the onUpdate callback with the updated data
       onUpdate({
         ...formData,
@@ -344,8 +431,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       <div className="bg-white rounded-lg w-full max-w-6xl p-4 relative max-h-[90vh] overflow-y-auto">
         {/* Employee Info */}
         <div className="mb-3">
-          <h2 className="text-lg font-bold uppercase">{employeeData?.employee_name || "EMPLOYEE NAME"}</h2>
-          <p className="text-xs text-gray-600">{employeeData?.employee_id || "ID"}</p>
+          <h2 className="text-xl font-bold uppercase">{employeeData?.employee_name || "EMPLOYEE NAME"}</h2>
+          <p className="text-sm text-gray-600">{employeeData?.employee_id || "ID"}</p>
+          {!hasPayrollData && (
+            <div className="mt-2 p-2 bg-blue-100 text-blue-700 rounded text-sm">
+              This employee doesn't have payroll information yet. Enter the details below to create their payroll
+              record.
+            </div>
+          )}
         </div>
 
         {loading && (
@@ -362,32 +455,32 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
             <div>
               {/* Payroll Dates */}
               <div className="mb-4">
-                <h3 className="font-medium text-sm mb-2 uppercase">Payroll Dates</h3>
+                <h3 className="font-medium text-base mb-2 uppercase">Payroll Dates</h3>
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Payroll Period</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Payroll Period</label>
                     <div className="flex gap-1">
                       <input
                         type="text"
                         value={formData.payrollPeriodStart}
                         onChange={(e) => handleInputChange(e, "payrollPeriodStart")}
-                        className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                        className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                       />
                       <input
                         type="text"
                         value={formData.payrollPeriodEnd}
                         onChange={(e) => handleInputChange(e, "payrollPeriodEnd")}
-                        className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                        className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Pay Date</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Pay Date</label>
                     <input
                       type="text"
                       value={formData.payDate}
                       onChange={(e) => handleInputChange(e, "payDate")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
@@ -395,60 +488,60 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
               {/* Earnings */}
               <div>
-                <h3 className="font-medium text-sm mb-2 uppercase">Earnings</h3>
+                <h3 className="font-medium text-base mb-2 uppercase">Earnings</h3>
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Base Salary</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Base Salary</label>
                     <input
                       type="text"
                       value={formatValue(formData.baseSalary)}
                       onChange={(e) => handleInputChange(e, "baseSalary")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Allowance</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Allowance</label>
                     <input
                       type="text"
                       value={formatValue(formData.allowance)}
                       onChange={(e) => handleInputChange(e, "allowance")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Other Earnings N-TAX</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Other Earnings N-TAX</label>
                     <input
                       type="text"
                       value={formatValue(formData.otherEarningsNTax)}
                       onChange={(e) => handleInputChange(e, "otherEarningsNTax")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Vacation Leave</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Vacation Leave</label>
                     <input
                       type="text"
-                      value={formatValue(formData.vacationLeave)}
-                      onChange={(e) => handleInputChange(e, "vacationLeave")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                      value={formatValue(formData.vacationleave)}
+                      onChange={(e) => handleInputChange(e, "vacationleave")}
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Sick Leave</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Sick Leave</label>
                     <input
                       type="text"
                       value={formatValue(formData.sickLeave)}
                       onChange={(e) => handleInputChange(e, "sickLeave")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Bereavement Leave</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Bereavement Leave</label>
                     <input
                       type="text"
                       value={formatValue(formData.bereavementLeave)}
                       onChange={(e) => handleInputChange(e, "bereavementLeave")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
@@ -457,87 +550,87 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
             {/* Column 2: Overtime Breakdown */}
             <div>
-              <h3 className="font-medium text-sm mb-2 uppercase">Overtime Breakdown</h3>
+              <h3 className="font-medium text-base mb-2 uppercase">Overtime Breakdown</h3>
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Regular Overtime</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Regular Overtime</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       placeholder="Hrs"
                       value={formData.regularOT.hours}
                       onChange={(e) => handleInputChange(e, "regularOT", "hours")}
-                      className="w-10 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-12 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                     <input
                       type="text"
                       value={formatValue(formData.regularOT.rate)}
                       onChange={(e) => handleInputChange(e, "regularOT", "rate")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Regular Holiday</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Regular Holiday</label>
                   <input
                     type="text"
                     value={formatValue(formData.regularHoliday.rate)}
                     onChange={(e) => handleInputChange(e, "regularHoliday", "rate")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Special Holiday</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Special Holiday</label>
                   <input
                     type="text"
                     value={formatValue(formData.specialHoliday.rate)}
                     onChange={(e) => handleInputChange(e, "specialHoliday", "rate")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Rest Day</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Rest Day</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       placeholder="Hrs"
                       value={formData.restDay.hours}
                       onChange={(e) => handleInputChange(e, "restDay", "hours")}
-                      className="w-10 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-12 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                     <input
                       type="text"
                       value={formatValue(formData.restDay.rate)}
                       onChange={(e) => handleInputChange(e, "restDay", "rate")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Night Diff</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Night Diff</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       placeholder="Hrs"
                       value={formData.nightDiff.hours}
                       onChange={(e) => handleInputChange(e, "nightDiff", "hours")}
-                      className="w-10 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-12 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                     <input
                       type="text"
                       value={formatValue(formData.nightDiff.rate)}
                       onChange={(e) => handleInputChange(e, "nightDiff", "rate")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Backwage</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Backwage</label>
                   <input
                     type="text"
                     value={formatValue(formData.backwage.rate)}
                     onChange={(e) => handleInputChange(e, "backwage", "rate")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
               </div>
@@ -545,75 +638,75 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
             {/* Column 3: Deductions */}
             <div>
-              <h3 className="font-medium text-sm mb-2 uppercase">Deductions</h3>
+              <h3 className="font-medium text-base mb-2 uppercase">Deductions</h3>
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">SSS</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">SSS</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       value={`${formData.sss.percentage}%`}
                       onChange={(e) => handleInputChange(e, "sss", "percentage")}
-                      className="w-12 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-14 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                     <input
                       type="text"
                       value={formatValue(formData.sss.amount)}
                       onChange={(e) => handleInputChange(e, "sss", "amount")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">PhilHealth</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">PhilHealth</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       value={`${formData.philhealth.percentage}%`}
                       onChange={(e) => handleInputChange(e, "philhealth", "percentage")}
-                      className="w-12 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-14 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                     <input
                       type="text"
                       value={formatValue(formData.philhealth.amount)}
                       onChange={(e) => handleInputChange(e, "philhealth", "amount")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Pag IBIG</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Pag IBIG</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       value={`${formData.pagibig.percentage}%`}
                       onChange={(e) => handleInputChange(e, "pagibig", "percentage")}
-                      className="w-12 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-14 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                     <input
                       type="text"
                       value={formatValue(formData.pagibig.amount)}
                       onChange={(e) => handleInputChange(e, "pagibig", "amount")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="flex-1 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Late</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Late</label>
                   <input
                     type="text"
                     value={formatValue(formData.late.amount)}
                     onChange={(e) => handleInputChange(e, "late", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">WTAX (S)</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">WTAX (S)</label>
                   <input
                     type="text"
                     value={formatValue(formData.wtax.amount)}
                     onChange={(e) => handleInputChange(e, "wtax", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
               </div>
@@ -621,51 +714,51 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
             {/* Column 4: Additional Deductions */}
             <div>
-              <h3 className="font-medium text-sm mb-2 uppercase">Additional Deductions</h3>
+              <h3 className="font-medium text-base mb-2 uppercase">Additional Deductions</h3>
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">No Work Day</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">No Work Day</label>
                   <input
                     type="text"
                     value={formatValue(formData.noWorkDay.amount)}
                     onChange={(e) => handleInputChange(e, "noWorkDay", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Loan</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Loan</label>
                   <input
                     type="text"
                     value={formatValue(formData.loan.amount)}
                     onChange={(e) => handleInputChange(e, "loan", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Charges</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Charges</label>
                   <input
                     type="text"
                     value={formatValue(formData.charges.amount)}
                     onChange={(e) => handleInputChange(e, "charges", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Undertime</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Undertime</label>
                   <input
                     type="text"
                     value={formatValue(formData.undertime.amount)}
                     onChange={(e) => handleInputChange(e, "undertime", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">MSFC Loan</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">MSFC Loan</label>
                   <input
                     type="text"
                     value={formatValue(formData.msfcLoan.amount)}
                     onChange={(e) => handleInputChange(e, "msfcLoan", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                    className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                   />
                 </div>
               </div>
@@ -674,33 +767,33 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
           {/* Overall Section */}
           <div className="bg-gray-50 p-3 rounded">
-            <h3 className="font-medium text-sm mb-2 uppercase">Overall</h3>
+            <h3 className="font-medium text-base mb-2 uppercase">Overall</h3>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="block text-xs text-gray-600 mb-1 uppercase">Total Gross</label>
+                <label className="block text-sm text-gray-600 mb-1 uppercase">Total Gross</label>
                 <input
                   type="text"
                   value={formatValue(formData.totalGross)}
                   readOnly
-                  className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                  className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1 uppercase">Total Deductions</label>
+                <label className="block text-sm text-gray-600 mb-1 uppercase">Total Deductions</label>
                 <input
                   type="text"
                   value={formatValue(formData.totalDeductions)}
                   readOnly
-                  className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                  className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                 />
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1 uppercase">Total Salary</label>
+                <label className="block text-sm text-gray-600 mb-1 uppercase">Total Salary</label>
                 <input
                   type="text"
                   value={formatValue(formData.totalSalaryCompensation)}
                   readOnly
-                  className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                  className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                 />
               </div>
             </div>
@@ -710,7 +803,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           <div className="flex justify-center space-x-4 sticky bottom-0 pt-2 pb-1 bg-white">
             <button
               type="submit"
-              className="px-6 py-1 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
+              className="px-6 py-2 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
               disabled={loading}
             >
               {loading ? "Saving..." : "Save"}
@@ -718,7 +811,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-1 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
+              className="px-6 py-2 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
               disabled={loading}
             >
               Cancel
