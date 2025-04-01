@@ -108,27 +108,27 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       console.log(`Fetching payroll data for user ID: ${userId}`)
 
-      // Check if employee has salary data
+      // Check if employee has salary data - add user filter parameter
       const salaryResponse = await fetch(`${API_BASE_URL}/salary/?user=${userId}`, { headers })
       if (!salaryResponse.ok) throw new Error("Failed to fetch salary data")
       const salaryData = await salaryResponse.json()
 
-      // Check if employee has total overtime data
+      // Check if employee has total overtime data - add user filter parameter
       const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/?user=${userId}`, { headers })
       if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
       const totalOvertimeData = await totalOvertimeResponse.json()
 
-      // Fetch earnings data
+      // Fetch earnings data - add user filter parameter
       const earningsResponse = await fetch(`${API_BASE_URL}/earnings/?user=${userId}`, { headers })
       if (!earningsResponse.ok) throw new Error("Failed to fetch earnings data")
       const earningsData = await earningsResponse.json()
 
-      // Fetch deductions data
+      // Fetch deductions data - add user filter parameter
       const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/?user=${userId}`, { headers })
       if (!deductionsResponse.ok) throw new Error("Failed to fetch deductions data")
       const deductionsData = await deductionsResponse.json()
 
-      // Fetch overtime hours data
+      // Fetch overtime hours data - add user filter parameter
       const overtimeResponse = await fetch(`${API_BASE_URL}/overtimehours/?user=${userId}`, { headers })
       if (!overtimeResponse.ok) throw new Error("Failed to fetch overtime data")
       const overtimeData = await overtimeResponse.json()
@@ -138,31 +138,63 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Total overtime data:", totalOvertimeData)
       console.log("Overtime hours data:", overtimeData)
 
-      // Store record IDs for updates
+      // Store record IDs for updates - only if they belong to this user
       if (earningsData.length > 0) {
-        setEarningsId(earningsData[0].id)
+        // Find the earnings record that belongs to this user
+        const userEarnings = earningsData.find((record) => record.user === userId)
+        if (userEarnings) {
+          setEarningsId(userEarnings.id)
+          console.log(`Found earnings ID ${userEarnings.id} for user ${userId}`)
+        } else {
+          setEarningsId(null)
+          console.log(`No earnings record found for user ${userId}`)
+        }
+      } else {
+        setEarningsId(null)
       }
 
       if (deductionsData.length > 0) {
-        setDeductionsId(deductionsData[0].id)
+        // Find the deductions record that belongs to this user
+        const userDeductions = deductionsData.find((record) => record.user === userId)
+        if (userDeductions) {
+          setDeductionsId(userDeductions.id)
+          console.log(`Found deductions ID ${userDeductions.id} for user ${userId}`)
+        } else {
+          setDeductionsId(null)
+          console.log(`No deductions record found for user ${userId}`)
+        }
+      } else {
+        setDeductionsId(null)
       }
 
       if (totalOvertimeData.length > 0) {
-        setTotalOvertimeId(totalOvertimeData[0].id)
+        // Find the total overtime record that belongs to this user
+        const userTotalOvertime = totalOvertimeData.find((record) => record.user === userId)
+        if (userTotalOvertime) {
+          setTotalOvertimeId(userTotalOvertime.id)
+          console.log(`Found total overtime ID ${userTotalOvertime.id} for user ${userId}`)
+        } else {
+          setTotalOvertimeId(null)
+          console.log(`No total overtime record found for user ${userId}`)
+        }
+      } else {
+        setTotalOvertimeId(null)
       }
 
       // Store overtime record IDs for updates
       const newOvertimeRecords = { regularOT: null, restDay: null, nightDiff: null }
 
       if (overtimeData.length > 0) {
-        // Find and store the IDs for each overtime type
+        // Find and store the IDs for each overtime type that belongs to this user
         overtimeData.forEach((record) => {
-          if (record.type === "regular") {
-            newOvertimeRecords.regularOT = record.id
-          } else if (record.type === "rest_day") {
-            newOvertimeRecords.restDay = record.id
-          } else if (record.type === "night_diff") {
-            newOvertimeRecords.nightDiff = record.id
+          if (record.user === userId) {
+            if (record.type === "regular") {
+              newOvertimeRecords.regularOT = record.id
+            } else if (record.type === "rest_day") {
+              newOvertimeRecords.restDay = record.id
+            } else if (record.type === "night_diff") {
+              newOvertimeRecords.nightDiff = record.id
+            }
           }
         })
       }
@@ -172,22 +204,29 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       // Check if employee has any payroll data
       const hasData =
-        salaryData.length > 0 ||
-        totalOvertimeData.length > 0 ||
-        earningsData.length > 0 ||
-        deductionsData.length > 0 ||
-        overtimeData.length > 0
+        (salaryData.length > 0 && salaryData.some((record) => record.user === userId)) ||
+        (totalOvertimeData.length > 0 && totalOvertimeData.some((record) => record.user === userId)) ||
+        (earningsData.length > 0 && earningsData.some((record) => record.user === userId)) ||
+        (deductionsData.length > 0 && deductionsData.some((record) => record.user === userId)) ||
+        (overtimeData.length > 0 && overtimeData.some((record) => record.user === userId))
 
       setHasPayrollData(hasData)
 
       // If employee has data, update form with it
       if (hasData) {
+        // Find the records that belong to this user
+        const userEarnings = earningsData.find((record) => record.user === userId) || null
+        const userDeductions = deductionsData.find((record) => record.user === userId) || null
+        const userTotalOvertime = totalOvertimeData.find((record) => record.user === userId) || null
+        const userOvertimeData = overtimeData.filter((record) => record.user === userId) || []
+        const userSalary = salaryData.find((record) => record.user === userId) || null
+
         const updatedFormData = createFormDataFromApi(
-          earningsData[0],
-          deductionsData[0],
-          overtimeData,
-          totalOvertimeData[0],
-          salaryData[0],
+          userEarnings,
+          userDeductions,
+          userOvertimeData,
+          userTotalOvertime,
+          userSalary,
           employeeData,
         )
         setFormData(updatedFormData)
