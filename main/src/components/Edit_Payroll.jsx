@@ -942,7 +942,13 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         rate_per_month: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
         rate_per_hour: (Number.parseFloat(updatedFormData.basicRate) / 160).toFixed(2), // Assuming 160 hours per month
         pay_date: new Date().toISOString().split("T")[0],
-      }
+        // Only include these fields if they have valid IDs
+        ...(updatedFormData.sss_id && { sss_id: updatedFormData.sss_id }),
+        ...(updatedFormData.philhealth_id && { philhealth_id: updatedFormData.philhealth_id }),
+        ...(updatedFormData.pagibig_id && { pagibig_id: updatedFormData.pagibig_id }),
+      };
+      
+      console.log("Salary data being sent:", salaryData);
 
       if (salaryId) {
         // Update existing record
@@ -992,9 +998,28 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const completeSalary = await completeSalaryResponse.json()
 
       // Step 4: Create or update payroll record
+      // First, fetch the complete objects for earnings, deductions, and overtime
+      const [earningsObj, deductionsObj, overtimeObj] = await Promise.all([
+        fetch(`${API_BASE_URL}/earnings/${earningsId}/`, { headers }).then((res) => res.json()),
+        fetch(`${API_BASE_URL}/deductions/${deductionsId}/`, { headers }).then((res) => res.json()),
+        fetch(`${API_BASE_URL}/totalovertime/${overtimeId}/`, { headers }).then((res) => res.json()),
+      ])
+
+      // Create a complete salary object with nested objects
+      const completeSalaryObj = {
+        ...completeSalary,
+        earnings_id: earningsObj,
+        deductions_id: deductionsObj,
+        overtime_id: overtimeObj,
+        // Don't include these fields if they're null
+        ...(completeSalary.sss_id && { sss_id: completeSalary.sss_id }),
+        ...(completeSalary.philhealth_id && { philhealth_id: completeSalary.philhealth_id }),
+        ...(completeSalary.pagibig_id && { pagibig_id: completeSalary.pagibig_id }),
+      }
+
       const payrollData = {
         user_id: userId,
-        salary_id: completeSalary, // Send the complete salary object
+        salary_id: completeSalaryObj, // Send the complete salary object with nested objects
         gross_pay: totalGross.toFixed(2),
         total_deductions: totalDeductions.toFixed(2),
         net_pay: totalSalaryCompensation.toFixed(2),
@@ -1538,4 +1563,3 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 }
 
 export default EditPayroll
-
