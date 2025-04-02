@@ -55,13 +55,13 @@ services:
     image: redis:alpine
     container_name: redis_broker
     restart: always
-    ports:
-      - "6379:6379"
+    command: redis-server --bind 0.0.0.0 --protected-mode no
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
+
 
 
   celery_worker:
@@ -72,7 +72,7 @@ services:
       - redis
       - backend_db
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis_broker:6379/0
 
   celery_beat:
     build: .
@@ -82,7 +82,7 @@ services:
       - redis
       - backend_db
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis_broker:6379/0
 
 volumes:
   prototype-backend:
