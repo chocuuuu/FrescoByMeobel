@@ -72,7 +72,7 @@ services:
       - redis
       - backend_db
     environment:
-      - CELERY_BROKER_URL=redis://redis_broker:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
 
   celery_beat:
     build: .
@@ -82,7 +82,7 @@ services:
       - redis
       - backend_db
     environment:
-      - CELERY_BROKER_URL=redis://redis_broker:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
 
 volumes:
   prototype-backend:
