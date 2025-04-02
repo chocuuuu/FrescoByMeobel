@@ -896,7 +896,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         // Update existing record
         console.log(`Updating salary record with ID ${salaryId}`)
         const salaryResponse = await fetch(`${API_BASE_URL}/salary/${salaryId}/`, {
-          method: "PATCH",
+          method: "POST",
           headers,
           body: JSON.stringify(salaryData),
         })
@@ -971,11 +971,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       // Find the section where we create the payrollData object (around line 1000)
-      // Replace the payrollData object with this updated version:
+      // Replace it with this updated version that always uses the complete salary object:
 
       const payrollData = {
         user_id: userId,
-        salary_id: payrollId ? completeSalary : salaryRecordId, // Send full object when updating, ID when creating
+        salary_id: completeSalary, // Always use the complete salary object
         gross_pay: totalGross.toFixed(2),
         total_deductions: totalDeductions.toFixed(2),
         net_pay: totalSalaryCompensation.toFixed(2),
@@ -1046,7 +1046,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           }
 
           const updateResponse = await fetch(`${API_BASE_URL}/payroll/${userPayroll.id}/`, {
-            method: "PATCH",
+            method: "POST",
             headers,
             body: JSON.stringify(updatePayrollData),
           })
@@ -1059,12 +1059,33 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
           console.log("Successfully updated payroll record")
         } else {
+          // Find the section where we create the payrollData object (around line 1000)
+          // Replace it with this updated version that always uses the complete salary object:
+
+          const payrollData = {
+            user_id: userId,
+            salary_id: completeSalary, // Always use the complete salary object
+            gross_pay: totalGross.toFixed(2),
+            total_deductions: totalDeductions.toFixed(2),
+            net_pay: totalSalaryCompensation.toFixed(2),
+            pay_date: new Date().toISOString().split("T")[0],
+            status: "Processing",
+          }
+
+          // Also update the code that creates a new payroll record (around line 1080)
+          // Replace it with this:
+
           // Create new payroll record
           console.log("Creating new payroll record")
+          const createPayrollData = {
+            ...payrollData,
+            salary_id: completeSalary, // Always use the complete salary object
+          }
+
           const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
             method: "POST",
             headers,
-            body: JSON.stringify(payrollData), // For creation, we can use just the ID
+            body: JSON.stringify(createPayrollData), // Use the object with complete salary
           })
 
           if (!payrollResponse.ok) {
@@ -1549,3 +1570,4 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 }
 
 export default EditPayroll
+
