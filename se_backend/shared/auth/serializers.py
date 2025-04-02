@@ -6,17 +6,23 @@ from rest_framework import serializers
 
 User = get_user_model()
 
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import Token
+from users.models import CustomUser  # Ensure you import your CustomUser model
+
 class LoginSerializer(TokenObtainPairSerializer):
     @classmethod
-    def get_token(cls, user: User) -> Token:
+    def get_token(cls, user: CustomUser) -> Token:
         token = super().get_token(user)
         token["email"] = user.email
+        token["role"] = user.role  # Add role to the token payload
         return token
 
     def validate(self, attrs):
         data = super().validate(attrs)
         data.update({"user": str(self.user.id)})
         data.update({"email": str(self.user.email)})
+        data.update({"role": str(self.user.role)})  # Include role in response
         return data
 
 

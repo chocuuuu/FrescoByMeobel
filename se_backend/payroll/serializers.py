@@ -34,6 +34,7 @@ class PhilhealthSerializer(serializers.ModelSerializer):
 class PagibigSerializer(serializers.ModelSerializer):
     class Meta:
         model = Pagibig
+        fields = '__all__'
 
 class SalarySerializer(serializers.ModelSerializer):
     earnings_id = EarningsSerializer()
