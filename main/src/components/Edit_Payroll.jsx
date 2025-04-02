@@ -747,23 +747,130 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         overtimeId = totalOvertimeResult.id
       }
 
+      // Find the section where we create or update the salary record (around line 950)
+      // Replace the salaryData object with this updated version:
+
       // Step 2: Create or update salary record
       let salaryRecordId = null
+
+      // First, fetch the SSS, PhilHealth, and Pag-IBIG records for this user
+      console.log(`Fetching benefit records for user ID: ${userId}`)
+      const [sssRecords, philhealthRecords, pagibigRecords] = await Promise.all([
+        fetch(`${API_BASE_URL}/benefits/sss/?user=${userId}`, { headers }).then((res) => (res.ok ? res.json() : [])),
+        fetch(`${API_BASE_URL}/benefits/philhealth/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+        fetch(`${API_BASE_URL}/benefits/pagibig/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+      ])
+
+      // Get the complete objects if records exist
+      let sssRecord = sssRecords && sssRecords.length > 0 ? sssRecords[0] : null
+      let philhealthRecord = philhealthRecords && philhealthRecords.length > 0 ? philhealthRecords[0] : null
+      let pagibigRecord = pagibigRecords && pagibigRecords.length > 0 ? pagibigRecords[0] : null
+
+      console.log("Benefit records:", { sssRecord, philhealthRecord, pagibigRecord })
+
+      // If any of the required records are missing, we need to create them
+      if (!sssRecord || !philhealthRecord || !pagibigRecord) {
+        console.log("Creating missing benefit records")
+
+        // Create SSS record if missing
+        if (!sssRecord) {
+          const sssData = {
+            user: userId,
+            basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+            msc: "5000.00",
+            employee_share: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+            employer_share: "500.00",
+            ec_contribution: "10.00",
+            employer_mpf_contribution: "0.00",
+            employee_mpf_contribution: "0.00",
+            total_employer: "510.00",
+            total_employee: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+            total_contribution: (Number.parseFloat(updatedFormData.sss.amount) + 510).toFixed(2),
+          }
+
+          const sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(sssData),
+          })
+
+          if (sssResponse.ok) {
+            sssRecord = await sssResponse.json()
+            console.log("Created new SSS record:", sssRecord)
+          } else {
+            console.error("Failed to create SSS record:", await sssResponse.text())
+            throw new Error("Failed to create SSS record")
+          }
+        }
+
+        // Create PhilHealth record if missing
+        if (!philhealthRecord) {
+          const philhealthData = {
+            user: userId,
+            basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+            total_contribution: Number.parseFloat(updatedFormData.philhealth.amount).toFixed(2),
+          }
+
+          const philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(philhealthData),
+          })
+
+          if (philhealthResponse.ok) {
+            philhealthRecord = await philhealthResponse.json()
+            console.log("Created new PhilHealth record:", philhealthRecord)
+          } else {
+            console.error("Failed to create PhilHealth record:", await philhealthResponse.text())
+            throw new Error("Failed to create PhilHealth record")
+          }
+        }
+
+        // Create Pag-IBIG record if missing
+        if (!pagibigRecord) {
+          const pagibigData = {
+            user: userId,
+            basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+            employee_share: Number.parseFloat(updatedFormData.pagibig.amount).toFixed(2),
+            employer_share: "200.00",
+            total_contribution: (Number.parseFloat(updatedFormData.pagibig.amount) + 200).toFixed(2),
+          }
+
+          const pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(pagibigData),
+          })
+
+          if (pagibigResponse.ok) {
+            pagibigRecord = await pagibigResponse.json()
+            console.log("Created new Pag-IBIG record:", pagibigRecord)
+          } else {
+            console.error("Failed to create Pag-IBIG record:", await pagibigResponse.text())
+            throw new Error("Failed to create Pag-IBIG record")
+          }
+        }
+      }
+
       const salaryData = {
         user: userId,
         earnings_id: earningsId,
         deductions_id: deductionsId,
         overtime_id: overtimeId,
+        // Include the benefit IDs - these must not be null
+        sss_id: sssRecord.id,
+        philhealth_id: philhealthRecord.id,
+        pagibig_id: pagibigRecord.id,
         rate_per_month: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
         rate_per_hour: (Number.parseFloat(updatedFormData.basicRate) / 160).toFixed(2), // Assuming 160 hours per month
         pay_date: new Date().toISOString().split("T")[0],
-        // Only include these fields if they have valid IDs
-        ...(updatedFormData.sss_id && { sss_id: updatedFormData.sss_id }),
-        ...(updatedFormData.philhealth_id && { philhealth_id: updatedFormData.philhealth_id }),
-        ...(updatedFormData.pagibig_id && { pagibig_id: updatedFormData.pagibig_id }),
-      };
-      
-      console.log("Salary data being sent:", salaryData);
+      }
+
+      console.log("Salary data to be sent:", salaryData)
 
       if (salaryId) {
         // Update existing record
@@ -826,10 +933,10 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         earnings_id: earningsObj,
         deductions_id: deductionsObj,
         overtime_id: overtimeObj,
-        // Don't include these fields if they're null
-        ...(completeSalary.sss_id && { sss_id: completeSalary.sss_id }),
-        ...(completeSalary.philhealth_id && { philhealth_id: completeSalary.philhealth_id }),
-        ...(completeSalary.pagibig_id && { pagibig_id: completeSalary.pagibig_id }),
+        // Include the benefit IDs - these must not be null
+        sss_id: sssRecord.id,
+        philhealth_id: philhealthRecord.id,
+        pagibig_id: pagibigRecord.id,
       }
 
       const payrollData = {
