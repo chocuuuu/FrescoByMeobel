@@ -67,6 +67,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const [totalOvertimeId, setTotalOvertimeId] = useState(null)
   const [userId, setUserId] = useState(null)
   const [payrollId, setPayrollId] = useState(null)
+  const [salaryId, setSalaryId] = useState(null)
   const [overtimeRecords, setOvertimeRecords] = useState({
     regularOT: null,
     restDay: null,
@@ -93,8 +94,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }, [employeeData, isOpen])
 
-  // Function to fix payroll relationships
-  const fixPayrollRelationships = async (userId) => {
+  // Function to check if a user has a payroll record
+  const checkUserPayroll = async (userId) => {
     try {
       const accessToken = localStorage.getItem("access_token")
       const headers = {
@@ -102,204 +103,248 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         "Content-Type": "application/json",
       }
 
-      // First, check if this user has a payroll record
+      // Check if this user has a payroll record
       const payrollResponse = await fetch(`${API_BASE_URL}/payroll/?user_id=${userId}`, { headers })
       if (!payrollResponse.ok) throw new Error("Failed to fetch payroll data")
       const payrollData = await payrollResponse.json()
 
-      // If user has a payroll record, check if it's using shared IDs
       if (payrollData.length > 0) {
-        const userPayroll = payrollData[0]
-        setPayrollId(userPayroll.id)
-
-        console.log("Found payroll record:", userPayroll)
-
-        // Check if this earnings ID is used by other users
-        const earningsCheckResponse = await fetch(`${API_BASE_URL}/payroll/?earnings_id=${userPayroll.earnings_id}`, {
-          headers,
-        })
-        if (!earningsCheckResponse.ok) throw new Error("Failed to check earnings relationships")
-        const earningsCheckData = await earningsCheckResponse.json()
-
-        // If this earnings ID is used by multiple users, we need to create a new one
-        const needNewEarnings = earningsCheckData.some(
-          (record) => record.user_id !== userId && record.earnings_id === userPayroll.earnings_id,
-        )
-
-        // Check if this deductions ID is used by other users
-        const deductionsCheckResponse = await fetch(
-          `${API_BASE_URL}/payroll/?deductions_id=${userPayroll.deductions_id}`,
-          { headers },
-        )
-        if (!deductionsCheckResponse.ok) throw new Error("Failed to check deductions relationships")
-        const deductionsCheckData = await deductionsCheckResponse.json()
-
-        // If this deductions ID is used by multiple users, we need to create a new one
-        const needNewDeductions = deductionsCheckData.some(
-          (record) => record.user_id !== userId && record.deductions_id === userPayroll.deductions_id,
-        )
-
-        // Check if this overtime ID is used by other users
-        const overtimeCheckResponse = await fetch(`${API_BASE_URL}/payroll/?overtime_id=${userPayroll.overtime_id}`, {
-          headers,
-        })
-        if (!overtimeCheckResponse.ok) throw new Error("Failed to check overtime relationships")
-        const overtimeCheckData = await overtimeCheckResponse.json()
-
-        // If this overtime ID is used by multiple users, we need to create a new one
-        const needNewOvertime = overtimeCheckData.some(
-          (record) => record.user_id !== userId && record.overtime_id === userPayroll.overtime_id,
-        )
-
-        console.log("Relationship check results:", {
-          needNewEarnings,
-          needNewDeductions,
-          needNewOvertime,
-        })
-
-        // If we need to create new records, do it now
-        if (needNewEarnings || needNewDeductions || needNewOvertime) {
-          console.log("Fixing shared record IDs for user", userId)
-
-          // Create new records as needed and update the payroll record
-          const updatedPayrollData = { ...userPayroll }
-
-          // Handle earnings
-          if (needNewEarnings) {
-            // Get the current earnings data
-            const earningsResponse = await fetch(`${API_BASE_URL}/earnings/${userPayroll.earnings_id}/`, { headers })
-            if (earningsResponse.ok) {
-              const earningsData = await earningsResponse.json()
-
-              // Create a new earnings record for this user
-              const newEarningsData = {
-                ...earningsData,
-                user: userId,
-                id: null, // Remove ID to create a new record
-              }
-
-              const createEarningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
-                method: "POST",
-                headers,
-                body: JSON.stringify(newEarningsData),
-              })
-
-              if (createEarningsResponse.ok) {
-                const newEarnings = await createEarningsResponse.json()
-                updatedPayrollData.earnings_id = newEarnings.id
-                setEarningsId(newEarnings.id)
-                console.log("Created new earnings record:", newEarnings.id)
-              }
-            }
-          } else {
-            setEarningsId(userPayroll.earnings_id)
-          }
-
-          // Handle deductions
-          if (needNewDeductions) {
-            // Get the current deductions data
-            const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/${userPayroll.deductions_id}/`, {
-              headers,
-            })
-            if (deductionsResponse.ok) {
-              const deductionsData = await deductionsResponse.json()
-
-              // Create a new deductions record for this user
-              const newDeductionsData = {
-                ...deductionsData,
-                user: userId,
-                id: null, // Remove ID to create a new record
-              }
-
-              const createDeductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, {
-                method: "POST",
-                headers,
-                body: JSON.stringify(newDeductionsData),
-              })
-
-              if (createDeductionsResponse.ok) {
-                const newDeductions = await createDeductionsResponse.json()
-                updatedPayrollData.deductions_id = newDeductions.id
-                setDeductionsId(newDeductions.id)
-                console.log("Created new deductions record:", newDeductions.id)
-              }
-            }
-          } else {
-            setDeductionsId(userPayroll.deductions_id)
-          }
-
-          // Handle overtime
-          if (needNewOvertime) {
-            // Get the current overtime data
-            const overtimeResponse = await fetch(`${API_BASE_URL}/totalovertime/${userPayroll.overtime_id}/`, {
-              headers,
-            })
-            if (overtimeResponse.ok) {
-              const overtimeData = await overtimeResponse.json()
-
-              // Create a new overtime record for this user
-              const newOvertimeData = {
-                ...overtimeData,
-                user: userId,
-                id: null, // Remove ID to create a new record
-              }
-
-              const createOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, {
-                method: "POST",
-                headers,
-                body: JSON.stringify(newOvertimeData),
-              })
-
-              if (createOvertimeResponse.ok) {
-                const newOvertime = await createOvertimeResponse.json()
-                updatedPayrollData.overtime_id = newOvertime.id
-                setTotalOvertimeId(newOvertime.id)
-                console.log("Created new overtime record:", newOvertime.id)
-              }
-            }
-          } else {
-            setTotalOvertimeId(userPayroll.overtime_id)
-          }
-
-          // Update the payroll record with the new IDs
-          if (
-            updatedPayrollData.earnings_id !== userPayroll.earnings_id ||
-            updatedPayrollData.deductions_id !== userPayroll.deductions_id ||
-            updatedPayrollData.overtime_id !== userPayroll.overtime_id
-          ) {
-            console.log("Updating payroll record with new IDs:", updatedPayrollData)
-
-            const updatePayrollResponse = await fetch(`${API_BASE_URL}/payroll/${userPayroll.id}/`, {
-              method: "PUT",
-              headers,
-              body: JSON.stringify(updatedPayrollData),
-            })
-
-            if (updatePayrollResponse.ok) {
-              console.log("Successfully updated payroll record with new IDs")
-            } else {
-              console.error("Failed to update payroll record with new IDs")
-            }
-          }
-        } else {
-          // If we don't need to create new records, just set the IDs
-          setEarningsId(userPayroll.earnings_id)
-          setDeductionsId(userPayroll.deductions_id)
-          setTotalOvertimeId(userPayroll.overtime_id)
+        const userPayroll = payrollData.find((record) => record.user_id === userId)
+        if (userPayroll) {
+          setPayrollId(userPayroll.id)
+          console.log("Found payroll record:", userPayroll)
+          return userPayroll
         }
-      } else {
-        // User doesn't have a payroll record yet, we'll create one when they save
-        console.log("No payroll record found for user", userId)
-        setEarningsId(null)
-        setDeductionsId(null)
-        setTotalOvertimeId(null)
-        setPayrollId(null)
       }
+
+      console.log("No payroll record found for user", userId)
+      return null
     } catch (error) {
-      console.error("Error fixing payroll relationships:", error)
+      console.error("Error checking user payroll:", error)
+      return null
     }
   }
 
+  // Function to check if a user has a salary record
+  const checkUserSalary = async (userId) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
+
+      // Check if this user has a salary record
+      const salaryResponse = await fetch(`${API_BASE_URL}/salary/?user=${userId}`, { headers })
+      if (!salaryResponse.ok) throw new Error("Failed to fetch salary data")
+      const salaryData = await salaryResponse.json()
+
+      if (salaryData.length > 0) {
+        const userSalary = salaryData.find((record) => record.user === userId)
+        if (userSalary) {
+          setSalaryId(userSalary.id)
+          setEarningsId(userSalary.earnings_id)
+          setDeductionsId(userSalary.deductions_id)
+          setTotalOvertimeId(userSalary.overtime_id)
+          console.log("Found salary record:", userSalary)
+          return userSalary
+        }
+      }
+
+      console.log("No salary record found for user", userId)
+      return null
+    } catch (error) {
+      console.error("Error checking user salary:", error)
+      return null
+    }
+  }
+
+  // Function to create new records for a user
+  const createNewRecordsForUser = async (userId) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
+
+      // Create new earnings record
+      const earningsData = {
+        user: userId,
+        basic_rate: "0.00",
+        basic: "0.00",
+        allowance: "0.00",
+        ntax: "0.00",
+        vacationleave: "0.00",
+        sickleave: "0.00",
+      }
+
+      const earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(earningsData),
+      })
+
+      if (!earningsResponse.ok) {
+        console.error("Failed to create earnings record")
+        return null
+      }
+
+      const newEarnings = await earningsResponse.json()
+      setEarningsId(newEarnings.id)
+      console.log("Created new earnings record:", newEarnings.id)
+
+      // Create new deductions record
+      const deductionsData = {
+        user: userId,
+        sss: "0.00",
+        philhealth: "0.00",
+        pagibig: "0.00",
+        late: "0.00",
+        wtax: "0.00",
+        nowork: "0.00",
+        loan: "0.00",
+        charges: "0.00",
+        undertime: "0.00",
+        msfcloan: "0.00",
+      }
+
+      const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(deductionsData),
+      })
+
+      if (!deductionsResponse.ok) {
+        console.error("Failed to create deductions record")
+        return null
+      }
+
+      const newDeductions = await deductionsResponse.json()
+      setDeductionsId(newDeductions.id)
+      console.log("Created new deductions record:", newDeductions.id)
+
+      // Create new overtime record
+      const overtimeData = {
+        user: userId,
+        total_regularot: "0.00",
+        total_regularholiday: "0.00",
+        total_specialholiday: "0.00",
+        total_restday: "0.00",
+        total_nightdiff: "0.00",
+        total_backwage: "0.00",
+        total_overtime: "0.00",
+        total_late: "0.00",
+        total_undertime: "0.00",
+        biweek_start: new Date().toISOString().split("T")[0],
+      }
+
+      const overtimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(overtimeData),
+      })
+
+      if (!overtimeResponse.ok) {
+        console.error("Failed to create overtime record")
+        return null
+      }
+
+      const newOvertime = await overtimeResponse.json()
+      setTotalOvertimeId(newOvertime.id)
+      console.log("Created new overtime record:", newOvertime.id)
+
+      // Create new salary record
+      const salaryData = {
+        user: userId,
+        earnings_id: newEarnings.id,
+        deductions_id: newDeductions.id,
+        overtime_id: newOvertime.id,
+        pay_date: new Date().toISOString().split("T")[0],
+        rate_per_month: employeeData?.rate_per_month || "0.00",
+        rate_per_hour: "0.00",
+      }
+
+      const salaryResponse = await fetch(`${API_BASE_URL}/salary/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(salaryData),
+      })
+
+      if (!salaryResponse.ok) {
+        const errorText = await salaryResponse.text()
+        console.error("Failed to create salary record:", errorText)
+        return null
+      }
+
+      const newSalary = await salaryResponse.json()
+      setSalaryId(newSalary.id)
+      console.log("Created new salary record:", newSalary.id)
+
+      // Fetch the complete salary object with all nested data
+      const completeSalaryResponse = await fetch(`${API_BASE_URL}/salary/${newSalary.id}/`, {
+        headers,
+      })
+
+      if (!completeSalaryResponse.ok) {
+        console.error("Failed to fetch complete salary data")
+        return null
+      }
+
+      const completeSalary = await completeSalaryResponse.json()
+
+      // Create new payroll record
+      const payrollData = {
+        user_id: userId,
+        salary_id: completeSalary, // Send the complete salary object
+        pay_date: new Date().toISOString().split("T")[0],
+        gross_pay: "0.00",
+        total_deductions: "0.00",
+        net_pay: "0.00",
+        status: "Pending",
+      }
+
+      try {
+        console.log("Creating new payroll record")
+        const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(payrollData),
+        })
+
+        if (!payrollResponse.ok) {
+          const errorText = await payrollResponse.text()
+          console.error("Failed to create payroll record:", errorText)
+          return null
+        }
+
+        const newPayroll = await payrollResponse.json()
+        setPayrollId(newPayroll.id)
+        console.log("Created new payroll record:", newPayroll.id)
+
+        return {
+          payrollId: newPayroll.id,
+          salaryId: newSalary.id,
+          earningsId: newEarnings.id,
+          deductionsId: newDeductions.id,
+          overtimeId: newOvertime.id,
+        }
+      } catch (error) {
+        console.error("Error creating payroll record:", error)
+        return {
+          salaryId: newSalary.id,
+          earningsId: newEarnings.id,
+          deductionsId: newDeductions.id,
+          overtimeId: newOvertime.id,
+        }
+      }
+    } catch (error) {
+      console.error("Error creating new records:", error)
+      return null
+    }
+  }
+
+  // Replace the fetchEmployeePayrollData function with this updated version that doesn't automatically create records
   const fetchEmployeePayrollData = async (userId) => {
     if (!userId) return
 
@@ -316,18 +361,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       console.log(`Fetching payroll data for user ID: ${userId}`)
 
-      // First, fix any shared record IDs
-      await fixPayrollRelationships(userId)
+      // First, check if user has a salary record
+      const userSalary = await checkUserSalary(userId)
 
-      // Check if employee has salary data - add user filter parameter
-      const salaryResponse = await fetch(`${API_BASE_URL}/salary/?user=${userId}`, { headers })
-      if (!salaryResponse.ok) throw new Error("Failed to fetch salary data")
-      const salaryData = await salaryResponse.json()
+      // Then check if user has a payroll record
+      const userPayroll = await checkUserPayroll(userId)
 
-      // Check if employee has total overtime data - add user filter parameter
-      const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/?user=${userId}`, { headers })
-      if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
-      const totalOvertimeData = await totalOvertimeResponse.json()
+      // Check if employee has any data - DON'T automatically create records
+      const hasData = userSalary !== null || userPayroll !== null
 
       // Fetch earnings data - add user filter parameter
       const earningsResponse = await fetch(`${API_BASE_URL}/earnings/?user=${userId}`, { headers })
@@ -338,6 +379,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/?user=${userId}`, { headers })
       if (!deductionsResponse.ok) throw new Error("Failed to fetch deductions data")
       const deductionsData = await deductionsResponse.json()
+
+      // Check if employee has total overtime data - add user filter parameter
+      const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/?user=${userId}`, { headers })
+      if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
+      const totalOvertimeData = await totalOvertimeResponse.json()
 
       // Fetch overtime hours data - add user filter parameter
       const overtimeResponse = await fetch(`${API_BASE_URL}/overtimehours/?user=${userId}`, { headers })
@@ -357,11 +403,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           setEarningsId(userEarnings.id)
           console.log(`Found earnings ID ${userEarnings.id} for user ${userId}`)
         } else {
-          setEarningsId(null)
           console.log(`No earnings record found for user ${userId}`)
         }
-      } else {
-        setEarningsId(null)
       }
 
       if (deductionsData.length > 0) {
@@ -371,11 +414,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           setDeductionsId(userDeductions.id)
           console.log(`Found deductions ID ${userDeductions.id} for user ${userId}`)
         } else {
-          setDeductionsId(null)
           console.log(`No deductions record found for user ${userId}`)
         }
-      } else {
-        setDeductionsId(null)
       }
 
       if (totalOvertimeData.length > 0) {
@@ -385,11 +425,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           setTotalOvertimeId(userTotalOvertime.id)
           console.log(`Found total overtime ID ${userTotalOvertime.id} for user ${userId}`)
         } else {
-          setTotalOvertimeId(null)
           console.log(`No total overtime record found for user ${userId}`)
         }
-      } else {
-        setTotalOvertimeId(null)
       }
 
       // Store overtime record IDs for updates
@@ -413,24 +450,23 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       setOvertimeRecords(newOvertimeRecords)
       console.log("Overtime record IDs:", newOvertimeRecords)
 
-      // Check if employee has any payroll data
-      const hasData =
-        (salaryData.length > 0 && salaryData.some((record) => record.user === userId)) ||
-        (totalOvertimeData.length > 0 && totalOvertimeData.some((record) => record.user === userId)) ||
+      // Update hasPayrollData based on whether we found any data
+      const foundData =
         (earningsData.length > 0 && earningsData.some((record) => record.user === userId)) ||
         (deductionsData.length > 0 && deductionsData.some((record) => record.user === userId)) ||
-        (overtimeData.length > 0 && overtimeData.some((record) => record.user === userId))
+        (totalOvertimeData.length > 0 && totalOvertimeData.some((record) => record.user === userId)) ||
+        (overtimeData.length > 0 && overtimeData.some((record) => record.user === userId)) ||
+        hasData
 
-      setHasPayrollData(hasData)
+      setHasPayrollData(foundData)
 
       // If employee has data, update form with it
-      if (hasData) {
+      if (foundData) {
         // Find the records that belong to this user
         const userEarnings = earningsData.find((record) => record.user === userId) || null
         const userDeductions = deductionsData.find((record) => record.user === userId) || null
         const userTotalOvertime = totalOvertimeData.find((record) => record.user === userId) || null
         const userOvertimeData = overtimeData.filter((record) => record.user === userId) || []
-        const userSalary = salaryData.find((record) => record.user === userId) || null
 
         const updatedFormData = createFormDataFromApi(
           userEarnings,
@@ -698,6 +734,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     return numValue.toFixed(2)
   }
 
+  // Replace the handleSubmit function with this updated version that properly handles creating or updating records
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -726,6 +763,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const totalDeductions = Number.parseFloat(updatedFormData.totalDeductions)
       const totalSalaryCompensation = Number.parseFloat(updatedFormData.totalSalaryCompensation)
 
+      // Step 1: Create or update earnings, deductions, and overtime records
+      let earningsId = null
+      let deductionsId = null
+      let overtimeId = null
+
       // Prepare earnings data
       const earningsData = {
         user: userId,
@@ -735,6 +777,45 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         ntax: Number.parseFloat(updatedFormData.ntax).toFixed(2),
         vacationleave: Number.parseFloat(updatedFormData.vacationleave).toFixed(2),
         sickleave: Number.parseFloat(updatedFormData.sickleave).toFixed(2),
+      }
+
+      // Create or update earnings record
+      if (earningsId) {
+        // Update existing record
+        console.log(`Updating earnings record with ID ${earningsId}`)
+        const earningsResponse = await fetch(`${API_BASE_URL}/earnings/${earningsId}/`, {
+          method: "PATCH", // Use PATCH instead of PUT
+          headers,
+          body: JSON.stringify(earningsData),
+        })
+
+        if (!earningsResponse.ok) {
+          const errorData = await earningsResponse.json()
+          console.error("Earnings update error:", errorData)
+          throw new Error(`Failed to update earnings data: ${JSON.stringify(errorData)}`)
+        }
+
+        const earningsResult = await earningsResponse.json()
+        console.log("Earnings update result:", earningsResult)
+        earningsId = earningsResult.id
+      } else {
+        // Create new record
+        console.log("Creating new earnings record")
+        const earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(earningsData),
+        })
+
+        if (!earningsResponse.ok) {
+          const errorData = await earningsResponse.json()
+          console.error("Earnings creation error:", errorData)
+          throw new Error(`Failed to create earnings data: ${JSON.stringify(errorData)}`)
+        }
+
+        const earningsResult = await earningsResponse.json()
+        console.log("Earnings creation result:", earningsResult)
+        earningsId = earningsResult.id
       }
 
       // Prepare deductions data
@@ -750,6 +831,45 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         charges: Number.parseFloat(updatedFormData.charges.amount).toFixed(2),
         undertime: Number.parseFloat(updatedFormData.undertime.amount).toFixed(2),
         msfcloan: Number.parseFloat(updatedFormData.msfcloan.amount).toFixed(2),
+      }
+
+      // Create or update deductions record
+      if (deductionsId) {
+        // Update existing record
+        console.log(`Updating deductions record with ID ${deductionsId}`)
+        const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/${deductionsId}/`, {
+          method: "PATCH", // Use PATCH instead of PUT
+          headers,
+          body: JSON.stringify(deductionsData),
+        })
+
+        if (!deductionsResponse.ok) {
+          const errorData = await deductionsResponse.json()
+          console.error("Deductions update error:", errorData)
+          throw new Error(`Failed to update deductions data: ${JSON.stringify(errorData)}`)
+        }
+
+        const deductionsResult = await deductionsResponse.json()
+        console.log("Deductions update result:", deductionsResult)
+        deductionsId = deductionsResult.id
+      } else {
+        // Create new record
+        console.log("Creating new deductions record")
+        const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(deductionsData),
+        })
+
+        if (!deductionsResponse.ok) {
+          const errorData = await deductionsResponse.json()
+          console.error("Deductions creation error:", errorData)
+          throw new Error(`Failed to create deductions data: ${JSON.stringify(errorData)}`)
+        }
+
+        const deductionsResult = await deductionsResponse.json()
+        console.log("Deductions creation result:", deductionsResult)
+        deductionsId = deductionsResult.id
       }
 
       // Prepare total overtime data
@@ -773,270 +893,177 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         biweek_start: new Date().toISOString().split("T")[0],
       }
 
-      // Prepare overtime hours data
-      const overtimeHoursData = {
-        regularOT: {
-          user: userId,
-          type: "regular",
-          hours: Number.parseFloat(formData.regularOT.hours).toFixed(2),
-          date: new Date().toISOString().split("T")[0],
-        },
-        restDay: {
-          user: userId,
-          type: "rest_day",
-          hours: Number.parseFloat(formData.restDay.hours).toFixed(2),
-          date: new Date().toISOString().split("T")[0],
-        },
-        nightDiff: {
-          user: userId,
-          type: "night_diff",
-          hours: Number.parseFloat(formData.nightDiff.hours).toFixed(2),
-          date: new Date().toISOString().split("T")[0],
-        },
-      }
-
-      console.log("Updating earnings with data:", earningsData)
-      console.log("Updating deductions with data:", deductionsData)
-      console.log("Updating total overtime with data:", totalOvertimeData)
-      console.log("Updating overtime hours with data:", overtimeHoursData)
-      console.log("User ID:", userId)
-      console.log("Overtime record IDs:", overtimeRecords)
-
-      // Update or create earnings record
-      let earningsResponse
-      if (earningsId) {
-        // Update existing record
-        console.log(`Updating earnings record with ID ${earningsId}`)
-        earningsResponse = await fetch(`${API_BASE_URL}/earnings/${earningsId}/`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(earningsData),
-        })
-      } else {
-        // Create new record
-        console.log("Creating new earnings record")
-        earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(earningsData),
-        })
-      }
-
-      if (!earningsResponse.ok) {
-        const errorData = await earningsResponse.json()
-        console.error("Earnings update error:", errorData)
-        throw new Error(`Failed to update earnings data: ${JSON.stringify(errorData)}`)
-      }
-
-      const earningsResult = await earningsResponse.json()
-      console.log("Earnings update result:", earningsResult)
-
-      // If we created a new record, store its ID
-      if (!earningsId && earningsResult.id) {
-        setEarningsId(earningsResult.id)
-      }
-
-      // Update or create deductions record
-      let deductionsResponse
-      if (deductionsId) {
-        // Update existing record
-        console.log(`Updating deductions record with ID ${deductionsId}`)
-        deductionsResponse = await fetch(`${API_BASE_URL}/deductions/${deductionsId}/`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(deductionsData),
-        })
-      } else {
-        // Create new record
-        console.log("Creating new deductions record")
-        deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(deductionsData),
-        })
-      }
-
-      if (!deductionsResponse.ok) {
-        const errorData = await deductionsResponse.json()
-        console.error("Deductions update error:", errorData)
-        throw new Error(`Failed to update deductions data: ${JSON.stringify(errorData)}`)
-      }
-
-      const deductionsResult = await deductionsResponse.json()
-      console.log("Deductions update result:", deductionsResult)
-
-      // If we created a new record, store its ID
-      if (!deductionsId && deductionsResult.id) {
-        setDeductionsId(deductionsResult.id)
-      }
-
-      // Update or create total overtime record
-      let totalOvertimeResponse
+      // Create or update total overtime record
       if (totalOvertimeId) {
         // Update existing record
         console.log(`Updating total overtime record with ID ${totalOvertimeId}`)
-        totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/${totalOvertimeId}/`, {
-          method: "PUT",
+        const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/${totalOvertimeId}/`, {
+          method: "PATCH", // Use PATCH instead of PUT
           headers,
           body: JSON.stringify(totalOvertimeData),
         })
+
+        if (!totalOvertimeResponse.ok) {
+          const errorData = await totalOvertimeResponse.json()
+          console.error("Total overtime update error:", errorData)
+          throw new Error(`Failed to update total overtime data: ${JSON.stringify(errorData)}`)
+        }
+
+        const totalOvertimeResult = await totalOvertimeResponse.json()
+        console.log("Total overtime update result:", totalOvertimeResult)
+        overtimeId = totalOvertimeResult.id
       } else {
         // Create new record
         console.log("Creating new total overtime record")
-        totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, {
+        const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, {
           method: "POST",
           headers,
           body: JSON.stringify(totalOvertimeData),
         })
+
+        if (!totalOvertimeResponse.ok) {
+          const errorData = await totalOvertimeResponse.json()
+          console.error("Total overtime creation error:", errorData)
+          throw new Error(`Failed to create total overtime data: ${JSON.stringify(errorData)}`)
+        }
+
+        const totalOvertimeResult = await totalOvertimeResponse.json()
+        console.log("Total overtime creation result:", totalOvertimeResult)
+        overtimeId = totalOvertimeResult.id
       }
 
-      if (!totalOvertimeResponse.ok) {
-        const errorData = await totalOvertimeResponse.json()
-        console.error("Total overtime update error:", errorData)
-        throw new Error(`Failed to update total overtime data: ${JSON.stringify(errorData)}`)
+      // Step 2: Create or update salary record
+      let salaryRecordId = null
+      const salaryData = {
+        user: userId,
+        earnings_id: earningsId,
+        deductions_id: deductionsId,
+        overtime_id: overtimeId,
+        rate_per_month: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        rate_per_hour: (Number.parseFloat(updatedFormData.basicRate) / 160).toFixed(2), // Assuming 160 hours per month
+        pay_date: new Date().toISOString().split("T")[0],
       }
 
-      const totalOvertimeResult = await totalOvertimeResponse.json()
-      console.log("Total overtime update result:", totalOvertimeResult)
-
-      // If we created a new record, store its ID
-      if (!totalOvertimeId && totalOvertimeResult.id) {
-        setTotalOvertimeId(totalOvertimeResult.id)
-      }
-
-      // Update or create overtime hours records
-      const newOvertimeRecords = { ...overtimeRecords }
-
-      // Handle regular overtime hours
-      if (overtimeRecords.regularOT) {
+      if (salaryId) {
         // Update existing record
-        console.log(`Updating regular overtime hours record with ID ${overtimeRecords.regularOT}`)
-        const response = await fetch(`${API_BASE_URL}/overtimehours/${overtimeRecords.regularOT}/`, {
-          method: "PUT",
+        console.log(`Updating salary record with ID ${salaryId}`)
+        const salaryResponse = await fetch(`${API_BASE_URL}/salary/${salaryId}/`, {
+          method: "PATCH",
           headers,
-          body: JSON.stringify(overtimeHoursData.regularOT),
+          body: JSON.stringify(salaryData),
         })
 
-        if (!response.ok) {
-          console.error("Failed to update regular overtime hours")
+        if (!salaryResponse.ok) {
+          console.error("Failed to update salary record:", await salaryResponse.text())
+          throw new Error("Failed to update salary record")
         }
-      } else if (Number.parseFloat(formData.regularOT.hours) > 0) {
-        // Create new record only if hours > 0
-        console.log("Creating new regular overtime hours record")
-        const response = await fetch(`${API_BASE_URL}/overtimehours/`, {
+
+        const salaryResult = await salaryResponse.json()
+        console.log("Salary update result:", salaryResult)
+        salaryRecordId = salaryResult.id
+      } else {
+        // Create new record
+        console.log("Creating new salary record")
+        const salaryResponse = await fetch(`${API_BASE_URL}/salary/`, {
           method: "POST",
           headers,
-          body: JSON.stringify(overtimeHoursData.regularOT),
+          body: JSON.stringify(salaryData),
         })
 
-        if (response.ok) {
-          const result = await response.json()
-          newOvertimeRecords.regularOT = result.id
-        } else {
-          console.error("Failed to create regular overtime hours")
+        if (!salaryResponse.ok) {
+          console.error("Failed to create salary record:", await salaryResponse.text())
+          throw new Error("Failed to create salary record")
         }
+
+        const salaryResult = await salaryResponse.json()
+        console.log("Salary creation result:", salaryResult)
+        salaryRecordId = salaryResult.id
       }
 
-      // Handle rest day hours
-      if (overtimeRecords.restDay) {
+      // Step 3: Fetch the complete salary object
+      const completeSalaryResponse = await fetch(`${API_BASE_URL}/salary/${salaryRecordId}/`, {
+        headers,
+      })
+
+      if (!completeSalaryResponse.ok) {
+        throw new Error("Failed to fetch complete salary data")
+      }
+
+      const completeSalary = await completeSalaryResponse.json()
+
+      // Step 4: Create or update payroll record
+      const payrollData = {
+        user_id: userId,
+        salary_id: completeSalary, // Send the complete salary object
+        gross_pay: totalGross.toFixed(2),
+        total_deductions: totalDeductions.toFixed(2),
+        net_pay: totalSalaryCompensation.toFixed(2),
+        pay_date: new Date().toISOString().split("T")[0],
+        status: "Processing",
+      }
+
+      if (payrollId) {
         // Update existing record
-        console.log(`Updating rest day hours record with ID ${overtimeRecords.restDay}`)
-        const response = await fetch(`${API_BASE_URL}/overtimehours/${overtimeRecords.restDay}/`, {
-          method: "PUT",
+        console.log(`Updating payroll record with ID ${payrollId}`)
+        const payrollResponse = await fetch(`${API_BASE_URL}/payroll/${payrollId}/`, {
+          method: "PATCH",
           headers,
-          body: JSON.stringify(overtimeHoursData.restDay),
+          body: JSON.stringify(payrollData),
         })
 
-        if (!response.ok) {
-          console.error("Failed to update rest day hours")
+        if (!payrollResponse.ok) {
+          const errorText = await payrollResponse.text()
+          console.error("Failed to update payroll record:", errorText)
+          throw new Error(`Failed to update payroll record: ${errorText}`)
         }
-      } else if (Number.parseFloat(formData.restDay.hours) > 0) {
-        // Create new record only if hours > 0
-        console.log("Creating new rest day hours record")
-        const response = await fetch(`${API_BASE_URL}/overtimehours/`, {
-          method: "POST",
+
+        console.log("Successfully updated payroll record")
+      } else {
+        // Check if a payroll record already exists for this user
+        const existingPayrollResponse = await fetch(`${API_BASE_URL}/payroll/?user_id=${userId}`, {
           headers,
-          body: JSON.stringify(overtimeHoursData.restDay),
         })
 
-        if (response.ok) {
-          const result = await response.json()
-          newOvertimeRecords.restDay = result.id
-        } else {
-          console.error("Failed to create rest day hours")
-        }
-      }
+        if (existingPayrollResponse.ok) {
+          const existingPayrolls = await existingPayrollResponse.json()
+          const userPayroll = existingPayrolls.find((p) => p.user_id === userId)
 
-      // Handle night diff hours
-      if (overtimeRecords.nightDiff) {
-        // Update existing record
-        console.log(`Updating night diff hours record with ID ${overtimeRecords.nightDiff}`)
-        const response = await fetch(`${API_BASE_URL}/overtimehours/${overtimeRecords.nightDiff}/`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(overtimeHoursData.nightDiff),
-        })
+          if (userPayroll) {
+            // Update existing payroll record
+            console.log("Updating existing payroll record:", userPayroll.id)
+            setPayrollId(userPayroll.id)
 
-        if (!response.ok) {
-          console.error("Failed to update night diff hours")
-        }
-      } else if (Number.parseFloat(formData.nightDiff.hours) > 0) {
-        // Create new record only if hours > 0
-        console.log("Creating new night diff hours record")
-        const response = await fetch(`${API_BASE_URL}/overtimehours/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(overtimeHoursData.nightDiff),
-        })
+            const updateResponse = await fetch(`${API_BASE_URL}/payroll/${userPayroll.id}/`, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify(payrollData),
+            })
 
-        if (response.ok) {
-          const result = await response.json()
-          newOvertimeRecords.nightDiff = result.id
-        } else {
-          console.error("Failed to create night diff hours")
-        }
-      }
+            if (!updateResponse.ok) {
+              const errorText = await updateResponse.text()
+              console.error("Failed to update payroll record:", errorText)
+              throw new Error(`Failed to update payroll record: ${errorText}`)
+            }
 
-      // Update overtime records state
-      setOvertimeRecords(newOvertimeRecords)
-
-      // Update or create payroll record to link everything together
-      if (earningsResult.id && deductionsResult.id && totalOvertimeResult.id) {
-        const payrollData = {
-          user_id: userId,
-          pay_date: new Date().toISOString().split("T")[0],
-          earnings_id: earningsResult.id,
-          deductions_id: deductionsResult.id,
-          overtime_id: totalOvertimeResult.id,
-        }
-
-        if (payrollId) {
-          // Update existing payroll record
-          console.log(`Updating payroll record with ID ${payrollId}`)
-          const payrollResponse = await fetch(`${API_BASE_URL}/payroll/${payrollId}/`, {
-            method: "PUT",
-            headers,
-            body: JSON.stringify(payrollData),
-          })
-
-          if (!payrollResponse.ok) {
-            console.error("Failed to update payroll record")
-          }
-        } else {
-          // Create new payroll record
-          console.log("Creating new payroll record")
-          const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
-            method: "POST",
-            headers,
-            body: JSON.stringify(payrollData),
-          })
-
-          if (payrollResponse.ok) {
-            const result = await payrollResponse.json()
-            setPayrollId(result.id)
-            console.log("Created new payroll record:", result.id)
+            console.log("Successfully updated payroll record")
           } else {
-            console.error("Failed to create payroll record")
+            // Create new payroll record
+            console.log("Creating new payroll record")
+            const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(payrollData),
+            })
+
+            if (!payrollResponse.ok) {
+              const errorText = await payrollResponse.text()
+              console.error("Failed to create payroll record:", errorText)
+              throw new Error(`Failed to create payroll record: ${errorText}`)
+            }
+
+            const newPayroll = await payrollResponse.json()
+            setPayrollId(newPayroll.id)
+            console.log("Created new payroll record:", newPayroll.id)
           }
         }
       }
@@ -1048,9 +1075,9 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       onUpdate({
         ...updatedFormData,
         id: employeeData.id,
-        baseSalary: updatedFormData.basic,
-        totalDeductions: updatedFormData.totalDeductions,
-        totalSalaryCompensation: updatedFormData.totalSalaryCompensation,
+        baseSalary: totalGross,
+        totalDeductions: totalDeductions,
+        totalSalaryCompensation: totalSalaryCompensation,
       })
     } catch (error) {
       console.error("Error updating payroll data:", error)
@@ -1511,3 +1538,4 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 }
 
 export default EditPayroll
+
