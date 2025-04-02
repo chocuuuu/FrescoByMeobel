@@ -74,15 +74,16 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     nightDiff: null,
   })
 
+  let actualUserId = ""
   // Fetch employee data from APIs when the modal opens
   useEffect(() => {
     if (employeeData && isOpen) {
       // Extract the actual user ID from the employeeData
-      const actualUserId = employeeData.user?.id || null
+      actualUserId = employeeData.user?.id || null
 
       console.log("Employee data:", employeeData)
       console.log("User ID extracted:", actualUserId)
-
+      
       setUserId(actualUserId)
 
       if (actualUserId) {
@@ -940,7 +941,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       const payrollData = {
-        user_id: userId,
+        user_id: actualUserId,
         salary_id: completeSalaryObj, // Send the complete salary object with nested objects
         gross_pay: totalGross.toFixed(2),
         total_deductions: totalDeductions.toFixed(2),
@@ -949,6 +950,10 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         status: "Processing",
       }
 
+      console.log("SSS ID", sssRecord.id)
+      console.log("Philhealth ID", philhealthRecord.id)
+      console.log("Pag-ibig ID", pagibigRecord.id)
+      console.log("User ID", userId)
       if (payrollId) {
         // Update existing record
         console.log(`Updating payroll record with ID ${payrollId}`)
@@ -967,7 +972,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         console.log("Successfully updated payroll record")
       } else {
         // Check if a payroll record already exists for this user
-        const existingPayrollResponse = await fetch(`${API_BASE_URL}/payroll/?user_id=${userId}`, {
+        const existingPayrollResponse = await fetch(`${API_BASE_URL}/payroll/${userId}`, {
           headers,
         })
 
