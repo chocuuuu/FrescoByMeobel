@@ -3,6 +3,7 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 
 from shared.generic_viewset import GenericViewset
+from shared.permissions import IsOwnerOrAdmin
 from users.models import CustomUser
 from admins.models import Admin
 from employees.models import Employee
@@ -11,7 +12,7 @@ from .serializers import EmploymentInfoSerializer
 
 
 class EmploymentInfoViewset(GenericViewset, viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsOwnerOrAdmin]
     queryset = EmploymentInfo.objects.all()
     serializer_class = EmploymentInfoSerializer
 
