@@ -83,7 +83,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       console.log("Employee data:", employeeData)
       console.log("User ID extracted:", actualUserId)
-      
+
       setUserId(actualUserId)
 
       if (actualUserId) {
@@ -766,10 +766,19 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         ),
       ])
 
-      // Get the complete objects if records exist
-      let sssRecord = sssRecords && sssRecords.length > 0 ? sssRecords[0] : null
-      let philhealthRecord = philhealthRecords && philhealthRecords.length > 0 ? philhealthRecords[0] : null
-      let pagibigRecord = pagibigRecords && pagibigRecords.length > 0 ? pagibigRecords[0] : null
+      // Get the complete objects if records exist - make sure we're getting the correct records for this user
+      let sssRecord =
+        sssRecords && sssRecords.length > 0
+          ? sssRecords.find((record) => record.user === Number.parseInt(userId))
+          : null
+      let philhealthRecord =
+        philhealthRecords && philhealthRecords.length > 0
+          ? philhealthRecords.find((record) => record.user === Number.parseInt(userId))
+          : null
+      let pagibigRecord =
+        pagibigRecords && pagibigRecords.length > 0
+          ? pagibigRecords.find((record) => record.user === Number.parseInt(userId))
+          : null
 
       console.log("Benefit records:", { sssRecord, philhealthRecord, pagibigRecord })
 
@@ -921,33 +930,43 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const completeSalary = await completeSalaryResponse.json()
 
       // Step 4: Create or update payroll record
-      // First, fetch the complete objects for earnings, deductions, and overtime
-      const [earningsObj, deductionsObj, overtimeObj] = await Promise.all([
-        fetch(`${API_BASE_URL}/earnings/${earningsId}/`, { headers }).then((res) => res.json()),
-        fetch(`${API_BASE_URL}/deductions/${deductionsId}/`, { headers }).then((res) => res.json()),
-        fetch(`${API_BASE_URL}/totalovertime/${overtimeId}/`, { headers }).then((res) => res.json()),
+      // First, fetch the complete objects for benefits
+      const [sssObj, philhealthObj, pagibigObj] = await Promise.all([
+        fetch(`${API_BASE_URL}/benefits/sss/${sssRecord.id}/`, { headers }).then((res) => res.json()),
+        fetch(`${API_BASE_URL}/benefits/philhealth/${philhealthRecord.id}/`, { headers }).then((res) => res.json()),
+        fetch(`${API_BASE_URL}/benefits/pagibig/${pagibigRecord.id}/`, { headers }).then((res) => res.json()),
       ])
 
       // Create a complete salary object with nested objects
-      const completeSalaryObj = {
-        ...completeSalary,
+      const earningsObj = await fetch(`${API_BASE_URL}/earnings/${earningsId}/`, { headers }).then((res) => res.json())
+      const deductionsObj = await fetch(`${API_BASE_URL}/deductions/${deductionsId}/`, { headers }).then((res) =>
+        res.json(),
+      )
+      const overtimeObj = await fetch(`${API_BASE_URL}/totalovertime/${overtimeId}/`, { headers }).then((res) =>
+        res.json(),
+      )
+
+      const salaryObj = {
+        id: salaryRecordId,
+        user: userId,
         earnings_id: earningsObj,
         deductions_id: deductionsObj,
         overtime_id: overtimeObj,
-        // Include the benefit IDs - these must not be null
-        sss_id: sssRecord.id,
-        philhealth_id: philhealthRecord.id,
-        pagibig_id: pagibigRecord.id,
+        sss_id: sssObj,
+        philhealth_id: philhealthObj,
+        pagibig_id: pagibigObj,
+        rate_per_month: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        rate_per_hour: (Number.parseFloat(updatedFormData.basicRate) / 160).toFixed(2),
+        pay_date: new Date().toISOString().split("T")[0],
       }
 
       const payrollData = {
-        user_id: actualUserId,
-        salary_id: completeSalaryObj, // Send the complete salary object with nested objects
+        user_id: userId,
+        salary_id: salaryRecordId, // Just send the ID, not the complete object
         gross_pay: totalGross.toFixed(2),
         total_deductions: totalDeductions.toFixed(2),
         net_pay: totalSalaryCompensation.toFixed(2),
         pay_date: new Date().toISOString().split("T")[0],
-        status: "Processing",
       }
 
       console.log("SSS ID", sssRecord.id)
@@ -972,7 +991,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         console.log("Successfully updated payroll record")
       } else {
         // Check if a payroll record already exists for this user
-        const existingPayrollResponse = await fetch(`${API_BASE_URL}/payroll/${userId}`, {
+        const existingPayrollResponse = await fetch(`${API_BASE_URL}/payroll/?user_id=${userId}`, {
           headers,
         })
 
@@ -1490,3 +1509,4 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 }
 
 export default EditPayroll
+
