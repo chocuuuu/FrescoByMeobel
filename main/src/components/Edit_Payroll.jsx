@@ -970,9 +970,12 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         pay_date: new Date().toISOString().split("T")[0],
       }
 
+      // Find the section where we create the payrollData object (around line 1000)
+      // Replace the payrollData object with this updated version:
+
       const payrollData = {
         user_id: userId,
-        salary_id: salaryRecordId, // Just send the ID, not the complete object
+        salary_id: payrollId ? completeSalary : salaryRecordId, // Send full object when updating, ID when creating
         gross_pay: totalGross.toFixed(2),
         total_deductions: totalDeductions.toFixed(2),
         net_pay: totalSalaryCompensation.toFixed(2),
@@ -984,13 +987,24 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Philhealth ID", philhealthRecord.id)
       console.log("Pag-ibig ID", pagibigRecord.id)
       console.log("User ID", userId)
+
+      // Also update the section where we update an existing payroll record (around line 1010)
+      // Replace it with this:
+
       if (payrollId) {
         // Update existing record
         console.log(`Updating payroll record with ID ${payrollId}`)
+
+        // For updates, we need to send the complete salary object
+        const updatePayrollData = {
+          ...payrollData,
+          salary_id: completeSalary, // Use the complete salary object for updates
+        }
+
         const payrollResponse = await fetch(`${API_BASE_URL}/payroll/${payrollId}/`, {
           method: "PATCH",
           headers,
-          body: JSON.stringify(payrollData),
+          body: JSON.stringify(updatePayrollData),
         })
 
         if (!payrollResponse.ok) {
@@ -1002,51 +1016,66 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         console.log("Successfully updated payroll record")
       } else {
         // Check if a payroll record already exists for this user
-        const existingPayrollResponse = await fetch(`${API_BASE_URL}/payroll/?user_id=${userId}`, {
-          headers,
-        })
+        // ... (keep the existing code here)
+      }
 
-        if (existingPayrollResponse.ok) {
-          const existingPayrolls = await existingPayrollResponse.json()
-          const userPayroll = existingPayrolls.find((p) => p.user_id === userId)
+      // Also, update the code that checks for existing payroll records to prevent duplicates
+      // Find the section where we check for existing payroll records (around line 1030)
+      // Replace it with this:
 
-          if (userPayroll) {
-            // Update existing payroll record
-            console.log("Updating existing payroll record:", userPayroll.id)
-            setPayrollId(userPayroll.id)
+      // Check if a payroll record already exists for this user
+      const existingPayrollResponse = await fetch(`${API_BASE_URL}/payroll/?user_id=${userId}`, {
+        headers,
+      })
 
-            const updateResponse = await fetch(`${API_BASE_URL}/payroll/${userPayroll.id}/`, {
-              method: "PATCH",
-              headers,
-              body: JSON.stringify(payrollData),
-            })
+      if (existingPayrollResponse.ok) {
+        const existingPayrolls = await existingPayrollResponse.json()
 
-            if (!updateResponse.ok) {
-              const errorText = await updateResponse.text()
-              console.error("Failed to update payroll record:", errorText)
-              throw new Error(`Failed to update payroll record: ${errorText}`)
-            }
+        // Find a record with matching user_id
+        const userPayroll = existingPayrolls.find((p) => p.user_id === userId)
 
-            console.log("Successfully updated payroll record")
-          } else {
-            // Create new payroll record
-            console.log("Creating new payroll record")
-            const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
-              method: "POST",
-              headers,
-              body: JSON.stringify(payrollData),
-            })
+        if (userPayroll) {
+          // Update existing payroll record
+          console.log("Updating existing payroll record:", userPayroll.id)
+          setPayrollId(userPayroll.id)
 
-            if (!payrollResponse.ok) {
-              const errorText = await payrollResponse.text()
-              console.error("Failed to create payroll record:", errorText)
-              throw new Error(`Failed to create payroll record: ${errorText}`)
-            }
-
-            const newPayroll = await payrollResponse.json()
-            setPayrollId(newPayroll.id)
-            console.log("Created new payroll record:", newPayroll.id)
+          // For updates, we need to send the complete salary object
+          const updatePayrollData = {
+            ...payrollData,
+            salary_id: completeSalary, // Use the complete salary object for updates
           }
+
+          const updateResponse = await fetch(`${API_BASE_URL}/payroll/${userPayroll.id}/`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify(updatePayrollData),
+          })
+
+          if (!updateResponse.ok) {
+            const errorText = await updateResponse.text()
+            console.error("Failed to update payroll record:", errorText)
+            throw new Error(`Failed to update payroll record: ${errorText}`)
+          }
+
+          console.log("Successfully updated payroll record")
+        } else {
+          // Create new payroll record
+          console.log("Creating new payroll record")
+          const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payrollData), // For creation, we can use just the ID
+          })
+
+          if (!payrollResponse.ok) {
+            const errorText = await payrollResponse.text()
+            console.error("Failed to create payroll record:", errorText)
+            throw new Error(`Failed to create payroll record: ${errorText}`)
+          }
+
+          const newPayroll = await payrollResponse.json()
+          setPayrollId(newPayroll.id)
+          console.log("Created new payroll record:", newPayroll.id)
         }
       }
 
@@ -1520,4 +1549,3 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 }
 
 export default EditPayroll
-
