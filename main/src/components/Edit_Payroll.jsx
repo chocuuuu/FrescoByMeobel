@@ -3,6 +3,17 @@
 import { useState, useEffect } from "react"
 import { API_BASE_URL } from "../config/api"
 
+// Add this function at the top of the component, before the useState declarations
+const formatToTwoDecimals = (value) => {
+  if (value === undefined || value === null || value === "") return "0.00"
+
+  // Convert to number and ensure it has exactly 2 decimal places
+  const numValue = Number.parseFloat(value)
+  if (isNaN(numValue)) return "0.00"
+
+  return numValue.toFixed(2)
+}
+
 function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const [formData, setFormData] = useState({
     // Payroll Dates
@@ -11,34 +22,35 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     payDate: "11/15/2024",
 
     // Earnings
-    baseSalary: 0,
+    basicRate: 0,
+    basic: 0,
     allowance: 0,
-    otherEarningsNTax: 0,
-    vacationLeave: 0,
-    sickLeave: 0,
+    ntax: 0,
+    vacationleave: 0,
+    sickleave: 0,
     bereavementLeave: 0,
 
     // Overtime
-    regularOT: { hours: "3", rate: 0 },
+    regularOT: { hours: "0", rate: 0 },
     regularHoliday: { rate: 0 },
     specialHoliday: { rate: 0 },
-    restDay: { hours: "3", rate: 0 },
-    nightDiff: { hours: "3", rate: 0 },
+    restDay: { hours: "0", rate: 0 },
+    nightDiff: { hours: "0", rate: 0 },
     backwage: { rate: "0" },
 
     // Deductions
-    sss: { percentage: "10", amount: 0 },
-    philhealth: { percentage: "10", amount: 0 },
-    pagibig: { percentage: "10", amount: 0 },
+    sss: { amount: 0 },
+    philhealth: { amount: 0 },
+    pagibig: { amount: 0 },
     late: { amount: 0 },
     wtax: { amount: 0 },
 
     // Additional Deductions
-    noWorkDay: { amount: 0 },
+    nowork: { amount: 0 },
     loan: { amount: 0 },
     charges: { amount: 0 },
     undertime: { amount: 0 },
-    msfcLoan: { amount: 0 },
+    msfcloan: { amount: 0 },
 
     // Totals (calculated)
     totalGross: 0,
@@ -49,19 +61,112 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [hasPayrollData, setHasPayrollData] = useState(false)
+  const [earningsId, setEarningsId] = useState(null)
+  const [deductionsId, setDeductionsId] = useState(null)
+  const [totalOvertimeId, setTotalOvertimeId] = useState(null)
+  const [userId, setUserId] = useState(null)
+  const [payrollId, setPayrollId] = useState(null)
+  const [salaryId, setSalaryId] = useState(null)
+  const [overtimeRecords, setOvertimeRecords] = useState({
+    regularOT: null,
+    restDay: null,
+    nightDiff: null,
+  })
 
+  let actualUserId = ""
   // Fetch employee data from APIs when the modal opens
   useEffect(() => {
     if (employeeData && isOpen) {
-      fetchEmployeePayrollData(employeeData.id)
+      // Extract the actual user ID from the employeeData
+      actualUserId = employeeData.user?.id || null
+
+      console.log("Employee data:", employeeData)
+      console.log("User ID extracted:", actualUserId)
+      
+      setUserId(actualUserId)
+
+      if (actualUserId) {
+        fetchEmployeePayrollData(actualUserId)
+      } else {
+        console.error("No user ID found in employee data:", employeeData)
+        setError("Could not determine user ID. Please try again.")
+      }
     }
   }, [employeeData, isOpen])
 
-  const fetchEmployeePayrollData = async (employeeId) => {
-    if (!employeeId) return
+  // Function to check if a user has a payroll record
+  const checkUserPayroll = async (userId) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
+
+      // Check if this user has a payroll record
+      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/?user_id=${userId}`, { headers })
+      if (!payrollResponse.ok) throw new Error("Failed to fetch payroll data")
+      const payrollData = await payrollResponse.json()
+
+      if (payrollData.length > 0) {
+        const userPayroll = payrollData.find((record) => record.user_id === userId)
+        if (userPayroll) {
+          setPayrollId(userPayroll.id)
+          console.log("Found payroll record:", userPayroll)
+          return userPayroll
+        }
+      }
+
+      console.log("No payroll record found for user", userId)
+      return null
+    } catch (error) {
+      console.error("Error checking user payroll:", error)
+      return null
+    }
+  }
+
+  // Function to check if a user has a salary record
+  const checkUserSalary = async (userId) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
+
+      // Check if this user has a salary record
+      const salaryResponse = await fetch(`${API_BASE_URL}/salary/?user=${userId}`, { headers })
+      if (!salaryResponse.ok) throw new Error("Failed to fetch salary data")
+      const salaryData = await salaryResponse.json()
+
+      if (salaryData.length > 0) {
+        const userSalary = salaryData.find((record) => record.user === userId)
+        if (userSalary) {
+          setSalaryId(userSalary.id)
+          setEarningsId(userSalary.earnings_id)
+          setDeductionsId(userSalary.deductions_id)
+          setTotalOvertimeId(userSalary.overtime_id)
+          console.log("Found salary record:", userSalary)
+          return userSalary
+        }
+      }
+
+      console.log("No salary record found for user", userId)
+      return null
+    } catch (error) {
+      console.error("Error checking user salary:", error)
+      return null
+    }
+  }
+
+  // Replace the fetchEmployeePayrollData function with this updated version that doesn't automatically create records
+  const fetchEmployeePayrollData = async (userId) => {
+    if (!userId) return
 
     setLoading(true)
     setError(null)
+    setHasPayrollData(false)
 
     try {
       const accessToken = localStorage.getItem("access_token")
@@ -70,97 +175,213 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         "Content-Type": "application/json",
       }
 
-      // Fetch earnings data
-      const earningsResponse = await fetch(`${API_BASE_URL}/earnings/?employee=${employeeId}`, { headers })
+      console.log(`Fetching payroll data for user ID: ${userId}`)
+
+      // First, check if user has a salary record
+      const userSalary = await checkUserSalary(userId)
+
+      // Then check if user has a payroll record
+      const userPayroll = await checkUserPayroll(userId)
+
+      // Check if employee has any data - DON'T automatically create records
+      const hasData = userSalary !== null || userPayroll !== null
+
+      // Fetch earnings data - add user filter parameter
+      const earningsResponse = await fetch(`${API_BASE_URL}/earnings/?user=${userId}`, { headers })
       if (!earningsResponse.ok) throw new Error("Failed to fetch earnings data")
       const earningsData = await earningsResponse.json()
 
-      // Fetch deductions data
-      const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/?employee=${employeeId}`, { headers })
+      // Fetch deductions data - add user filter parameter
+      const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/?user=${userId}`, { headers })
       if (!deductionsResponse.ok) throw new Error("Failed to fetch deductions data")
       const deductionsData = await deductionsResponse.json()
 
-      // Fetch overtime hours data
-      const overtimeResponse = await fetch(`${API_BASE_URL}/overtimehours/?employee=${employeeId}`, { headers })
+      // Check if employee has total overtime data - add user filter parameter
+      const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/?user=${userId}`, { headers })
+      if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
+      const totalOvertimeData = await totalOvertimeResponse.json()
+
+      // Fetch overtime hours data - add user filter parameter
+      const overtimeResponse = await fetch(`${API_BASE_URL}/overtimehours/?user=${userId}`, { headers })
       if (!overtimeResponse.ok) throw new Error("Failed to fetch overtime data")
       const overtimeData = await overtimeResponse.json()
 
-      // Update form data with fetched values
-      const updatedFormData = createFormDataFromApi(earningsData[0], deductionsData[0], overtimeData, employeeData)
-      setFormData(updatedFormData)
+      console.log("Earnings data:", earningsData)
+      console.log("Deductions data:", deductionsData)
+      console.log("Total overtime data:", totalOvertimeData)
+      console.log("Overtime hours data:", overtimeData)
+
+      // Store record IDs for updates - only if they belong to this user
+      if (earningsData.length > 0) {
+        // Find the earnings record that belongs to this user
+        const userEarnings = earningsData.find((record) => record.user === userId)
+        if (userEarnings) {
+          setEarningsId(userEarnings.id)
+          console.log(`Found earnings ID ${userEarnings.id} for user ${userId}`)
+        } else {
+          console.log(`No earnings record found for user ${userId}`)
+        }
+      }
+
+      if (deductionsData.length > 0) {
+        // Find the deductions record that belongs to this user
+        const userDeductions = deductionsData.find((record) => record.user === userId)
+        if (userDeductions) {
+          setDeductionsId(userDeductions.id)
+          console.log(`Found deductions ID ${userDeductions.id} for user ${userId}`)
+        } else {
+          console.log(`No deductions record found for user ${userId}`)
+        }
+      }
+
+      if (totalOvertimeData.length > 0) {
+        // Find the total overtime record that belongs to this user
+        const userTotalOvertime = totalOvertimeData.find((record) => record.user === userId)
+        if (userTotalOvertime) {
+          setTotalOvertimeId(userTotalOvertime.id)
+          console.log(`Found total overtime ID ${userTotalOvertime.id} for user ${userId}`)
+        } else {
+          console.log(`No total overtime record found for user ${userId}`)
+        }
+      }
+
+      // Store overtime record IDs for updates
+      const newOvertimeRecords = { regularOT: null, restDay: null, nightDiff: null }
+
+      if (overtimeData.length > 0) {
+        // Find and store the IDs for each overtime type that belongs to this user
+        overtimeData.forEach((record) => {
+          if (record.user === userId) {
+            if (record.type === "regular") {
+              newOvertimeRecords.regularOT = record.id
+            } else if (record.type === "rest_day") {
+              newOvertimeRecords.restDay = record.id
+            } else if (record.type === "night_diff") {
+              newOvertimeRecords.nightDiff = record.id
+            }
+          }
+        })
+      }
+
+      setOvertimeRecords(newOvertimeRecords)
+      console.log("Overtime record IDs:", newOvertimeRecords)
+
+      // Update hasPayrollData based on whether we found any data
+      const foundData =
+        (earningsData.length > 0 && earningsData.some((record) => record.user === userId)) ||
+        (deductionsData.length > 0 && deductionsData.some((record) => record.user === userId)) ||
+        (totalOvertimeData.length > 0 && totalOvertimeData.some((record) => record.user === userId)) ||
+        (overtimeData.length > 0 && overtimeData.some((record) => record.user === userId)) ||
+        hasData
+
+      setHasPayrollData(foundData)
+
+      // If employee has data, update form with it
+      if (foundData) {
+        // Find the records that belong to this user
+        const userEarnings = earningsData.find((record) => record.user === userId) || null
+        const userDeductions = deductionsData.find((record) => record.user === userId) || null
+        const userTotalOvertime = totalOvertimeData.find((record) => record.user === userId) || null
+        const userOvertimeData = overtimeData.filter((record) => record.user === userId) || []
+
+        const updatedFormData = createFormDataFromApi(
+          userEarnings,
+          userDeductions,
+          userOvertimeData,
+          userTotalOvertime,
+          userSalary,
+          employeeData,
+        )
+        setFormData(updatedFormData)
+      } else {
+        // If no data, reset to default values with employee's base salary if available
+        const defaultFormData = { ...formData }
+        if (employeeData?.rate_per_month) {
+          defaultFormData.basicRate = employeeData.rate_per_month
+          defaultFormData.basic = employeeData.rate_per_month / 2 // Assuming bi-weekly pay
+        }
+        setFormData(defaultFormData)
+      }
     } catch (error) {
       console.error("Error fetching payroll data:", error)
       setError("Failed to load payroll data. Using default values.")
 
       // Set default values from employeeData
-      setFormData((prevData) => ({
-        ...prevData,
-        baseSalary: employeeData.rate_per_month || prevData.baseSalary,
-        totalDeductions: employeeData.deductions?.toString() || prevData.totalDeductions,
-      }))
+      if (employeeData?.rate_per_month) {
+        setFormData((prevData) => ({
+          ...prevData,
+          basicRate: employeeData.rate_per_month,
+          basic: employeeData.rate_per_month / 2, // Assuming bi-weekly pay
+        }))
+      }
     } finally {
       setLoading(false)
     }
   }
 
-  const createFormDataFromApi = (earnings, deductions, overtime, employeeData) => {
+  const createFormDataFromApi = (earnings, deductions, overtime, totalOvertime, salary, employeeData) => {
     // Start with default form data
     const newFormData = { ...formData }
 
     // Update earnings data if available
     if (earnings) {
-      newFormData.baseSalary = earnings.base_salary?.toString() || newFormData.baseSalary
+      newFormData.basicRate = earnings.basic_rate?.toString() || newFormData.basicRate
+      newFormData.basic = earnings.basic?.toString() || newFormData.basic
       newFormData.allowance = earnings.allowance?.toString() || newFormData.allowance
-      newFormData.otherEarningsNTax = earnings.other_earnings?.toString() || newFormData.otherEarningsNTax
-      newFormData.vacationLeave = earnings.vacation_leave?.toString() || newFormData.vacationLeave
-      newFormData.sickLeave = earnings.sick_leave?.toString() || newFormData.sickLeave
-      newFormData.bereavementLeave = earnings.bereavement_leave?.toString() || newFormData.bereavementLeave
+      newFormData.ntax = earnings.ntax?.toString() || newFormData.ntax
+      newFormData.vacationleave = earnings.vacationleave?.toString() || newFormData.vacationleave
+      newFormData.sickleave = earnings.sickleave?.toString() || newFormData.sickleave
     } else if (employeeData?.rate_per_month) {
-      // If no earnings data but we have rate_per_month, use that for base salary
-      newFormData.baseSalary = employeeData.rate_per_month.toString()
+      // If no earnings data but we have rate_per_month, use that for basic rate
+      newFormData.basicRate = employeeData.rate_per_month.toString()
+      newFormData.basic = (employeeData.rate_per_month / 2).toString() // Assuming bi-weekly pay
     }
 
     // Update deductions data if available
     if (deductions) {
-      newFormData.sss.percentage = deductions.sss_percentage?.toString() || newFormData.sss.percentage
       newFormData.sss.amount = deductions.sss?.toString() || newFormData.sss.amount
-
-      newFormData.philhealth.percentage =
-        deductions.philhealth_percentage?.toString() || newFormData.philhealth.percentage
       newFormData.philhealth.amount = deductions.philhealth?.toString() || newFormData.philhealth.amount
-
-      newFormData.pagibig.percentage = deductions.pagibig_percentage?.toString() || newFormData.pagibig.percentage
       newFormData.pagibig.amount = deductions.pagibig?.toString() || newFormData.pagibig.amount
-
       newFormData.late.amount = deductions.late?.toString() || newFormData.late.amount
       newFormData.wtax.amount = deductions.wtax?.toString() || newFormData.wtax.amount
-      newFormData.noWorkDay.amount = deductions.no_work_day?.toString() || newFormData.noWorkDay.amount
+      newFormData.nowork.amount = deductions.nowork?.toString() || newFormData.nowork.amount
       newFormData.loan.amount = deductions.loan?.toString() || newFormData.loan.amount
       newFormData.charges.amount = deductions.charges?.toString() || newFormData.charges.amount
       newFormData.undertime.amount = deductions.undertime?.toString() || newFormData.undertime.amount
-      newFormData.msfcLoan.amount = deductions.msfc_loan?.toString() || newFormData.msfcLoan.amount
+      newFormData.msfcloan.amount = deductions.msfcloan?.toString() || newFormData.msfcloan.amount
     }
 
     // Update overtime data if available
     if (overtime && overtime.length > 0) {
-      // Sum up regular overtime hours
-      const regularOTHours = overtime
-        .filter((ot) => ot.type === "regular")
-        .reduce((sum, ot) => sum + (Number.parseFloat(ot.hours) || 0), 0)
+      // Find regular overtime hours
+      const regularOT = overtime.find((ot) => ot.type === "regular")
+      if (regularOT) {
+        newFormData.regularOT.hours = regularOT.hours?.toString() || newFormData.regularOT.hours
+      }
 
-      // Sum up rest day hours
-      const restDayHours = overtime
-        .filter((ot) => ot.type === "rest_day")
-        .reduce((sum, ot) => sum + (Number.parseFloat(ot.hours) || 0), 0)
+      // Find rest day hours
+      const restDay = overtime.find((ot) => ot.type === "rest_day")
+      if (restDay) {
+        newFormData.restDay.hours = restDay.hours?.toString() || newFormData.restDay.hours
+      }
 
-      // Sum up night differential hours
-      const nightDiffHours = overtime
-        .filter((ot) => ot.type === "night_diff")
-        .reduce((sum, ot) => sum + (Number.parseFloat(ot.hours) || 0), 0)
+      // Find night differential hours
+      const nightDiff = overtime.find((ot) => ot.type === "night_diff")
+      if (nightDiff) {
+        newFormData.nightDiff.hours = nightDiff.hours?.toString() || newFormData.nightDiff.hours
+      }
+    }
 
-      newFormData.regularOT.hours = regularOTHours.toString() || newFormData.regularOT.hours
-      newFormData.restDay.hours = restDayHours.toString() || newFormData.restDay.hours
-      newFormData.nightDiff.hours = nightDiffHours.toString() || newFormData.nightDiff.hours
+    // Update overtime rates if available
+    if (totalOvertime) {
+      newFormData.regularOT.rate = totalOvertime.total_regularot?.toString() || newFormData.regularOT.rate
+      newFormData.regularHoliday.rate =
+        totalOvertime.total_regularholiday?.toString() || newFormData.regularHoliday.rate
+      newFormData.specialHoliday.rate =
+        totalOvertime.total_specialholiday?.toString() || newFormData.specialHoliday.rate
+      newFormData.restDay.rate = totalOvertime.total_restday?.toString() || newFormData.restDay.rate
+      newFormData.nightDiff.rate = totalOvertime.total_nightdiff?.toString() || newFormData.nightDiff.rate
+      newFormData.backwage.rate = totalOvertime.total_backwage?.toString() || newFormData.backwage.rate
     }
 
     // Calculate totals
@@ -170,31 +391,60 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     return { ...newFormData, ...totals }
   }
 
+  // Replace the calculateTotals function with this improved version
   const calculateTotals = (data) => {
+    // Parse all values to ensure they're numbers
+    const basic = Number.parseFloat(data.basic) || 0
+    const allowance = Number.parseFloat(data.allowance) || 0
+    const ntax = Number.parseFloat(data.ntax) || 0
+    const vacationleave = Number.parseFloat(data.vacationleave) || 0
+    const sickleave = Number.parseFloat(data.sickleave) || 0
+    const bereavementLeave = Number.parseFloat(data.bereavementLeave) || 0
+
+    const regularOT = Number.parseFloat(data.regularOT.rate) || 0
+    const regularHoliday = Number.parseFloat(data.regularHoliday.rate) || 0
+    const specialHoliday = Number.parseFloat(data.specialHoliday.rate) || 0
+    const restDay = Number.parseFloat(data.restDay.rate) || 0
+    const nightDiff = Number.parseFloat(data.nightDiff.rate) || 0
+    const backwage = Number.parseFloat(data.backwage.rate) || 0
+
+    const sss = Number.parseFloat(data.sss.amount) || 0
+    const philhealth = Number.parseFloat(data.philhealth.amount) || 0
+    const pagibig = Number.parseFloat(data.pagibig.amount) || 0
+    const late = Number.parseFloat(data.late.amount) || 0
+    const wtax = Number.parseFloat(data.wtax.amount) || 0
+    const nowork = Number.parseFloat(data.nowork.amount) || 0
+    const loan = Number.parseFloat(data.loan.amount) || 0
+    const charges = Number.parseFloat(data.charges.amount) || 0
+    const undertime = Number.parseFloat(data.undertime.amount) || 0
+    const msfcloan = Number.parseFloat(data.msfcloan.amount) || 0
+
     // Calculate total gross
     const totalGross =
-      Number.parseFloat(data.baseSalary) +
-      Number.parseFloat(data.allowance) +
-      Number.parseFloat(data.otherEarningsNTax) +
-      Number.parseFloat(data.vacationLeave) +
-      Number.parseFloat(data.sickLeave) +
-      Number.parseFloat(data.bereavementLeave)
+      basic +
+      allowance +
+      ntax +
+      vacationleave +
+      sickleave +
+      bereavementLeave +
+      regularOT +
+      regularHoliday +
+      specialHoliday +
+      restDay +
+      nightDiff +
+      backwage
 
     // Calculate total deductions
-    const totalDeductions =
-      Number.parseFloat(data.sss.amount) +
-      Number.parseFloat(data.philhealth.amount) +
-      Number.parseFloat(data.pagibig.amount) +
-      Number.parseFloat(data.late.amount) +
-      Number.parseFloat(data.wtax.amount) +
-      Number.parseFloat(data.noWorkDay.amount) +
-      Number.parseFloat(data.loan.amount) +
-      Number.parseFloat(data.charges.amount) +
-      Number.parseFloat(data.undertime.amount) +
-      Number.parseFloat(data.msfcLoan.amount)
+    const totalDeductions = sss + philhealth + pagibig + late + wtax + nowork + loan + charges + undertime + msfcloan
 
     // Calculate total salary compensation
     const totalSalaryCompensation = totalGross - totalDeductions
+
+    console.log("Calculated totals:", {
+      totalGross,
+      totalDeductions,
+      totalSalaryCompensation,
+    })
 
     return {
       totalGross: totalGross.toFixed(2),
@@ -204,8 +454,70 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }
 
-  const handleInputChange = (e, section, field, subfield = null) => {
-    const value = e.target.value.replace(/[^\d.]/g, "") // Only allow numbers and decimal point
+  // Calculate SSS, PhilHealth, and Pag-IBIG contributions based on salary
+  const calculateBenefits = async (basicRate) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
+
+      // Calculate SSS contribution
+      const sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/?salary=${basicRate}`, { headers })
+      if (!sssResponse.ok) throw new Error("Failed to calculate SSS contribution")
+      const sssData = await sssResponse.json()
+
+      // Calculate PhilHealth contribution
+      const philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/?salary=${basicRate}`, { headers })
+      if (!philhealthResponse.ok) throw new Error("Failed to calculate PhilHealth contribution")
+      const philhealthData = await philhealthResponse.json()
+
+      // Calculate Pag-IBIG contribution
+      const pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/?salary=${basicRate}`, { headers })
+      if (!pagibigResponse.ok) throw new Error("Failed to calculate Pag-IBIG contribution")
+      const pagibigData = await pagibigResponse.json()
+
+      return {
+        sss: sssData.contribution || 0,
+        philhealth: philhealthData.contribution || 0,
+        pagibig: pagibigData.contribution || 0,
+      }
+    } catch (error) {
+      console.error("Error calculating benefits:", error)
+      return {
+        sss: 0,
+        philhealth: 0,
+        pagibig: 0,
+      }
+    }
+  }
+
+  // Replace the handleInputChange function with this improved version
+  const handleInputChange = async (e, section, field, subfield = null) => {
+    // Get the raw input value
+    let value = e.target.value
+
+    // Remove peso sign if present
+    value = value.replace(/^₱/, "")
+
+    // Allow typing decimal points and numbers
+    if (e.nativeEvent) {
+      // Remove any non-numeric characters except decimal point
+      value = value.replace(/[^\d.]/g, "")
+
+      // Ensure only one decimal point
+      const parts = value.split(".")
+      if (parts.length > 2) {
+        value = parts[0] + "." + parts.slice(1).join("")
+      }
+
+      // Limit to 2 decimal places only if there's a decimal point and user has typed past it
+      if (parts.length === 2 && parts[1].length > 2) {
+        value = parts[0] + "." + parts[1].substring(0, 2)
+      }
+    }
+
     const newFormData = { ...formData }
 
     if (subfield) {
@@ -216,19 +528,35 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       newFormData[section] = value
     }
 
+    // If basic rate is changed, recalculate SSS, PhilHealth, and Pag-IBIG
+    if (section === "basicRate") {
+      const benefits = await calculateBenefits(value)
+      newFormData.sss.amount = benefits.sss.toString()
+      newFormData.philhealth.amount = benefits.philhealth.toString()
+      newFormData.pagibig.amount = benefits.pagibig.toString()
+    }
+
     const totals = calculateTotals(newFormData)
     setFormData({ ...newFormData, ...totals })
   }
 
-  const formatValue = (value) => {
-    return value
+  // Format for display with Peso sign and 2 decimal places
+  const formatCurrency = (value) => {
+    if (value === undefined || value === null) return "0.00"
+
+    const numValue = Number.parseFloat(value)
+    if (isNaN(numValue)) return "0.00"
+
+    return numValue.toFixed(2)
   }
 
+  // Replace the handleSubmit function with this updated version that properly handles creating or updating records
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!employeeData?.id) {
-      console.error("No employee ID available")
+    if (!userId) {
+      console.error("No user ID available")
+      setError("User ID is missing. Cannot save payroll data.")
       return
     }
 
@@ -242,96 +570,470 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         "Content-Type": "application/json",
       }
 
+      // Calculate totals to ensure they're up-to-date
+      const totals = calculateTotals(formData)
+      const updatedFormData = { ...formData, ...totals }
+
+      // Use the updated totals for all calculations
+      const totalGross = Number.parseFloat(updatedFormData.totalGross)
+      const totalDeductions = Number.parseFloat(updatedFormData.totalDeductions)
+      const totalSalaryCompensation = Number.parseFloat(updatedFormData.totalSalaryCompensation)
+
+      // Step 1: Create or update earnings, deductions, and overtime records
+      let earningsId = null
+      let deductionsId = null
+      let overtimeId = null
+
       // Prepare earnings data
       const earningsData = {
-        employee: employeeData.id,
-        base_salary: Number.parseFloat(formData.baseSalary),
-        allowance: Number.parseFloat(formData.allowance),
-        other_earnings: Number.parseFloat(formData.otherEarningsNTax),
-        vacation_leave: Number.parseFloat(formData.vacationLeave),
-        sick_leave: Number.parseFloat(formData.sickLeave),
-        bereavement_leave: Number.parseFloat(formData.bereavementLeave),
+        user: userId,
+        basic_rate: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        basic: Number.parseFloat(updatedFormData.basic).toFixed(2),
+        allowance: Number.parseFloat(updatedFormData.allowance).toFixed(2),
+        ntax: Number.parseFloat(updatedFormData.ntax).toFixed(2),
+        vacationleave: Number.parseFloat(updatedFormData.vacationleave).toFixed(2),
+        sickleave: Number.parseFloat(updatedFormData.sickleave).toFixed(2),
+      }
+
+      // Create or update earnings record
+      if (earningsId) {
+        // Update existing record
+        console.log(`Updating earnings record with ID ${earningsId}`)
+        const earningsResponse = await fetch(`${API_BASE_URL}/earnings/${earningsId}/`, {
+          method: "PATCH", // Use PATCH instead of PUT
+          headers,
+          body: JSON.stringify(earningsData),
+        })
+
+        if (!earningsResponse.ok) {
+          const errorData = await earningsResponse.json()
+          console.error("Earnings update error:", errorData)
+          throw new Error(`Failed to update earnings data: ${JSON.stringify(errorData)}`)
+        }
+
+        const earningsResult = await earningsResponse.json()
+        console.log("Earnings update result:", earningsResult)
+        earningsId = earningsResult.id
+      } else {
+        // Create new record
+        console.log("Creating new earnings record")
+        const earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(earningsData),
+        })
+
+        if (!earningsResponse.ok) {
+          const errorData = await earningsResponse.json()
+          console.error("Earnings creation error:", errorData)
+          throw new Error(`Failed to create earnings data: ${JSON.stringify(errorData)}`)
+        }
+
+        const earningsResult = await earningsResponse.json()
+        console.log("Earnings creation result:", earningsResult)
+        earningsId = earningsResult.id
       }
 
       // Prepare deductions data
       const deductionsData = {
-        employee: employeeData.id,
-        sss: Number.parseFloat(formData.sss.amount),
-        sss_percentage: Number.parseFloat(formData.sss.percentage),
-        philhealth: Number.parseFloat(formData.philhealth.amount),
-        philhealth_percentage: Number.parseFloat(formData.philhealth.percentage),
-        pagibig: Number.parseFloat(formData.pagibig.amount),
-        pagibig_percentage: Number.parseFloat(formData.pagibig.percentage),
-        late: Number.parseFloat(formData.late.amount),
-        wtax: Number.parseFloat(formData.wtax.amount),
-        no_work_day: Number.parseFloat(formData.noWorkDay.amount),
-        loan: Number.parseFloat(formData.loan.amount),
-        charges: Number.parseFloat(formData.charges.amount),
-        undertime: Number.parseFloat(formData.undertime.amount),
-        msfc_loan: Number.parseFloat(formData.msfcLoan.amount),
+        user: userId,
+        sss: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+        philhealth: Number.parseFloat(updatedFormData.philhealth.amount).toFixed(2),
+        pagibig: Number.parseFloat(updatedFormData.pagibig.amount).toFixed(2),
+        late: Number.parseFloat(updatedFormData.late.amount).toFixed(2),
+        wtax: Number.parseFloat(updatedFormData.wtax.amount).toFixed(2),
+        nowork: Number.parseFloat(updatedFormData.nowork.amount).toFixed(2),
+        loan: Number.parseFloat(updatedFormData.loan.amount).toFixed(2),
+        charges: Number.parseFloat(updatedFormData.charges.amount).toFixed(2),
+        undertime: Number.parseFloat(updatedFormData.undertime.amount).toFixed(2),
+        msfcloan: Number.parseFloat(updatedFormData.msfcloan.amount).toFixed(2),
       }
 
-      // Check if earnings record exists for this employee
-      const earningsCheckResponse = await fetch(`${API_BASE_URL}/earnings/?employee=${employeeData.id}`, { headers })
-      const earningsCheckData = await earningsCheckResponse.json()
+      // Create or update deductions record
+      if (deductionsId) {
+        // Update existing record
+        console.log(`Updating deductions record with ID ${deductionsId}`)
+        const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/${deductionsId}/`, {
+          method: "PATCH", // Use PATCH instead of PUT
+          headers,
+          body: JSON.stringify(deductionsData),
+        })
 
-      // Check if deductions record exists for this employee
-      const deductionsCheckResponse = await fetch(`${API_BASE_URL}/deductions/?employee=${employeeData.id}`, {
+        if (!deductionsResponse.ok) {
+          const errorData = await deductionsResponse.json()
+          console.error("Deductions update error:", errorData)
+          throw new Error(`Failed to update deductions data: ${JSON.stringify(errorData)}`)
+        }
+
+        const deductionsResult = await deductionsResponse.json()
+        console.log("Deductions update result:", deductionsResult)
+        deductionsId = deductionsResult.id
+      } else {
+        // Create new record
+        console.log("Creating new deductions record")
+        const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(deductionsData),
+        })
+
+        if (!deductionsResponse.ok) {
+          const errorData = await deductionsResponse.json()
+          console.error("Deductions creation error:", errorData)
+          throw new Error(`Failed to create deductions data: ${JSON.stringify(errorData)}`)
+        }
+
+        const deductionsResult = await deductionsResponse.json()
+        console.log("Deductions creation result:", deductionsResult)
+        deductionsId = deductionsResult.id
+      }
+
+      // Prepare total overtime data
+      const totalOvertimeData = {
+        user: userId,
+        total_regularot: Number.parseFloat(updatedFormData.regularOT.rate).toFixed(2),
+        total_regularholiday: Number.parseFloat(updatedFormData.regularHoliday.rate).toFixed(2),
+        total_specialholiday: Number.parseFloat(updatedFormData.specialHoliday.rate).toFixed(2),
+        total_restday: Number.parseFloat(updatedFormData.restDay.rate).toFixed(2),
+        total_nightdiff: Number.parseFloat(updatedFormData.nightDiff.rate).toFixed(2),
+        total_backwage: Number.parseFloat(updatedFormData.backwage.rate).toFixed(2),
+        total_overtime: (
+          Number.parseFloat(updatedFormData.regularOT.rate) +
+          Number.parseFloat(updatedFormData.regularHoliday.rate) +
+          Number.parseFloat(updatedFormData.specialHoliday.rate) +
+          Number.parseFloat(updatedFormData.restDay.rate) +
+          Number.parseFloat(updatedFormData.nightDiff.rate)
+        ).toFixed(2),
+        total_late: Number.parseFloat(updatedFormData.late.amount).toFixed(2),
+        total_undertime: Number.parseFloat(updatedFormData.undertime.amount).toFixed(2),
+        biweek_start: new Date().toISOString().split("T")[0],
+      }
+
+      // Create or update total overtime record
+      if (totalOvertimeId) {
+        // Update existing record
+        console.log(`Updating total overtime record with ID ${totalOvertimeId}`)
+        const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/${totalOvertimeId}/`, {
+          method: "PATCH", // Use PATCH instead of PUT
+          headers,
+          body: JSON.stringify(totalOvertimeData),
+        })
+
+        if (!totalOvertimeResponse.ok) {
+          const errorData = await totalOvertimeResponse.json()
+          console.error("Total overtime update error:", errorData)
+          throw new Error(`Failed to update total overtime data: ${JSON.stringify(errorData)}`)
+        }
+
+        const totalOvertimeResult = await totalOvertimeResponse.json()
+        console.log("Total overtime update result:", totalOvertimeResult)
+        overtimeId = totalOvertimeResult.id
+      } else {
+        // Create new record
+        console.log("Creating new total overtime record")
+        const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(totalOvertimeData),
+        })
+
+        if (!totalOvertimeResponse.ok) {
+          const errorData = await totalOvertimeResponse.json()
+          console.error("Total overtime creation error:", errorData)
+          throw new Error(`Failed to create total overtime data: ${JSON.stringify(errorData)}`)
+        }
+
+        const totalOvertimeResult = await totalOvertimeResponse.json()
+        console.log("Total overtime creation result:", totalOvertimeResult)
+        overtimeId = totalOvertimeResult.id
+      }
+
+      // Find the section where we create or update the salary record (around line 950)
+      // Replace the salaryData object with this updated version:
+
+      // Step 2: Create or update salary record
+      let salaryRecordId = null
+
+      // First, fetch the SSS, PhilHealth, and Pag-IBIG records for this user
+      console.log(`Fetching benefit records for user ID: ${userId}`)
+      const [sssRecords, philhealthRecords, pagibigRecords] = await Promise.all([
+        fetch(`${API_BASE_URL}/benefits/sss/?user=${userId}`, { headers }).then((res) => (res.ok ? res.json() : [])),
+        fetch(`${API_BASE_URL}/benefits/philhealth/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+        fetch(`${API_BASE_URL}/benefits/pagibig/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+      ])
+
+      // Get the complete objects if records exist
+      let sssRecord = sssRecords && sssRecords.length > 0 ? sssRecords[0] : null
+      let philhealthRecord = philhealthRecords && philhealthRecords.length > 0 ? philhealthRecords[0] : null
+      let pagibigRecord = pagibigRecords && pagibigRecords.length > 0 ? pagibigRecords[0] : null
+
+      console.log("Benefit records:", { sssRecord, philhealthRecord, pagibigRecord })
+
+      // If any of the required records are missing, we need to create them
+      if (!sssRecord || !philhealthRecord || !pagibigRecord) {
+        console.log("Creating missing benefit records")
+
+        // Create SSS record if missing
+        if (!sssRecord) {
+          const sssData = {
+            user: userId,
+            basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+            msc: "5000.00",
+            employee_share: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+            employer_share: "500.00",
+            ec_contribution: "10.00",
+            employer_mpf_contribution: "0.00",
+            employee_mpf_contribution: "0.00",
+            total_employer: "510.00",
+            total_employee: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+            total_contribution: (Number.parseFloat(updatedFormData.sss.amount) + 510).toFixed(2),
+          }
+
+          const sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(sssData),
+          })
+
+          if (sssResponse.ok) {
+            sssRecord = await sssResponse.json()
+            console.log("Created new SSS record:", sssRecord)
+          } else {
+            console.error("Failed to create SSS record:", await sssResponse.text())
+            throw new Error("Failed to create SSS record")
+          }
+        }
+
+        // Create PhilHealth record if missing
+        if (!philhealthRecord) {
+          const philhealthData = {
+            user: userId,
+            basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+            total_contribution: Number.parseFloat(updatedFormData.philhealth.amount).toFixed(2),
+          }
+
+          const philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(philhealthData),
+          })
+
+          if (philhealthResponse.ok) {
+            philhealthRecord = await philhealthResponse.json()
+            console.log("Created new PhilHealth record:", philhealthRecord)
+          } else {
+            console.error("Failed to create PhilHealth record:", await philhealthResponse.text())
+            throw new Error("Failed to create PhilHealth record")
+          }
+        }
+
+        // Create Pag-IBIG record if missing
+        if (!pagibigRecord) {
+          const pagibigData = {
+            user: userId,
+            basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+            employee_share: Number.parseFloat(updatedFormData.pagibig.amount).toFixed(2),
+            employer_share: "200.00",
+            total_contribution: (Number.parseFloat(updatedFormData.pagibig.amount) + 200).toFixed(2),
+          }
+
+          const pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(pagibigData),
+          })
+
+          if (pagibigResponse.ok) {
+            pagibigRecord = await pagibigResponse.json()
+            console.log("Created new Pag-IBIG record:", pagibigRecord)
+          } else {
+            console.error("Failed to create Pag-IBIG record:", await pagibigResponse.text())
+            throw new Error("Failed to create Pag-IBIG record")
+          }
+        }
+      }
+
+      const salaryData = {
+        user: userId,
+        earnings_id: earningsId,
+        deductions_id: deductionsId,
+        overtime_id: overtimeId,
+        // Include the benefit IDs - these must not be null
+        sss_id: sssRecord.id,
+        philhealth_id: philhealthRecord.id,
+        pagibig_id: pagibigRecord.id,
+        rate_per_month: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        rate_per_hour: (Number.parseFloat(updatedFormData.basicRate) / 160).toFixed(2), // Assuming 160 hours per month
+        pay_date: new Date().toISOString().split("T")[0],
+      }
+
+      console.log("Salary data to be sent:", salaryData)
+
+      if (salaryId) {
+        // Update existing record
+        console.log(`Updating salary record with ID ${salaryId}`)
+        const salaryResponse = await fetch(`${API_BASE_URL}/salary/${salaryId}/`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(salaryData),
+        })
+
+        if (!salaryResponse.ok) {
+          console.error("Failed to update salary record:", await salaryResponse.text())
+          throw new Error("Failed to update salary record")
+        }
+
+        const salaryResult = await salaryResponse.json()
+        console.log("Salary update result:", salaryResult)
+        salaryRecordId = salaryResult.id
+      } else {
+        // Create new record
+        console.log("Creating new salary record")
+        const salaryResponse = await fetch(`${API_BASE_URL}/salary/`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify(salaryData),
+        })
+
+        if (!salaryResponse.ok) {
+          console.error("Failed to create salary record:", await salaryResponse.text())
+          throw new Error("Failed to create salary record")
+        }
+
+        const salaryResult = await salaryResponse.json()
+        console.log("Salary creation result:", salaryResult)
+        salaryRecordId = salaryResult.id
+      }
+
+      // Step 3: Fetch the complete salary object
+      const completeSalaryResponse = await fetch(`${API_BASE_URL}/salary/${salaryRecordId}/`, {
         headers,
       })
-      const deductionsCheckData = await deductionsCheckResponse.json()
 
-      // Update or create earnings record
-      let earningsResponse
-      if (earningsCheckData.length > 0) {
-        // Update existing record
-        earningsResponse = await fetch(`${API_BASE_URL}/earnings/${earningsCheckData[0].id}/`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(earningsData),
-        })
-      } else {
-        // Create new record
-        earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(earningsData),
-        })
+      if (!completeSalaryResponse.ok) {
+        throw new Error("Failed to fetch complete salary data")
       }
 
-      if (!earningsResponse.ok) throw new Error("Failed to update earnings data")
+      const completeSalary = await completeSalaryResponse.json()
 
-      // Update or create deductions record
-      let deductionsResponse
-      if (deductionsCheckData.length > 0) {
-        // Update existing record
-        deductionsResponse = await fetch(`${API_BASE_URL}/deductions/${deductionsCheckData[0].id}/`, {
-          method: "PUT",
-          headers,
-          body: JSON.stringify(deductionsData),
-        })
-      } else {
-        // Create new record
-        deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(deductionsData),
-        })
+      // Step 4: Create or update payroll record
+      // First, fetch the complete objects for earnings, deductions, and overtime
+      const [earningsObj, deductionsObj, overtimeObj] = await Promise.all([
+        fetch(`${API_BASE_URL}/earnings/${earningsId}/`, { headers }).then((res) => res.json()),
+        fetch(`${API_BASE_URL}/deductions/${deductionsId}/`, { headers }).then((res) => res.json()),
+        fetch(`${API_BASE_URL}/totalovertime/${overtimeId}/`, { headers }).then((res) => res.json()),
+      ])
+
+      // Create a complete salary object with nested objects
+      const completeSalaryObj = {
+        ...completeSalary,
+        earnings_id: earningsObj,
+        deductions_id: deductionsObj,
+        overtime_id: overtimeObj,
+        // Include the benefit IDs - these must not be null
+        sss_id: sssRecord.id,
+        philhealth_id: philhealthRecord.id,
+        pagibig_id: pagibigRecord.id,
       }
 
-      if (!deductionsResponse.ok) throw new Error("Failed to update deductions data")
+      const payrollData = {
+        user_id: actualUserId,
+        salary_id: completeSalaryObj, // Send the complete salary object with nested objects
+        gross_pay: totalGross.toFixed(2),
+        total_deductions: totalDeductions.toFixed(2),
+        net_pay: totalSalaryCompensation.toFixed(2),
+        pay_date: new Date().toISOString().split("T")[0],
+        status: "Processing",
+      }
+
+      console.log("SSS ID", sssRecord.id)
+      console.log("Philhealth ID", philhealthRecord.id)
+      console.log("Pag-ibig ID", pagibigRecord.id)
+      console.log("User ID", userId)
+      if (payrollId) {
+        // Update existing record
+        console.log(`Updating payroll record with ID ${payrollId}`)
+        const payrollResponse = await fetch(`${API_BASE_URL}/payroll/${payrollId}/`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(payrollData),
+        })
+
+        if (!payrollResponse.ok) {
+          const errorText = await payrollResponse.text()
+          console.error("Failed to update payroll record:", errorText)
+          throw new Error(`Failed to update payroll record: ${errorText}`)
+        }
+
+        console.log("Successfully updated payroll record")
+      } else {
+        // Check if a payroll record already exists for this user
+        const existingPayrollResponse = await fetch(`${API_BASE_URL}/payroll/${userId}`, {
+          headers,
+        })
+
+        if (existingPayrollResponse.ok) {
+          const existingPayrolls = await existingPayrollResponse.json()
+          const userPayroll = existingPayrolls.find((p) => p.user_id === userId)
+
+          if (userPayroll) {
+            // Update existing payroll record
+            console.log("Updating existing payroll record:", userPayroll.id)
+            setPayrollId(userPayroll.id)
+
+            const updateResponse = await fetch(`${API_BASE_URL}/payroll/${userPayroll.id}/`, {
+              method: "PATCH",
+              headers,
+              body: JSON.stringify(payrollData),
+            })
+
+            if (!updateResponse.ok) {
+              const errorText = await updateResponse.text()
+              console.error("Failed to update payroll record:", errorText)
+              throw new Error(`Failed to update payroll record: ${errorText}`)
+            }
+
+            console.log("Successfully updated payroll record")
+          } else {
+            // Create new payroll record
+            console.log("Creating new payroll record")
+            const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
+              method: "POST",
+              headers,
+              body: JSON.stringify(payrollData),
+            })
+
+            if (!payrollResponse.ok) {
+              const errorText = await payrollResponse.text()
+              console.error("Failed to create payroll record:", errorText)
+              throw new Error(`Failed to create payroll record: ${errorText}`)
+            }
+
+            const newPayroll = await payrollResponse.json()
+            setPayrollId(newPayroll.id)
+            console.log("Created new payroll record:", newPayroll.id)
+          }
+        }
+      }
+
+      // Set hasPayrollData to true since we've now saved data
+      setHasPayrollData(true)
 
       // Call the onUpdate callback with the updated data
       onUpdate({
-        ...formData,
+        ...updatedFormData,
         id: employeeData.id,
-        baseSalary: formData.baseSalary,
-        totalDeductions: formData.totalDeductions,
-        totalSalaryCompensation: formData.totalSalaryCompensation,
+        baseSalary: totalGross,
+        totalDeductions: totalDeductions,
+        totalSalaryCompensation: totalSalaryCompensation,
       })
     } catch (error) {
       console.error("Error updating payroll data:", error)
-      setError("Failed to update payroll data. Please try again.")
+      setError(`Failed to update payroll data: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -344,8 +1046,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       <div className="bg-white rounded-lg w-full max-w-6xl p-4 relative max-h-[90vh] overflow-y-auto">
         {/* Employee Info */}
         <div className="mb-3">
-          <h2 className="text-lg font-bold uppercase">{employeeData?.employee_name || "EMPLOYEE NAME"}</h2>
-          <p className="text-xs text-gray-600">{employeeData?.employee_id || "ID"}</p>
+          <h2 className="text-xl font-bold uppercase">{employeeData?.employee_name || "EMPLOYEE NAME"}</h2>
+          <p className="text-sm text-gray-600">{employeeData?.employee_id || "ID"}</p>
+          {!hasPayrollData && (
+            <div className="mt-2 p-2 bg-blue-100 text-blue-700 rounded text-sm">
+              This employee doesn't have payroll information yet. Enter the details below to create their payroll
+              record.
+            </div>
+          )}
         </div>
 
         {loading && (
@@ -362,32 +1070,32 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
             <div>
               {/* Payroll Dates */}
               <div className="mb-4">
-                <h3 className="font-medium text-sm mb-2 uppercase">Payroll Dates</h3>
+                <h3 className="font-medium text-base mb-2 uppercase">Payroll Dates</h3>
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Payroll Period</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Payroll Period</label>
                     <div className="flex gap-1">
                       <input
                         type="text"
                         value={formData.payrollPeriodStart}
                         onChange={(e) => handleInputChange(e, "payrollPeriodStart")}
-                        className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                        className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                       />
                       <input
                         type="text"
                         value={formData.payrollPeriodEnd}
                         onChange={(e) => handleInputChange(e, "payrollPeriodEnd")}
-                        className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                        className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Pay Date</label>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Pay Date</label>
                     <input
                       type="text"
                       value={formData.payDate}
                       onChange={(e) => handleInputChange(e, "payDate")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
@@ -395,61 +1103,79 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
               {/* Earnings */}
               <div>
-                <h3 className="font-medium text-sm mb-2 uppercase">Earnings</h3>
+                <h3 className="font-medium text-base mb-2 uppercase">Earnings</h3>
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Base Salary</label>
-                    <input
-                      type="text"
-                      value={formatValue(formData.baseSalary)}
-                      onChange={(e) => handleInputChange(e, "baseSalary")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Basic Rate (Monthly)</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.basicRate}
+                        onChange={(e) => handleInputChange(e, "basicRate")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Allowance</label>
-                    <input
-                      type="text"
-                      value={formatValue(formData.allowance)}
-                      onChange={(e) => handleInputChange(e, "allowance")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Basic (Bi-weekly)</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.basic}
+                        onChange={(e) => handleInputChange(e, "basic")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Other Earnings N-TAX</label>
-                    <input
-                      type="text"
-                      value={formatValue(formData.otherEarningsNTax)}
-                      onChange={(e) => handleInputChange(e, "otherEarningsNTax")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Allowance</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.allowance}
+                        onChange={(e) => handleInputChange(e, "allowance")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Vacation Leave</label>
-                    <input
-                      type="text"
-                      value={formatValue(formData.vacationLeave)}
-                      onChange={(e) => handleInputChange(e, "vacationLeave")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Non-Taxable</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.ntax}
+                        onChange={(e) => handleInputChange(e, "ntax")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Sick Leave</label>
-                    <input
-                      type="text"
-                      value={formatValue(formData.sickLeave)}
-                      onChange={(e) => handleInputChange(e, "sickLeave")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Vacation Leave</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.vacationleave}
+                        onChange={(e) => handleInputChange(e, "vacationleave")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1 uppercase">Bereavement Leave</label>
-                    <input
-                      type="text"
-                      value={formatValue(formData.bereavementLeave)}
-                      onChange={(e) => handleInputChange(e, "bereavementLeave")}
-                      className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Sick Leave</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.sickleave}
+                        onChange={(e) => handleInputChange(e, "sickleave")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -457,216 +1183,240 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
             {/* Column 2: Overtime Breakdown */}
             <div>
-              <h3 className="font-medium text-sm mb-2 uppercase">Overtime Breakdown</h3>
+              <h3 className="font-medium text-base mb-2 uppercase">Overtime Breakdown</h3>
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Regular Overtime</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Regular Overtime</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       placeholder="Hrs"
                       value={formData.regularOT.hours}
                       onChange={(e) => handleInputChange(e, "regularOT", "hours")}
-                      className="w-10 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-12 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.regularOT.rate}
+                        onChange={(e) => handleInputChange(e, "regularOT", "rate")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Regular Holiday</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
                     <input
                       type="text"
-                      value={formatValue(formData.regularOT.rate)}
-                      onChange={(e) => handleInputChange(e, "regularOT", "rate")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      value={formData.regularHoliday.rate}
+                      onChange={(e) => handleInputChange(e, "regularHoliday", "rate")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Regular Holiday</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.regularHoliday.rate)}
-                    onChange={(e) => handleInputChange(e, "regularHoliday", "rate")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Special Holiday</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.specialHoliday.rate}
+                      onChange={(e) => handleInputChange(e, "specialHoliday", "rate")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Special Holiday</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.specialHoliday.rate)}
-                    onChange={(e) => handleInputChange(e, "specialHoliday", "rate")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Rest Day</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Rest Day</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       placeholder="Hrs"
                       value={formData.restDay.hours}
                       onChange={(e) => handleInputChange(e, "restDay", "hours")}
-                      className="w-10 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-12 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
-                    <input
-                      type="text"
-                      value={formatValue(formData.restDay.rate)}
-                      onChange={(e) => handleInputChange(e, "restDay", "rate")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.restDay.rate}
+                        onChange={(e) => handleInputChange(e, "restDay", "rate")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Night Diff</label>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Night Diff</label>
                   <div className="flex gap-1">
                     <input
                       type="text"
                       placeholder="Hrs"
                       value={formData.nightDiff.hours}
                       onChange={(e) => handleInputChange(e, "nightDiff", "hours")}
-                      className="w-10 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-12 px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
-                    <input
-                      type="text"
-                      value={formatValue(formData.nightDiff.rate)}
-                      onChange={(e) => handleInputChange(e, "nightDiff", "rate")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.nightDiff.rate}
+                        onChange={(e) => handleInputChange(e, "nightDiff", "rate")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Backwage</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.backwage.rate)}
-                    onChange={(e) => handleInputChange(e, "backwage", "rate")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Backwage</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.backwage.rate}
+                      onChange={(e) => handleInputChange(e, "backwage", "rate")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Column 3: Deductions */}
             <div>
-              <h3 className="font-medium text-sm mb-2 uppercase">Deductions</h3>
+              <h3 className="font-medium text-base mb-2 uppercase">Deductions</h3>
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">SSS</label>
-                  <div className="flex gap-1">
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">SSS</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
                     <input
                       type="text"
-                      value={`${formData.sss.percentage}%`}
-                      onChange={(e) => handleInputChange(e, "sss", "percentage")}
-                      className="w-12 px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
-                    <input
-                      type="text"
-                      value={formatValue(formData.sss.amount)}
+                      value={formData.sss.amount}
                       onChange={(e) => handleInputChange(e, "sss", "amount")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">PhilHealth</label>
-                  <div className="flex gap-1">
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">PhilHealth</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
                     <input
                       type="text"
-                      value={`${formData.philhealth.percentage}%`}
-                      onChange={(e) => handleInputChange(e, "philhealth", "percentage")}
-                      className="w-12 px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
-                    <input
-                      type="text"
-                      value={formatValue(formData.philhealth.amount)}
+                      value={formData.philhealth.amount}
                       onChange={(e) => handleInputChange(e, "philhealth", "amount")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Pag IBIG</label>
-                  <div className="flex gap-1">
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Pag IBIG</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
                     <input
                       type="text"
-                      value={`${formData.pagibig.percentage}%`}
-                      onChange={(e) => handleInputChange(e, "pagibig", "percentage")}
-                      className="w-12 px-1 py-1 text-xs border rounded bg-gray-100"
-                    />
-                    <input
-                      type="text"
-                      value={formatValue(formData.pagibig.amount)}
+                      value={formData.pagibig.amount}
                       onChange={(e) => handleInputChange(e, "pagibig", "amount")}
-                      className="flex-1 px-1 py-1 text-xs border rounded bg-gray-100"
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Late</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.late.amount)}
-                    onChange={(e) => handleInputChange(e, "late", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Late</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.late.amount}
+                      onChange={(e) => handleInputChange(e, "late", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">WTAX (S)</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.wtax.amount)}
-                    onChange={(e) => handleInputChange(e, "wtax", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">WTAX</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.wtax.amount}
+                      onChange={(e) => handleInputChange(e, "wtax", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Column 4: Additional Deductions */}
             <div>
-              <h3 className="font-medium text-sm mb-2 uppercase">Additional Deductions</h3>
+              <h3 className="font-medium text-base mb-2 uppercase">Additional Deductions</h3>
               <div className="space-y-2">
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">No Work Day</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.noWorkDay.amount)}
-                    onChange={(e) => handleInputChange(e, "noWorkDay", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">No Work Day</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.nowork.amount}
+                      onChange={(e) => handleInputChange(e, "nowork", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Loan</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.loan.amount)}
-                    onChange={(e) => handleInputChange(e, "loan", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Loan</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.loan.amount}
+                      onChange={(e) => handleInputChange(e, "loan", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Charges</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.charges.amount)}
-                    onChange={(e) => handleInputChange(e, "charges", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Charges</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.charges.amount}
+                      onChange={(e) => handleInputChange(e, "charges", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">Undertime</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.undertime.amount)}
-                    onChange={(e) => handleInputChange(e, "undertime", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Undertime</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.undertime.amount}
+                      onChange={(e) => handleInputChange(e, "undertime", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-600 mb-1 uppercase">MSFC Loan</label>
-                  <input
-                    type="text"
-                    value={formatValue(formData.msfcLoan.amount)}
-                    onChange={(e) => handleInputChange(e, "msfcLoan", "amount")}
-                    className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                  />
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">MSFC Loan</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.msfcloan.amount}
+                      onChange={(e) => handleInputChange(e, "msfcloan", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -674,34 +1424,43 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
           {/* Overall Section */}
           <div className="bg-gray-50 p-3 rounded">
-            <h3 className="font-medium text-sm mb-2 uppercase">Overall</h3>
+            <h3 className="font-medium text-base mb-2 uppercase">Overall</h3>
             <div className="grid grid-cols-3 gap-2">
               <div>
-                <label className="block text-xs text-gray-600 mb-1 uppercase">Total Gross</label>
-                <input
-                  type="text"
-                  value={formatValue(formData.totalGross)}
-                  readOnly
-                  className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                />
+                <label className="block text-sm text-gray-600 mb-1 uppercase">Total Gross</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                  <input
+                    type="text"
+                    value={formatCurrency(formData.totalGross)}
+                    readOnly
+                    className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                  />
+                </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1 uppercase">Total Deductions</label>
-                <input
-                  type="text"
-                  value={formatValue(formData.totalDeductions)}
-                  readOnly
-                  className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                />
+                <label className="block text-sm text-gray-600 mb-1 uppercase">Total Deductions</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                  <input
+                    type="text"
+                    value={formatCurrency(formData.totalDeductions)}
+                    readOnly
+                    className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                  />
+                </div>
               </div>
               <div>
-                <label className="block text-xs text-gray-600 mb-1 uppercase">Total Salary</label>
-                <input
-                  type="text"
-                  value={formatValue(formData.totalSalaryCompensation)}
-                  readOnly
-                  className="w-full px-1 py-1 text-xs border rounded bg-gray-100"
-                />
+                <label className="block text-sm text-gray-600 mb-1 uppercase">Total Salary</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                  <input
+                    type="text"
+                    value={formatCurrency(formData.totalSalaryCompensation)}
+                    readOnly
+                    className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -710,7 +1469,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           <div className="flex justify-center space-x-4 sticky bottom-0 pt-2 pb-1 bg-white">
             <button
               type="submit"
-              className="px-6 py-1 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
+              className="px-6 py-2 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
               disabled={loading}
             >
               {loading ? "Saving..." : "Save"}
@@ -718,7 +1477,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-1 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
+              className="px-6 py-2 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
               disabled={loading}
             >
               Cancel
@@ -731,4 +1490,3 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 }
 
 export default EditPayroll
-

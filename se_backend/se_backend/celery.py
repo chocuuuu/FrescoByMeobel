@@ -21,7 +21,8 @@ app.conf.broker_connection_retry_on_startup = True
 app.conf.beat_schedule = {
     "generate_salary_entries": {
         "task": "salary.tasks.generate_salary_entries",
-        "schedule": crontab(minute=0, hour="*"),  # Run every hour
+        #"schedule": crontab(minute=0, hour="*"),  # Run every hour
+         "schedule": crontab(minute="*"),
     },
     "generate_payroll_entries": {
         "task": "payroll.tasks.generate_payroll_entries",
