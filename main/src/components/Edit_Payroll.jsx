@@ -95,37 +95,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }, [employeeData, isOpen])
 
-  // Function to check if a user has a payroll record
-  const checkUserPayroll = async (userId) => {
-    try {
-      const accessToken = localStorage.getItem("access_token")
-      const headers = {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      }
-
-      // Check if this user has a payroll record
-      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/?user_id=${userId}`, { headers })
-      if (!payrollResponse.ok) throw new Error("Failed to fetch payroll data")
-      const payrollData = await payrollResponse.json()
-
-      if (payrollData.length > 0) {
-        const userPayroll = payrollData.find((record) => record.user_id === userId)
-        if (userPayroll) {
-          setPayrollId(userPayroll.id)
-          console.log("Found payroll record:", userPayroll)
-          return userPayroll
-        }
-      }
-
-      console.log("No payroll record found for user", userId)
-      return null
-    } catch (error) {
-      console.error("Error checking user payroll:", error)
-      return null
-    }
-  }
-
   // Function to check if a user has a salary record
   const checkUserSalary = async (userId) => {
     try {
@@ -141,7 +110,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const salaryData = await salaryResponse.json()
 
       if (salaryData.length > 0) {
-        const userSalary = salaryData.find((record) => record.user === userId)
+        // First try to find a record with a non-null user_id that matches our userId
+        let userSalary = salaryData.find((record) => record.user === userId && record.user_id === userId)
+
+        // If not found, fall back to any record that matches the user
+        if (!userSalary) {
+          userSalary = salaryData.find((record) => record.user === userId)
+        }
+
         if (userSalary) {
           setSalaryId(userSalary.id)
           setEarningsId(userSalary.earnings_id)
@@ -156,6 +132,39 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       return null
     } catch (error) {
       console.error("Error checking user salary:", error)
+      return null
+    }
+  }
+
+  // Function to check if a user has a payroll record
+  const checkUserPayroll = async (userId) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
+
+      // Check if this user has a payroll record
+      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/?user_id=${userId}`, { headers })
+      if (!payrollResponse.ok) throw new Error("Failed to fetch payroll data")
+      const payrollData = await payrollResponse.json()
+
+      if (payrollData.length > 0) {
+        // First try to find a record with a non-null user_id that matches our userId
+        const userPayroll = payrollData.find((record) => record.user_id === userId)
+
+        if (userPayroll) {
+          setPayrollId(userPayroll.id)
+          console.log("Found payroll record:", userPayroll)
+          return userPayroll
+        }
+      }
+
+      console.log("No payroll record found for user", userId)
+      return null
+    } catch (error) {
+      console.error("Error checking user payroll:", error)
       return null
     }
   }
@@ -868,6 +877,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       const salaryData = {
         user: userId,
+        user_id: userId, // Explicitly set user_id to prevent null values
         earnings_id: earningsId,
         deductions_id: deductionsId,
         overtime_id: overtimeId,
@@ -967,6 +977,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         total_deductions: totalDeductions.toFixed(2),
         net_pay: totalSalaryCompensation.toFixed(2),
         pay_date: new Date().toISOString().split("T")[0],
+        status: "Processing",
       }
 
       console.log("SSS ID", sssRecord.id)
