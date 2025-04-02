@@ -14,6 +14,18 @@ const formatToTwoDecimals = (value) => {
   return numValue.toFixed(2)
 }
 
+// Add this function to handle token refresh or redirect to login
+const handleTokenError = () => {
+  // Clear the expired token
+  localStorage.removeItem("access_token")
+
+  // Show an alert to the user
+  alert("Your session has expired. Please log in again.")
+
+  // Redirect to login page
+  window.location.href = "/"
+}
+
 function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const [formData, setFormData] = useState({
     // Payroll Dates
@@ -220,6 +232,25 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Total overtime data:", totalOvertimeData)
       console.log("Overtime hours data:", overtimeData)
 
+      // Fetch SSS, PhilHealth, and Pag-IBIG data
+      console.log("Fetching benefit records for user ID:", userId)
+      const [sssRecords, philhealthRecords, pagibigRecords] = await Promise.all([
+        fetch(`${API_BASE_URL}/benefits/sss/?user=${userId}`, { headers }).then((res) => (res.ok ? res.json() : [])),
+        fetch(`${API_BASE_URL}/benefits/philhealth/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+        fetch(`${API_BASE_URL}/benefits/pagibig/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+      ])
+
+      console.log("Benefit records:", { sssRecords, philhealthRecords, pagibigRecords })
+
+      // Find the benefit records for this user
+      const sssRecord = sssRecords.find((record) => record.user === Number.parseInt(userId))
+      const philhealthRecord = philhealthRecords.find((record) => record.user === Number.parseInt(userId))
+      const pagibigRecord = pagibigRecords.find((record) => record.user === Number.parseInt(userId))
+
       // Store record IDs for updates - only if they belong to this user
       if (earningsData.length > 0) {
         // Find the earnings record that belongs to this user
@@ -300,6 +331,9 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           userTotalOvertime,
           userSalary,
           employeeData,
+          sssRecord,
+          philhealthRecord,
+          pagibigRecord,
         )
         setFormData(updatedFormData)
       } else {
@@ -328,7 +362,17 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }
 
-  const createFormDataFromApi = (earnings, deductions, overtime, totalOvertime, salary, employeeData) => {
+  const createFormDataFromApi = (
+    earnings,
+    deductions,
+    overtime,
+    totalOvertime,
+    salary,
+    employeeData,
+    sssRecord,
+    philhealthRecord,
+    pagibigRecord,
+  ) => {
     // Start with default form data
     const newFormData = { ...formData }
 
@@ -391,6 +435,19 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       newFormData.restDay.rate = totalOvertime.total_restday?.toString() || newFormData.restDay.rate
       newFormData.nightDiff.rate = totalOvertime.total_nightdiff?.toString() || newFormData.nightDiff.rate
       newFormData.backwage.rate = totalOvertime.total_backwage?.toString() || newFormData.backwage.rate
+    }
+
+    // Update benefit values if available
+    if (sssRecord) {
+      newFormData.sss.amount = sssRecord.employee_share?.toString() || newFormData.sss.amount
+    }
+
+    if (philhealthRecord) {
+      newFormData.philhealth.amount = philhealthRecord.total_contribution?.toString() || newFormData.philhealth.amount
+    }
+
+    if (pagibigRecord) {
+      newFormData.pagibig.amount = pagibigRecord.employee_share?.toString() || newFormData.pagibig.amount
     }
 
     // Calculate totals
@@ -907,6 +964,13 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       onClose()
     } catch (error) {
       console.error("Error updating payroll data:", error)
+
+      // Check if this is a token error
+      if (error.message && error.message.includes("token_not_valid")) {
+        handleTokenError()
+        return
+      }
+
       setError(`Failed to update payroll data: ${error.message}`)
     } finally {
       setLoading(false)
