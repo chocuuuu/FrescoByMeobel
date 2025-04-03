@@ -5,6 +5,8 @@ from rest_framework import permissions, viewsets
 from .filters import CRUDEventFilter
 from .serializers import CRUDEventSerializer, LoginEventSerializer
 
+from shared.utils import role_required
+
 
 class CRUDEventViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = CRUDEventSerializer
@@ -12,6 +14,7 @@ class CRUDEventViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = CRUDEventFilter
 
+    @role_required(["admin", "owner"])
     def get_queryset(self):
         # Only models that should be logged
         included_models = {
