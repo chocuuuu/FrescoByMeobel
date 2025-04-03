@@ -26,10 +26,12 @@ app.conf.beat_schedule = {
     "generate_payroll_entries": {
         "task": "payroll.tasks.generate_payroll_entries",
         "schedule": crontab(minute=0, hour="*"),  # Run every hour
+        #"schedule": crontab(minute="*"),  # Run every hour
     },
     "generate_payslip_entries": {
         "task": "payslip.tasks.generate_payslip_entries",
         "schedule": crontab(minute=0, hour="*"),  # Run every hour
+        #"schedule": crontab(minute="*"),  # Run every hour
 
     },
 }
