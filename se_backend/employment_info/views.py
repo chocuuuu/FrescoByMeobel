@@ -1,9 +1,9 @@
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 
 from shared.generic_viewset import GenericViewset
-from shared.permissions import IsOwnerOrAdmin
+from shared.utils import role_required
 from users.models import CustomUser
 from admins.models import Admin
 from employees.models import Employee
@@ -12,10 +12,23 @@ from .serializers import EmploymentInfoSerializer
 
 
 class EmploymentInfoViewset(GenericViewset, viewsets.ModelViewSet):
-    permission_classes = [IsOwnerOrAdmin]
+    permission_classes = [IsAuthenticated]
     queryset = EmploymentInfo.objects.all()
     serializer_class = EmploymentInfoSerializer
 
+    @role_required(["owner", "admin", "employee"])
+    def list(self, request, *args, **kwargs):
+        """List all EmployeeInfo records with pagination. Accessible by owners, admins, and employees."""
+        return super().list(request, *args, **kwargs)
+
+    @role_required(["owner", "admin", "employee"])
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve details of a single EmploymentInfo record."""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+    @role_required(["owner", "admin"])
     def create(self, request, *args, **kwargs):
         """Create EmploymentInfo with user creation handled by the serializer."""
         serializer = self.get_serializer(data=request.data)
@@ -24,6 +37,7 @@ class EmploymentInfoViewset(GenericViewset, viewsets.ModelViewSet):
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @role_required(["owner", "admin"])
     def update(self, request, *args, **kwargs):
         """
         Update EmploymentInfo and corresponding role-based instance.
@@ -73,3 +87,15 @@ class EmploymentInfoViewset(GenericViewset, viewsets.ModelViewSet):
 
         user.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
+
+    @role_required(["owner", "admin"])
+    def partial_update(self, request, *args, **kwargs):
+        """Partially update EmployeeInfo record. Accessible by owners and admins."""
+        return self.update(request, *args, partial=True, **kwargs)
+
+    @role_required(["owner"])
+    def destroy(self, request, *args, **kwargs):
+        """Delete EmploymentInfo. Only owners can delete."""
+        instance = self.get_object()
+        self.perform_destroy(instance)
+        return Response({"detail": "Employment info deleted."}, status=status.HTTP_204_NO_CONTENT)

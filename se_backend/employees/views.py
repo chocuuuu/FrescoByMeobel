@@ -1,55 +1,55 @@
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
-from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status, viewsets
 from rest_framework.response import Response
-from rest_framework import status
 from shared.generic_viewset import GenericViewset
+from shared.utils import role_required
 from .models import Employee
 from .serializers import EmployeeSerializer
-
 
 class EmployeeViewset(GenericViewset, viewsets.ModelViewSet):
     queryset = Employee.objects.all()
     serializer_class = EmployeeSerializer
     permission_classes = [IsAuthenticated]
+    protected_views = ["create", "update", "partial_update", "retrieve", "destroy", "list"]
 
-    protected_views = ["create", "update", "partial_update", "retrieve", "destroy"]
+    @role_required(["owner", "admin", "employee"])
+    def list(self, request, *args, **kwargs):
+        """List all Employee records with pagination. Accessible by owners, admins, and employees."""
+        return super().list(request, *args, **kwargs)
 
-    def get_permissions(self):
-        if self.action in self.protected_views:
-            return [IsAdminUser()]
-        return [IsAuthenticated()]
+    @role_required(["owner", "admin", "employee"])
+    def retrieve(self, request, *args, **kwargs):
+        """Retrieve a specific Employee record. Accessible by owners, admins, and employees."""
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
 
-    # Commented out as employee creation is now handled via EmploymentInfo creation
-    # def create(self, request, *args, **kwargs):
-    #     """
-    #     Creates an Employee instance using existing user and employment_info.
-    #     """
-    #     serializer = self.get_serializer(data=request.data)
-    #     serializer.is_valid(raise_exception=True)
+    @role_required(["owner", "admin"])
+    def create(self, request, *args, **kwargs):
+        """Create Employee record. Accessible by owners and admins."""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    #     user = serializer.validated_data.pop("user_id")
-    #     employment_info = serializer.validated_data.pop("employment_info_id")
+    @role_required(["owner", "admin"])
+    def update(self, request, *args, **kwargs):
+        """Update Employee record. Accessible by owners and admins."""
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-    #     employee = Employee.objects.create(user=user, employment_info=employment_info)
+    @role_required(["owner", "admin"])
+    def partial_update(self, request, *args, **kwargs):
+        """Partially update Employee record. Accessible by owners and admins."""
+        return self.update(request, *args, partial=True, **kwargs)
 
-    #     return Response(self.get_serializer(employee).data, status=status.HTTP_201_CREATED)
-
-    # Commented out as employee updates should be managed via user and employment_info updates
-    # def update(self, request, *args, **kwargs):
-    #     """
-    #     Updates the Employee instance, allowing user and employment_info changes.
-    #     """
-    #     partial = kwargs.pop("partial", False)
-    #     instance = self.get_object()
-
-    #     serializer = self.get_serializer(instance, data=request.data, partial=partial)
-    #     serializer.is_valid(raise_exception=True)
-
-    #     if "user_id" in serializer.validated_data:
-    #         instance.user = serializer.validated_data.pop("user_id")
-    #     if "employment_info_id" in serializer.validated_data:
-    #         instance.employment_info = serializer.validated_data.pop("employment_info_id")
-
-    #     instance.save()
-
-    #     return Response(self.get_serializer(instance).data, status=status.HTTP_200_OK)
+    @role_required(["owner", "admin"])
+    def destroy(self, request, *args, **kwargs):
+        """Delete Employee record. Accessible by owners and admins."""
+        instance = self.get_object()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
