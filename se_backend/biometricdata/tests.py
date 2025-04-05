@@ -1,7 +1,7 @@
 from django.test import TestCase
 from biometricdata.models import BiometricData
+from django.utils import timezone
 from datetime import datetime
-
 
 class BiometricDataModelTestCase(TestCase):
 
@@ -9,7 +9,7 @@ class BiometricDataModelTestCase(TestCase):
         self.biometric = BiometricData.objects.create(
             emp_id=1234,
             name="Juan Dela Cruz",
-            time=datetime(2025, 4, 5, 9, 0),
+            time=timezone.make_aware(datetime(2025, 4, 5, 9, 0, 0)),
             work_code="IN",
             work_state="Present",
             terminal_name="Main Gate"
@@ -18,7 +18,8 @@ class BiometricDataModelTestCase(TestCase):
     def test_create_biometric_data(self):
         self.assertEqual(BiometricData.objects.count(), 1)
         self.assertEqual(self.biometric.name, "Juan Dela Cruz")
-        self.assertEqual(str(self.biometric), "Juan Dela Cruz - 2025-04-05 09:00:00")
+        # Include the timezone information in the expected string
+        self.assertEqual(str(self.biometric), "Juan Dela Cruz - 2025-04-05 09:00:00+00:00")
 
     def test_read_biometric_data(self):
         biometric = BiometricData.objects.get(id=self.biometric.id)
