@@ -23,20 +23,28 @@ def calculate_minutes(check_in, check_out):
     return worked_minutes
 
 
-def get_biweekly_period(date):
-    """Determine the biweekly period start date."""
-    if date.day < 15:
-        prev_month = date.month - 1 if date.month > 1 else 12
-        prev_year = date.year if date.month > 1 else date.year - 1
-        last_day_prev_month = (date.replace(day=1) - timedelta(days=1)).day
-        return date.replace(month=prev_month, year=prev_year, day=last_day_prev_month)
-    else:
-        return date.replace(day=15)
+def get_biweekly_period(date, user):
+    """Determine the biweekly period using payroll_period_start and payroll_period_end from the schedule."""
+    schedule = Schedule.objects.filter(user_id=user).order_by('-id').first()
+
+    if not schedule or not schedule.payroll_period_start or not schedule.payroll_period_end:
+        logger.warning(f"[get_biweekly_period] No schedule or payroll period for User: {user}")
+        return None
+
+    start_date = schedule.payroll_period_start
+    end_date = schedule.payroll_period_end
+
+    # Check if the provided date falls within this range
+    if start_date <= date <= end_date:
+        return start_date
+
+    # If the date doesn't fall within the range, return the closest start date.
+    return start_date if date < start_date else end_date
 
 
 def get_shift_details(user, date):
     """Retrieve shift details for the given user and date."""
-    biweekly_start = get_biweekly_period(date)
+    biweekly_start = get_biweekly_period(date, user)
 
     logger.debug(f"[get_shift_details] Searching for Schedule with User ID: {user}, Biweekly Start: {biweekly_start}")
 
@@ -73,7 +81,7 @@ def generate_attendance_summary(sender, instance, **kwargs):
         logger.warning(f"[generate_attendance_summary] Skipping invalid attendance for User: {user}, Date: {date}")
         return
 
-    biweekly_start = get_biweekly_period(date)
+    biweekly_start = get_biweekly_period(date, user)
     shift = get_shift_details(user, date)
 
     if not shift:
