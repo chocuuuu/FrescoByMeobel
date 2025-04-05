@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import NavBar from "../components/Nav_Bar.jsx"
 import { API_BASE_URL } from "../config/api"
 
 function AdminEmployeeAttendancePage() {
+  const navigate = useNavigate()
+
   // Calculate biweekly date range (today to 14 days from today)
   const today = new Date()
   const twoWeeksLater = new Date(today)
@@ -18,11 +21,7 @@ function AdminEmployeeAttendancePage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const recordsPerPage = 7
-  const [showScheduleModal, setShowScheduleModal] = useState(false)
-  const [selectedEmployeeSchedule, setSelectedEmployeeSchedule] = useState(null)
-  const [selectedEmployeeName, setSelectedEmployeeName] = useState("")
   const [deleteLoading, setDeleteLoading] = useState(false)
-  const [scheduleLoading, setScheduleLoading] = useState(false)
 
   // Fetch employees for the dropdown
   useEffect(() => {
@@ -228,71 +227,16 @@ function AdminEmployeeAttendancePage() {
     }
   }
 
-  // Handle view employee schedule
-  const handleViewSchedule = async (employeeId, employeeName) => {
-    setScheduleLoading(true)
-    setSelectedEmployeeName(employeeName)
-
-    try {
-      const accessToken = localStorage.getItem("access_token")
-      const response = await fetch(`${API_BASE_URL}/schedule/?employment_info=${employeeId}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch employee schedule: ${response.status} ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      console.log("Employee schedule fetched:", data)
-
-      setSelectedEmployeeSchedule(data)
-      setShowScheduleModal(true)
-    } catch (error) {
-      console.error("Error fetching employee schedule:", error)
-      alert(`Failed to fetch employee schedule: ${error.message}`)
-    } finally {
-      setScheduleLoading(false)
-    }
-  }
-
-  // Format schedule data for display
-  const formatScheduleData = (scheduleData) => {
-    if (!scheduleData || scheduleData.length === 0) {
-      return <p className="text-gray-500">No schedule data available for this employee.</p>
+  // Handle view employee schedule - navigate to Edit_Schedule_Page
+  const handleViewSchedule = (employeeId) => {
+    if (!employeeId) {
+      alert("Cannot view schedule: Employee ID not found")
+      return
     }
 
-    return (
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Day</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Start Time
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                End Time
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shift</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {scheduleData.map((schedule) => (
-              <tr key={schedule.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{schedule.day_of_week}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatTime(schedule.start_time)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatTime(schedule.end_time)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{schedule.shift?.name || "N/A"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )
+    // Navigate to the Edit_Schedule_Page with the employee ID
+    // This should match the route parameter expected in the router configuration
+    navigate(`/attendance/schedule/${employeeId}`)
   }
 
   const filteredAttendanceData = attendanceData.filter(
@@ -385,8 +329,8 @@ function AdminEmployeeAttendancePage() {
                       <td className="py-3 px-4">
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => handleViewSchedule(record.employment_info_id, record.employee_name)}
-                            disabled={scheduleLoading || !record.employment_info_id}
+                            onClick={() => handleViewSchedule(record.employment_info_id)}
+                            disabled={!record.employment_info_id}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-sm"
                           >
                             Schedule
@@ -448,45 +392,6 @@ function AdminEmployeeAttendancePage() {
           </div>
         </div>
       </div>
-
-      {/* Schedule Modal */}
-      {showScheduleModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-semibold text-gray-800">Schedule for {selectedEmployeeName}</h3>
-              <button onClick={() => setShowScheduleModal(false)} className="text-gray-500 hover:text-gray-700">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {scheduleLoading ? (
-              <div className="flex justify-center items-center h-40">
-                <p>Loading schedule data...</p>
-              </div>
-            ) : (
-              formatScheduleData(selectedEmployeeSchedule)
-            )}
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowScheduleModal(false)}
-                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
