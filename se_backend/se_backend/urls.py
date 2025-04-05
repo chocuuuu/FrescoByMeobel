@@ -31,6 +31,7 @@ urlpatterns = [
     path(f"{api_prefix}payslip/", include("payslip.urls")),
     path(f"{api_prefix}benefits/", include("benefits.urls")),
     path(f"{api_prefix}activity-log/", include("activity_log.urls")),
+    path(f"{api_prefix}total-payroll/", include("totalpayroll.urls")),
 ]
 
 
