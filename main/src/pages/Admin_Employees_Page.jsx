@@ -7,6 +7,7 @@ import EditEmployee from "../components/Edit_Employee"
 import DeleteEmployee from "../components/Delete_Employee"
 import { API_BASE_URL } from "../config/api"
 import { useNavigate } from "react-router-dom"
+import { UserPlus } from 'lucide-react';
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -347,7 +348,6 @@ function AdminEmployeePage() {
                       {activeTab === "active" && (
                         <td className="py-3 px-4 whitespace-nowrap">
                           <div className="flex space-x-2">
-                            
                             <button
                               onClick={() => handleEditClick(employee)}
                               className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors text-md md:text-lg"
@@ -388,8 +388,9 @@ function AdminEmployeePage() {
             {activeTab === "active" && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="bg-[#5C7346] text-white px-6 py-2 rounded-md hover:bg-[#4a5c38] transition-colors font-medium w-full md:w-auto"
+                className="bg-[#5C7346] text-white px-6 py-2 rounded-md hover:bg-[#4a5c38] transition-colors font-medium w-full md:w-auto flex"
               >
+                <UserPlus className="w-6 h-6 whitespace-nowrap mr-2" />
                 Add Account
               </button>
             )}
