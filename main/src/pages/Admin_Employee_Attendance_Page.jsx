@@ -196,7 +196,7 @@ function AdminEmployeeAttendancePage() {
   }
 
   // Handle delete attendance record
-  const handleDeleteAttendance = async (attendanceId) => {
+  const handleDeleteAttendance = async (attendanceId, userId, date, checkInTime, checkOutTime) => {
     if (!window.confirm("Are you sure you want to delete this attendance record?")) {
       return
     }
@@ -204,7 +204,68 @@ function AdminEmployeeAttendancePage() {
     setDeleteLoading(true)
     try {
       const accessToken = localStorage.getItem("access_token")
-      const response = await fetch(`${API_BASE_URL}/attendance/${attendanceId}/`, {
+
+      // 1. First, fetch biometric data to find matching records
+      const bioResponse = await fetch(`${API_BASE_URL}/biometricdata/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!bioResponse.ok) {
+        throw new Error(`Failed to fetch biometric data: ${bioResponse.status} ${bioResponse.statusText}`)
+      }
+
+      const bioData = await bioResponse.json()
+      console.log("Fetched biometric data:", bioData)
+
+      // 2. Filter biometric records that match this attendance record
+      // Convert attendance date to YYYY-MM-DD format for comparison
+      const attendanceDate = new Date(date).toISOString().split("T")[0]
+
+      const matchingBioRecords = bioData.filter((record) => {
+        // Match by employee ID
+        const empIdMatch = record.emp_id === userId
+
+        // Match by date (compare only the date part of the timestamp)
+        const bioDate = new Date(record.time).toISOString().split("T")[0]
+        const dateMatch = bioDate === attendanceDate
+
+        // Match by time (either check-in or check-out)
+        // Extract just the time part for comparison (HH:MM:SS)
+        const bioTime = new Date(record.time).toISOString().split("T")[1].substring(0, 8)
+        const checkInMatch = bioTime === checkInTime
+        const checkOutMatch = bioTime === checkOutTime
+
+        return empIdMatch && dateMatch && (checkInMatch || checkOutMatch)
+      })
+
+      console.log("Matching biometric records to delete:", matchingBioRecords)
+
+      // 3. Delete each matching biometric record
+      const bioDeletionPromises = matchingBioRecords.map((record) =>
+        fetch(`${API_BASE_URL}/biometricdata/${record.id}/`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }),
+      )
+
+      // Wait for all biometric deletions to complete
+      const bioResults = await Promise.allSettled(bioDeletionPromises)
+      console.log("Biometric deletion results:", bioResults)
+
+      // Check if any biometric deletions failed
+      const failedBioDeletions = bioResults.filter((result) => result.status === "rejected")
+      if (failedBioDeletions.length > 0) {
+        console.warn(`${failedBioDeletions.length} biometric records failed to delete`)
+      }
+
+      // 4. Delete the attendance record
+      const attendanceResponse = await fetch(`${API_BASE_URL}/attendance/${attendanceId}/`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -212,16 +273,18 @@ function AdminEmployeeAttendancePage() {
         },
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to delete attendance record: ${response.status} ${response.statusText}`)
+      if (!attendanceResponse.ok) {
+        throw new Error(
+          `Failed to delete attendance record: ${attendanceResponse.status} ${attendanceResponse.statusText}`,
+        )
       }
 
-      // Remove the deleted record from the state
+      // 5. Remove the deleted record from the state
       setRawAttendanceData((prevData) => prevData.filter((record) => record.id !== attendanceId))
-      alert("Attendance record deleted successfully")
+      alert("Attendance record and associated biometric data deleted successfully")
     } catch (error) {
-      console.error("Error deleting attendance record:", error)
-      alert(`Failed to delete attendance record: ${error.message}`)
+      console.error("Error deleting records:", error)
+      alert(`Failed to delete records: ${error.message}`)
     } finally {
       setDeleteLoading(false)
     }
@@ -236,7 +299,7 @@ function AdminEmployeeAttendancePage() {
 
     // Navigate to the Edit_Schedule_Page with the employee ID
     // This should match the route parameter expected in the router configuration
-    navigate(`/attendance/schedule/${employeeId}`)
+    navigate(`/admin/employee/schedule/${employeeId}`)
   }
 
   const filteredAttendanceData = attendanceData.filter(
@@ -331,12 +394,20 @@ function AdminEmployeeAttendancePage() {
                           <button
                             onClick={() => handleViewSchedule(record.employment_info_id)}
                             disabled={!record.employment_info_id}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg" 
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
                           >
                             Schedule
                           </button>
                           <button
-                            onClick={() => handleDeleteAttendance(record.id)}
+                            onClick={() =>
+                              handleDeleteAttendance(
+                                record.id,
+                                record.user,
+                                record.date,
+                                record.check_in_time,
+                                record.check_out_time,
+                              )
+                            }
                             disabled={deleteLoading}
                             className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
                           >
