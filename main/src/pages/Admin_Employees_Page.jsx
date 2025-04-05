@@ -134,6 +134,12 @@ function AdminEmployeePage() {
     return matchesSearch && matchesTab && (activeTab === "inactive" || (matchesYear && matchesRole))
   })
 
+  // After the filteredEmployees definition, add a sorting step:
+  const sortedFilteredEmployees = [...filteredEmployees].sort((a, b) => {
+    // Sort by ID in descending order (newer employees first)
+    return b.id - a.id
+  })
+
   // Get unique years and roles for filters
   const years = [...new Set(employees.map((e) => getYearFromDate(e.hire_date)))]
     .filter((year) => year !== "-")
@@ -141,7 +147,7 @@ function AdminEmployeePage() {
   const roles = ["owner", "admin", "employee"]
 
   // Pagination logic
-  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / employeesPerPage))
+  const totalPages = Math.max(1, Math.ceil(sortedFilteredEmployees.length / employeesPerPage))
   // Ensure current page is within valid range
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
   if (currentPage !== validCurrentPage) {
@@ -150,7 +156,7 @@ function AdminEmployeePage() {
 
   const indexOfLastEmployee = validCurrentPage * employeesPerPage
   const indexOfFirstEmployee = indexOfLastEmployee - employeesPerPage
-  const currentEmployees = filteredEmployees.slice(indexOfFirstEmployee, indexOfLastEmployee)
+  const currentEmployees = sortedFilteredEmployees.slice(indexOfFirstEmployee, indexOfLastEmployee)
 
   const nextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
