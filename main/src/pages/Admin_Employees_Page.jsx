@@ -347,12 +347,7 @@ function AdminEmployeePage() {
                       {activeTab === "active" && (
                         <td className="py-3 px-4 whitespace-nowrap">
                           <div className="flex space-x-2">
-                            <button
-                              onClick={() => handleDeleteClick(employee)}
-                              className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-md md:text-lg"
-                            >
-                              Delete
-                            </button>
+                            
                             <button
                               onClick={() => handleEditClick(employee)}
                               className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors text-md md:text-lg"
@@ -364,6 +359,12 @@ function AdminEmployeePage() {
                               className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition-colors text-md md:text-lg"
                             >
                               Schedule
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClick(employee)}
+                              className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-md md:text-lg"
+                            >
+                              Delete
                             </button>
                           </div>
                         </td>

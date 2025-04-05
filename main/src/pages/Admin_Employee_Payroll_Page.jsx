@@ -532,11 +532,11 @@ function AdminEmployeePayrollPage() {
               <thead>
                 <tr className="text-left text-white border-b border-white/20">
                   <th className="py-3 px-4 w-[10%]">ID</th>
-                  <th className="py-3 px-4 w-[30%]">NAME</th>
+                  <th className="py-3 px-4 w-[20%]">NAME</th>
                   <th className="py-3 px-4 w-[15%]">POSITION</th>
                   <th className="py-3 px-4 w-[12%]">GROSS SALARY</th>
                   <th className="py-3 px-4 w-[12%]">NET SALARY</th>
-                  <th className="py-3 px-4 w-[10%]">STATUS</th>
+                  <th className="py-3 px-4 w-[12%]">STATUS</th>
                   <th className="py-3 px-4 w-[15%]">ACTIONS</th>
                 </tr>
               </thead>
