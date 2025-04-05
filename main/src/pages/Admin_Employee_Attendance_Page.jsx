@@ -290,18 +290,6 @@ function AdminEmployeeAttendancePage() {
     }
   }
 
-  // Handle view employee schedule - navigate to Edit_Schedule_Page
-  const handleViewSchedule = (employeeId) => {
-    if (!employeeId) {
-      alert("Cannot view schedule: Employee ID not found")
-      return
-    }
-
-    // Navigate to the Edit_Schedule_Page with the employee ID
-    // This should match the route parameter expected in the router configuration
-    navigate(`/admin/employee/schedule/${employeeId}`)
-  }
-
   const filteredAttendanceData = attendanceData.filter(
     (record) =>
       record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -365,12 +353,12 @@ function AdminEmployeeAttendancePage() {
               <thead>
                 <tr className="text-left text-white border-b border-white/20">
                   <th className="py-3 px-4 w-[10%]">DATE</th>
-                  <th className="py-3 px-4 w-[12%]">EMPLOYEE ID</th>
-                  <th className="py-3 px-4 w-[25%]">NAME</th>
+                  <th className="py-3 px-4 w-[10%]">EMPLOYEE ID</th>
+                  <th className="py-3 px-4 w-[30%]">NAME</th>
                   <th className="py-3 px-4 w-[12%]">TIME IN</th>
                   <th className="py-3 px-4 w-[12%]">TIME OUT</th>
                   <th className="py-3 px-4 w-[12%]">STATUS</th>
-                  <th className="py-3 px-4 w-[17%]">ACTIONS</th>
+                  <th className="py-3 px-4 w-[15%]">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="text-white">
@@ -391,13 +379,6 @@ function AdminEmployeeAttendancePage() {
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleViewSchedule(record.employment_info_id)}
-                            disabled={!record.employment_info_id}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
-                          >
-                            Schedule
-                          </button>
                           <button
                             onClick={() =>
                               handleDeleteAttendance(

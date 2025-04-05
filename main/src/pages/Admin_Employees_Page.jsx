@@ -6,6 +6,7 @@ import AddEmployee from "../components/Add_Employee"
 import EditEmployee from "../components/Edit_Employee"
 import DeleteEmployee from "../components/Delete_Employee"
 import { API_BASE_URL } from "../config/api"
+import { useNavigate } from "react-router-dom"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -22,6 +23,8 @@ function AdminEmployeePage() {
   const [employeeToEdit, setEmployeeToEdit] = useState(null)
   const [employeeToDelete, setEmployeeToDelete] = useState(null)
   const employeesPerPage = 5
+
+  const navigate = useNavigate()
 
   const fetchEmployees = async () => {
     setLoading(true)
@@ -202,6 +205,14 @@ function AdminEmployeePage() {
     }
   }
 
+  const handleViewSchedule = (employeeId) => {
+    if (!employeeId) {
+      alert("Cannot view schedule: Employee ID not found")
+      return
+    }
+    navigate(`/employee/schedule/${employeeId}`)
+  }
+
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>
   if (error) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">{error}</div>
 
@@ -283,9 +294,9 @@ function AdminEmployeePage() {
                 <thead>
                   <tr className="text-left text-white border-b border-white/20">
                     <th className="py-3 px-4 w-[10%]">ID</th>
-                    <th className="py-3 px-4 w-[30%]">NAME</th>
-                    <th className="py-3 px-4 w-[20%]">POSITION</th>
-                    <th className="py-3 px-4 w-[15%]">YEAR EMPLOYED</th>
+                    <th className="py-3 px-4 w-[20%]">NAME</th>
+                    <th className="py-3 px-4 w-[10%]">POSITION</th>
+                    <th className="py-3 px-4 w-[10%]">YEAR EMPLOYED</th>
                     {activeTab === "inactive" && <th className="py-3 px-4 w-[15%]">YEAR RESIGNED</th>}
                     {activeTab === "active" && <th className="py-3 px-4 w-[10%]">STATUS</th>}
                     {activeTab === "active" && <th className="py-3 px-4 w-[15%]">ACTIONS</th>}
@@ -337,18 +348,23 @@ function AdminEmployeePage() {
                         <td className="py-3 px-4 whitespace-nowrap">
                           <div className="flex space-x-2">
                             <button
+                              onClick={() => handleDeleteClick(employee)}
+                              className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-md md:text-lg"
+                            >
+                              Delete
+                            </button>
+                            <button
                               onClick={() => handleEditClick(employee)}
                               className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors text-md md:text-lg"
                             >
                               Edit
                             </button>
                             <button
-                              onClick={() => handleDeleteClick(employee)}
-                              className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-md md:text-lg"
+                              onClick={() => handleViewSchedule(employee.id)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition-colors text-md md:text-lg"
                             >
-                              Delete
+                              Schedule
                             </button>
-                            
                           </div>
                         </td>
                       )}
