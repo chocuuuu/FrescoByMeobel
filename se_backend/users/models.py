@@ -42,8 +42,8 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     objects = CustomUserManager()
 
-    USERNAME_FIELD = "id"  # Users will log in using 'id'
-    REQUIRED_FIELDS = ["email", "role"]  # Superuser creation requires `email` and `role`
+    USERNAME_FIELD = "id"
+    REQUIRED_FIELDS = ["email"]
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
