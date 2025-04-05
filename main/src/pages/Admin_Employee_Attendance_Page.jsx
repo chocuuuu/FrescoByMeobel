@@ -331,14 +331,14 @@ function AdminEmployeeAttendancePage() {
                           <button
                             onClick={() => handleViewSchedule(record.employment_info_id)}
                             disabled={!record.employment_info_id}
-                            className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-sm"
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg" 
                           >
                             Schedule
                           </button>
                           <button
                             onClick={() => handleDeleteAttendance(record.id)}
                             disabled={deleteLoading}
-                            className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-sm"
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
                           >
                             Delete
                           </button>

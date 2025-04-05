@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import NavBar from "../components/Nav_Bar";
-import { ArrowLeft, User2, Calendar, Clock, CheckSquare } from "lucide-react";
+import { ArrowLeft, ArrowRight, User2, Calendar, Clock, CheckSquare } from "lucide-react";
 import dayjs from "dayjs";
 import { API_BASE_URL } from "../config/api";
 
@@ -1646,7 +1646,7 @@ The calendar has been updated to show the scheduled days.`);
                     className="bg-[#3A4D2B] text-white px-3 py-1 rounded-md hover:bg-[#2a3b1d] mr-2"
                     onClick={() => handleMonthChange("prev")}
                   >
-                    &lt;
+                    <ArrowLeft className="w-5 h-7"></ArrowLeft>
                   </button>
                   <h2 className="text-white text-4xl font-bold p-2">
                     {currentDate.format("MMMM YYYY")}
@@ -1655,7 +1655,7 @@ The calendar has been updated to show the scheduled days.`);
                     className="bg-[#3A4D2B] text-white px-3 py-1 rounded-md hover:bg-[#2a3b1d] ml-2"
                     onClick={() => handleMonthChange("next")}
                   >
-                    &gt;
+                    <ArrowRight className="w-5 h-7"></ArrowRight>
                   </button>
                 </div>
                 <div className="w-20"></div> {/* Spacer for alignment */}
@@ -1695,7 +1695,8 @@ The calendar has been updated to show the scheduled days.`);
                         day
                       )} rounded-lg h-20 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90 relative p-2 sm:p-3 md:p-4
                       ${
-                        day.date.format("YYYY-MM-DD") === currentDate.format("YYYY-MM-DD")
+                        day.date.format("YYYY-MM-DD") ===
+                        currentDate.format("YYYY-MM-DD")
                           ? "ring-4 ring-blue-500 font-bold shadow-lg"
                           : ""
                       }`}
