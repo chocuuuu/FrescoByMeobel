@@ -1,7 +1,7 @@
 from django.test import TestCase
 from users.models import CustomUser
 from employment_info.models import EmploymentInfo
-from employee.models import Employee
+from employees.models import Employee
 
 
 class EmployeeModelTestCase(TestCase):
@@ -43,9 +43,14 @@ class EmployeeModelTestCase(TestCase):
         self.assertEqual(employee.employment_info.first_name, "John")
 
     def test_update_employee(self):
+        # Update the email of the linked user
         self.employee.user.email = "new_email@example.com"
-        self.employee.save()
+        self.employee.user.save()  # Save the user instance explicitly
+
+        # Now fetch the updated employee
         updated_employee = Employee.objects.get(id=self.employee.id)
+
+        # Check if the email is updated
         self.assertEqual(updated_employee.user.email, "new_email@example.com")
 
     def test_delete_employee(self):
