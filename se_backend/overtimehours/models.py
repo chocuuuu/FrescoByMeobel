@@ -17,4 +17,4 @@ class OvertimeHours(models.Model):
     biweek_start = models.DateField(null=True, blank=True)
 
     def __str__(self):
-        return f"{self.id} - {self.otbase if self.otbase else 'No OT Base'}"
+        return f"{self.id} - {self.user} - {self.biweek_start}"
