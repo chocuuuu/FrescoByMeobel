@@ -100,6 +100,7 @@ INSTALLED_APPS = [
     "payslip",
     "benefits",
     "activity_log",
+    "totalpayroll",
 
 ]
 
