@@ -1,6 +1,6 @@
 from django.test import TestCase
 from users.models import CustomUser
-from deductions.models import SSS, Philhealth, Pagibig
+from benefits.models import SSS, Philhealth, Pagibig
 from decimal import Decimal
 
 
