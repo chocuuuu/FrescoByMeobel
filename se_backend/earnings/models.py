@@ -6,7 +6,6 @@ from users.models import CustomUser
 class Earnings(models.Model):
     id = models.AutoField(primary_key=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, null=True)
-    #attendancesummary_id = models.ForeignKey(AttendanceSummary, on_delete=models.CASCADE, null=True)
     basic_rate = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     basic = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
     allowance = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
