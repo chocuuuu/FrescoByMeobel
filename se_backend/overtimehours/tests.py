@@ -2,23 +2,36 @@ from django.test import TestCase
 from users.models import CustomUser
 from attendance_summary.models import AttendanceSummary
 from .models import OvertimeHours
-from datetime import date
+from datetime import date, time
+from attendance.models import Attendance
 
 
 class OvertimeHoursModelTestCase(TestCase):
 
     def setUp(self):
-        # Creating test instances for CustomUser and AttendanceSummary
+        # Creating test instances for CustomUser
         self.user = CustomUser.objects.create_user(
             email="testuser@example.com", password="password", role="employee"
         )
+
+        # Creating an Attendance instance
+        self.attendance = Attendance.objects.create(
+            user=self.user,
+            date=date.today(),
+            status="Present",
+            check_in_time=time(9, 0),
+            check_out_time=time(17, 0)
+        )
+
+        # Creating an AttendanceSummary instance and linking it to the Attendance instance
         self.attendance_summary = AttendanceSummary.objects.create(
             user_id=self.user,
             date=date.today(),
             actual_hours=40,
             overtime_hours=5,
             late_minutes=15,
-            undertime=0
+            undertime=0,
+            attendance_id=self.attendance  # linking the Attendance instance
         )
 
         # Creating an OvertimeHours instance
@@ -37,7 +50,10 @@ class OvertimeHoursModelTestCase(TestCase):
         )
 
     def test_create_overtime_hours(self):
+        # Ensure only 1 OvertimeHours object exists
         self.assertEqual(OvertimeHours.objects.count(), 1)
+
+        # Verify that the correct overtime hours were created
         self.assertEqual(self.overtime_hours.regularot, 2)
         self.assertEqual(self.overtime_hours.nightdiff, 1)
         self.assertEqual(str(self.overtime_hours), f"{self.overtime_hours.id} - {self.user} - {self.overtime_hours.biweek_start}")
@@ -55,4 +71,7 @@ class OvertimeHoursModelTestCase(TestCase):
 
     def test_delete_overtime_hours(self):
         self.overtime_hours.delete()
+        self.assertEqual(OvertimeHours.objects.count(), 0)
+
+        # Make sure no extra OvertimeHours were created
         self.assertEqual(OvertimeHours.objects.count(), 0)
