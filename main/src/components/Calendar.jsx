@@ -92,7 +92,7 @@ export default function Calendar({
               },
             },
             actionBar: {
-              actions: ["today", "cancel"],
+              actions: ["today", "accept", "cancel"],
               sx: {
                 "& .MuiButton-root": {
                   color: "#5C7346",
@@ -133,7 +133,7 @@ export default function Calendar({
           }}
           componentsProps={{
             actionBar: {
-              actions: ["today", "cancel"],
+              actions: ["today", "accept", "cancel"],
             },
           }}
         />
