@@ -381,6 +381,7 @@ function AdminEmployeePayrollPage() {
         totalSalaryCompensation,
       })
 
+      // Update the payroll data in the state directly
       const updatedPayrollData = payrollData.map((emp) => {
         if (emp.id === selectedEmployee.id) {
           return {
@@ -397,11 +398,6 @@ function AdminEmployeePayrollPage() {
       setPayrollData(updatedPayrollData)
       setIsEditModalOpen(false)
       setSelectedEmployee(null)
-
-      // Refresh data from server after a short delay to ensure changes are saved
-      setTimeout(() => {
-        fetchPayrollData()
-      }, 2000)
     }
   }
 
@@ -410,10 +406,8 @@ function AdminEmployeePayrollPage() {
     console.log("Updating payroll periods:", updatedPeriods)
     setPayrollPeriods(updatedPeriods)
 
-    // Refresh data after a short delay to get the updated periods
-    setTimeout(() => {
-      fetchPayrollData()
-    }, 1000)
+    // No need to refresh the entire page, just fetch the data again
+    fetchPayrollData()
   }
 
   // Filter payroll data based on search term, year, and role
@@ -502,15 +496,6 @@ function AdminEmployeePayrollPage() {
               >
                 Set Payroll Periods
               </button>
-              <button
-                onClick={() => {
-                  // Refresh payroll data
-                  fetchPayrollData()
-                }}
-                className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
-              >
-                Refresh Payroll
-              </button>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="search"
@@ -581,7 +566,7 @@ function AdminEmployeePayrollPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex space-x-2">
+                        <div className="flex space-x-2 whitespace-nowrap">
                           <button
                             onClick={() => handleEditPayroll(record.id)}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"

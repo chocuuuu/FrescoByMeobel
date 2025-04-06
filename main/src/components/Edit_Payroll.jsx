@@ -1058,13 +1058,13 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       <input
                         type="text"
                         value={formData.payrollPeriodStart}
-                        onChange={(e) => handleInputChange(e, "payrollPeriodStart")}
+                        readOnly
                         className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                       />
                       <input
                         type="text"
                         value={formData.payrollPeriodEnd}
-                        onChange={(e) => handleInputChange(e, "payrollPeriodEnd")}
+                        readOnly
                         className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                       />
                     </div>
@@ -1074,7 +1074,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     <input
                       type="text"
                       value={formData.payDate}
-                      onChange={(e) => handleInputChange(e, "payDate")}
+                      readOnly
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>

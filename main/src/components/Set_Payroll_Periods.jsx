@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { API_BASE_URL } from "../config/api"
+import Calendar from "./Calendar"
 
 function SetPayrollPeriods({ isOpen, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
@@ -13,13 +14,24 @@ function SetPayrollPeriods({ isOpen, onClose, onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
+  const [showCalendar, setShowCalendar] = useState(null) // 'start', 'end', or 'pay'
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prevData) => ({
-      ...prevData,
-      [name]: value,
-    }))
+  const handleDateSelect = (date) => {
+    // Format date as MM/DD/YY
+    const formattedDate = `${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")}/${date.getFullYear().toString().slice(2)}`
+
+    // Format full date for pay date as MM/DD/YYYY
+    const formattedFullDate = `${(date.getMonth() + 1).toString().padStart(2, "0")}/${date.getDate().toString().padStart(2, "0")}/${date.getFullYear()}`
+
+    if (showCalendar === "start") {
+      setFormData((prev) => ({ ...prev, payrollPeriodStart: formattedDate }))
+    } else if (showCalendar === "end") {
+      setFormData((prev) => ({ ...prev, payrollPeriodEnd: formattedDate }))
+    } else if (showCalendar === "pay") {
+      setFormData((prev) => ({ ...prev, payDate: formattedFullDate }))
+    }
+
+    setShowCalendar(null) // Close calendar after selection
   }
 
   const handleSubmit = async (e) => {
@@ -55,6 +67,7 @@ function SetPayrollPeriods({ isOpen, onClose, onSuccess }) {
       }
 
       // Send request to update all schedules with the new payroll periods
+      // Fix the API endpoint to use the correct path
       const response = await fetch(`${API_BASE_URL}/schedule/update-payroll-periods/`, {
         method: "POST",
         headers: {
@@ -115,41 +128,62 @@ function SetPayrollPeriods({ isOpen, onClose, onSuccess }) {
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Payroll Period Start (MM/DD/YY)</label>
-            <input
-              type="text"
-              name="payrollPeriodStart"
-              value={formData.payrollPeriodStart}
-              onChange={handleInputChange}
-              placeholder="10/26/24"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
-              required
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={formData.payrollPeriodStart}
+                onClick={() => setShowCalendar("start")}
+                readOnly
+                placeholder="Click to select date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346] cursor-pointer"
+                required
+              />
+              {showCalendar === "start" && (
+                <div className="absolute z-10 mt-1 bg-white shadow-lg rounded-md">
+                  <Calendar onSelectDate={handleDateSelect} />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-1">Payroll Period End (MM/DD/YY)</label>
-            <input
-              type="text"
-              name="payrollPeriodEnd"
-              value={formData.payrollPeriodEnd}
-              onChange={handleInputChange}
-              placeholder="11/10/24"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
-              required
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={formData.payrollPeriodEnd}
+                onClick={() => setShowCalendar("end")}
+                readOnly
+                placeholder="Click to select date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346] cursor-pointer"
+                required
+              />
+              {showCalendar === "end" && (
+                <div className="absolute z-10 mt-1 bg-white shadow-lg rounded-md">
+                  <Calendar onSelectDate={handleDateSelect} />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-1">Pay Date (MM/DD/YYYY)</label>
-            <input
-              type="text"
-              name="payDate"
-              value={formData.payDate}
-              onChange={handleInputChange}
-              placeholder="11/15/2024"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346]"
-              required
-            />
+            <div className="relative">
+              <input
+                type="text"
+                value={formData.payDate}
+                onClick={() => setShowCalendar("pay")}
+                readOnly
+                placeholder="Click to select date"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#5C7346] cursor-pointer"
+                required
+              />
+              {showCalendar === "pay" && (
+                <div className="absolute z-10 mt-1 bg-white shadow-lg rounded-md">
+                  <Calendar onSelectDate={handleDateSelect} />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex justify-end space-x-3">
