@@ -6,6 +6,7 @@ import AddEmployee from "../components/Add_Employee"
 import EditEmployee from "../components/Edit_Employee"
 import DeleteEmployee from "../components/Delete_Employee"
 import { API_BASE_URL } from "../config/api"
+import { useNavigate } from "react-router-dom"
 
 function AdminEmployeePage() {
   const [employees, setEmployees] = useState([])
@@ -22,6 +23,8 @@ function AdminEmployeePage() {
   const [employeeToEdit, setEmployeeToEdit] = useState(null)
   const [employeeToDelete, setEmployeeToDelete] = useState(null)
   const employeesPerPage = 5
+
+  const navigate = useNavigate()
 
   const fetchEmployees = async () => {
     setLoading(true)
@@ -134,6 +137,12 @@ function AdminEmployeePage() {
     return matchesSearch && matchesTab && (activeTab === "inactive" || (matchesYear && matchesRole))
   })
 
+  // After the filteredEmployees definition, add a sorting step:
+  const sortedFilteredEmployees = [...filteredEmployees].sort((a, b) => {
+    // Sort by ID in descending order (newer employees first)
+    return b.id - a.id
+  })
+
   // Get unique years and roles for filters
   const years = [...new Set(employees.map((e) => getYearFromDate(e.hire_date)))]
     .filter((year) => year !== "-")
@@ -141,7 +150,7 @@ function AdminEmployeePage() {
   const roles = ["owner", "admin", "employee"]
 
   // Pagination logic
-  const totalPages = Math.max(1, Math.ceil(filteredEmployees.length / employeesPerPage))
+  const totalPages = Math.max(1, Math.ceil(sortedFilteredEmployees.length / employeesPerPage))
   // Ensure current page is within valid range
   const validCurrentPage = Math.min(Math.max(1, currentPage), totalPages)
   if (currentPage !== validCurrentPage) {
@@ -150,7 +159,7 @@ function AdminEmployeePage() {
 
   const indexOfLastEmployee = validCurrentPage * employeesPerPage
   const indexOfFirstEmployee = indexOfLastEmployee - employeesPerPage
-  const currentEmployees = filteredEmployees.slice(indexOfFirstEmployee, indexOfLastEmployee)
+  const currentEmployees = sortedFilteredEmployees.slice(indexOfFirstEmployee, indexOfLastEmployee)
 
   const nextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
@@ -194,6 +203,14 @@ function AdminEmployeePage() {
       setIsDeleteModalOpen(false)
       setEmployeeToDelete(null)
     }
+  }
+
+  const handleViewSchedule = (employeeId) => {
+    if (!employeeId) {
+      alert("Cannot view schedule: Employee ID not found")
+      return
+    }
+    navigate(`/employee/schedule/${employeeId}`)
   }
 
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>
@@ -277,9 +294,9 @@ function AdminEmployeePage() {
                 <thead>
                   <tr className="text-left text-white border-b border-white/20">
                     <th className="py-3 px-4 w-[10%]">ID</th>
-                    <th className="py-3 px-4 w-[30%]">NAME</th>
-                    <th className="py-3 px-4 w-[20%]">POSITION</th>
-                    <th className="py-3 px-4 w-[15%]">YEAR EMPLOYED</th>
+                    <th className="py-3 px-4 w-[20%]">NAME</th>
+                    <th className="py-3 px-4 w-[10%]">POSITION</th>
+                    <th className="py-3 px-4 w-[10%]">YEAR EMPLOYED</th>
                     {activeTab === "inactive" && <th className="py-3 px-4 w-[15%]">YEAR RESIGNED</th>}
                     {activeTab === "active" && <th className="py-3 px-4 w-[10%]">STATUS</th>}
                     {activeTab === "active" && <th className="py-3 px-4 w-[15%]">ACTIONS</th>}
@@ -331,16 +348,22 @@ function AdminEmployeePage() {
                         <td className="py-3 px-4 whitespace-nowrap">
                           <div className="flex space-x-2">
                             <button
-                              onClick={() => handleDeleteClick(employee)}
-                              className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-md md:text-lg"
-                            >
-                              Delete
-                            </button>
-                            <button
                               onClick={() => handleEditClick(employee)}
                               className="bg-[#5C7346] text-white px-3 py-1 rounded-md hover:bg-[#4a5c38] transition-colors text-md md:text-lg"
                             >
                               Edit
+                            </button>
+                            <button
+                              onClick={() => handleViewSchedule(employee.id)}
+                              className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition-colors text-md md:text-lg"
+                            >
+                              Schedule
+                            </button>
+                            <button
+                              onClick={() => handleDeleteClick(employee)}
+                              className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 transition-colors text-md md:text-lg"
+                            >
+                              Delete
                             </button>
                           </div>
                         </td>
@@ -360,18 +383,18 @@ function AdminEmployeePage() {
           </div>
 
           {/* Footer Section - Responsive layout */}
-          <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:justify-between md:items-center mt-6">
+          {/* Footer Section - Responsive layout with Add Account and pagination on same row */}
+          <div className="flex flex-row justify-between items-center mt-6">
             {activeTab === "active" && (
               <button
                 onClick={() => setIsAddModalOpen(true)}
-                className="bg-[#5C7346] text-white px-6 py-2 rounded-md hover:bg-[#4a5c38] transition-colors font-medium w-full md:w-auto"
+                className="bg-[#5C7346] text-white px-6 py-2 rounded-md hover:bg-[#4a5c38] transition-colors font-medium"
               >
                 Add Account
               </button>
             )}
-            <div
-              className={`flex justify-center space-x-2 ${activeTab === "inactive" ? "md:ml-auto" : ""} ${activeTab === "active" ? "w-full md:w-auto" : ""}`}
-            >
+            {activeTab === "inactive" && <div></div>} {/* Empty div for spacing when inactive tab */}
+            <div className="flex justify-center space-x-2">
               <button
                 onClick={prevPage}
                 disabled={currentPage === 1}

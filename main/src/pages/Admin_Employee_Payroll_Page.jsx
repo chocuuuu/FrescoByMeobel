@@ -15,6 +15,8 @@ function AdminEmployeePayrollPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const recordsPerPage = 5
+  const [yearFilter, setYearFilter] = useState("all")
+  const [roleFilter, setRoleFilter] = useState("all")
 
   // Fetch payroll data from API
   const fetchPayrollData = async () => {
@@ -40,6 +42,32 @@ function AdminEmployeePayrollPage() {
 
       // Create a map to store payroll data
       const payrollMap = new Map()
+
+      // Fetch all payroll records
+      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      let payrollRecords = []
+      if (payrollResponse.ok) {
+        payrollRecords = await payrollResponse.json()
+      }
+
+      // Fetch salary data for all employees
+      const salaryResponse = await fetch(`${API_BASE_URL}/salary/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      let salaryRecords = []
+      if (salaryResponse.ok) {
+        salaryRecords = await salaryResponse.json()
+      }
 
       // Fetch earnings data for all employees
       const earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
@@ -136,7 +164,7 @@ function AdminEmployeePayrollPage() {
 
             // Add overtime to base salary for gross calculation
             const overtimeTotal = Number.parseFloat(overtime.total_overtime) || 0
-            payrollEntry.base_salary = (payrollEntry.base_salary || 0) + overtimeTotal
+            payrollEntry.overtimeTotal = overtimeTotal
             payrollEntry.overtimeData = overtime
           }
         })
@@ -148,44 +176,72 @@ function AdminEmployeePayrollPage() {
       activeEmployees.forEach((employee) => {
         const userId = employee.user?.id
 
-        if (userId && payrollMap.has(userId)) {
-          // Employee has payroll data
-          const payrollInfo = payrollMap.get(userId)
-          const grossSalary = payrollInfo.base_salary || 0
-          const deductions = payrollInfo.deductions || 0
-          const netSalary = grossSalary - deductions
+        if (userId) {
+          // Find payroll record for this user
+          const userPayroll = payrollRecords.find((record) => record.user_id === userId)
 
-          payrollData.push({
-            id: employee.id,
-            employee_id: employee.employee_number,
-            employee_name: `${employee.first_name} ${employee.last_name}`,
-            position: employee.position || "Staff",
-            base_salary: grossSalary,
-            deductions: deductions,
-            net_salary: netSalary,
-            status: "Paid", // Default status
-            rate_per_month: grossSalary.toString(),
-            user: employee.user,
-            // Store the raw data for editing
-            earnings: payrollInfo.earnings,
-            deductionsData: payrollInfo.deductionsData,
-            overtimeData: payrollInfo.overtimeData,
-          })
-        } else {
-          // Employee has no payroll data - use zeros instead of random values
-          payrollData.push({
-            id: employee.id,
-            employee_id: employee.employee_number,
-            employee_name: `${employee.first_name} ${employee.last_name}`,
-            position: employee.position || "Staff",
-            base_salary: 0,
-            allowances: 0,
-            deductions: 0,
-            net_salary: 0,
-            status: "Paid", // Default status
-            rate_per_month: "0",
-            user: employee.user,
-          })
+          // Find salary record for this user
+          const userSalary = salaryRecords.find((record) => record.user === userId)
+
+          if (userPayroll) {
+            // Employee has payroll data from the API
+            payrollData.push({
+              id: employee.id,
+              employee_id: employee.employee_number,
+              employee_name: `${employee.first_name} ${employee.last_name}`,
+              position: employee.position || "Staff",
+              base_salary: Number.parseFloat(userPayroll.gross_pay) || 0,
+              deductions: Number.parseFloat(userPayroll.total_deductions) || 0,
+              net_salary: Number.parseFloat(userPayroll.net_pay) || 0,
+              status: userPayroll.status || "Paid",
+              rate_per_month: userSalary ? userSalary.rate_per_month : "0",
+              user: employee.user,
+              // Store the raw data for editing
+              payrollRecord: userPayroll,
+              salaryRecord: userSalary,
+              earnings: payrollMap.get(userId)?.earnings,
+              deductionsData: payrollMap.get(userId)?.deductionsData,
+              overtimeData: payrollMap.get(userId)?.overtimeData,
+            })
+          } else if (payrollMap.has(userId)) {
+            // Employee has data in our map but no payroll record
+            const payrollInfo = payrollMap.get(userId)
+            const grossSalary = payrollInfo.base_salary || 0
+            const deductions = payrollInfo.deductions || 0
+            const netSalary = grossSalary - deductions
+
+            payrollData.push({
+              id: employee.id,
+              employee_id: employee.employee_number,
+              employee_name: `${employee.first_name} ${employee.last_name}`,
+              position: employee.position || "Staff",
+              base_salary: grossSalary,
+              deductions: deductions,
+              net_salary: netSalary,
+              status: "Pending", // Default status
+              rate_per_month: grossSalary.toString(),
+              user: employee.user,
+              // Store the raw data for editing
+              earnings: payrollInfo.earnings,
+              deductionsData: payrollInfo.deductionsData,
+              overtimeData: payrollInfo.overtimeData,
+            })
+          } else {
+            // Employee has no payroll data - use zeros
+            payrollData.push({
+              id: employee.id,
+              employee_id: employee.employee_number,
+              employee_name: `${employee.first_name} ${employee.last_name}`,
+              position: employee.position || "Staff",
+              base_salary: 0,
+              allowances: 0,
+              deductions: 0,
+              net_salary: 0,
+              status: "Pending", // Default status
+              rate_per_month: "0",
+              user: employee.user,
+            })
+          }
         }
       })
 
@@ -206,7 +262,7 @@ function AdminEmployeePayrollPage() {
           allowances: 0,
           deductions: 0,
           net_salary: 0,
-          status: "Paid", // Default status
+          status: "Pending", // Default status
           rate_per_month: "0",
           user: employee.user,
         }))
@@ -240,24 +296,86 @@ function AdminEmployeePayrollPage() {
     }
   }
 
+  // Handle delete payroll
+  const handleDeletePayroll = async (employeeId, userId) => {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this employee's payroll information? This action cannot be undone.",
+      )
+    ) {
+      return
+    }
+
+    try {
+      const accessToken = localStorage.getItem("access_token")
+
+      // Find the payroll record for this user
+      const employee = payrollData.find((emp) => emp.id === employeeId)
+      if (!employee || !employee.payrollRecord || !employee.payrollRecord.id) {
+        alert("No payroll record found for this employee")
+        return
+      }
+
+      // Delete the payroll record
+      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/${employee.payrollRecord.id}/`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!payrollResponse.ok) {
+        throw new Error(`Failed to delete payroll: ${payrollResponse.status} ${payrollResponse.statusText}`)
+      }
+
+      // Update the UI by removing the payroll data
+      setPayrollData((prevData) =>
+        prevData.map((emp) => {
+          if (emp.id === employeeId) {
+            return {
+              ...emp,
+              base_salary: 0,
+              deductions: 0,
+              net_salary: 0,
+              status: "Pending",
+              payrollRecord: null,
+            }
+          }
+          return emp
+        }),
+      )
+
+      alert("Payroll information deleted successfully")
+
+      // Refresh data after a short delay
+      setTimeout(() => {
+        fetchPayrollData()
+      }, 1000)
+    } catch (error) {
+      console.error("Error deleting payroll:", error)
+      alert(`Failed to delete payroll: ${error.message}`)
+    }
+  }
+
   // Handle payroll update
   const handlePayrollUpdate = (updatedData) => {
     console.log("Updating payroll data with:", updatedData)
 
     if (selectedEmployee) {
+      // Parse values to ensure they're numbers
+      const totalGross = Number.parseFloat(updatedData.totalGross)
+      const totalDeductions = Number.parseFloat(updatedData.totalDeductions)
+      const totalSalaryCompensation = Number.parseFloat(updatedData.totalSalaryCompensation)
+
+      console.log("Parsed values:", {
+        totalGross,
+        totalDeductions,
+        totalSalaryCompensation,
+      })
+
       const updatedPayrollData = payrollData.map((emp) => {
         if (emp.id === selectedEmployee.id) {
-          // Parse values to ensure they're numbers
-          const totalGross = Number.parseFloat(updatedData.totalGross)
-          const totalDeductions = Number.parseFloat(updatedData.totalDeductions)
-          const totalSalaryCompensation = Number.parseFloat(updatedData.totalSalaryCompensation)
-
-          console.log("Parsed values:", {
-            totalGross,
-            totalDeductions,
-            totalSalaryCompensation,
-          })
-
           return {
             ...emp,
             base_salary: totalGross,
@@ -273,16 +391,32 @@ function AdminEmployeePayrollPage() {
       setIsEditModalOpen(false)
       setSelectedEmployee(null)
 
+      // Refresh data from server after a short delay to ensure changes are saved
+      setTimeout(() => {
+        fetchPayrollData()
+      }, 2000)
     }
   }
 
-  // Filter payroll data based on search term
+  // Filter payroll data based on search term, year, and role
   const filteredPayrollData = payrollData.filter((record) => {
-    return (
+    const matchesSearch =
       record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.employee_id?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.position?.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+
+    // Get year from hire_date if available in the employee data
+    const employee = employees.find((emp) => emp.id === record.id)
+    const yearEmployed = employee?.hire_date ? new Date(employee.hire_date).getFullYear() : null
+    const matchesYear = yearFilter === "all" || (yearEmployed && yearEmployed.toString() === yearFilter)
+
+    // Check role
+    const matchesRole =
+      roleFilter === "all" ||
+      (roleFilter === "owner" && !record.user) ||
+      (record.user && record.user.role && record.user.role.toLowerCase() === roleFilter.toLowerCase())
+
+    return matchesSearch && matchesYear && matchesRole
   })
 
   // Sort by employee ID in descending order (assuming higher ID = newer employee)
@@ -307,11 +441,12 @@ function AdminEmployeePayrollPage() {
 
   // Format currency
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-PH", {
+    const PHP = new Intl.NumberFormat("en-PH", {
       style: "currency",
       currency: "PHP",
       minimumFractionDigits: 2,
     }).format(amount)
+    return PHP
   }
 
   // Get status color
@@ -343,13 +478,51 @@ function AdminEmployeePayrollPage() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <h2 className="text-2xl font-semibold text-white">Employee Payroll</h2>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <input
-                type="search"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full sm:w-auto"
-              />
+              <button
+                onClick={() => {
+                  // Refresh payroll data
+                  fetchPayrollData()
+                }}
+                className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
+              >
+                Refresh Payroll
+              </button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="search"
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full sm:w-auto"
+                />
+                <select
+                  value={yearFilter}
+                  onChange={(e) => setYearFilter(e.target.value)}
+                  className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
+                >
+                  <option value="all">All Years</option>
+                  {[...new Set(employees.map((e) => (e.hire_date ? new Date(e.hire_date).getFullYear() : null)))]
+                    .filter((year) => year !== null)
+                    .sort((a, b) => b - a)
+                    .map((year) => (
+                      <option key={year} value={year.toString()}>
+                        {year}
+                      </option>
+                    ))}
+                </select>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
+                >
+                  <option value="all">All Roles</option>
+                  {["owner", "admin", "employee"].map((role) => (
+                    <option key={role} value={role.toLowerCase()}>
+                      {role.charAt(0).toUpperCase() + role.slice(1).toLowerCase()}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -359,11 +532,11 @@ function AdminEmployeePayrollPage() {
               <thead>
                 <tr className="text-left text-white border-b border-white/20">
                   <th className="py-3 px-4 w-[10%]">ID</th>
-                  <th className="py-3 px-4 w-[30%]">NAME</th>
+                  <th className="py-3 px-4 w-[20%]">NAME</th>
                   <th className="py-3 px-4 w-[15%]">POSITION</th>
                   <th className="py-3 px-4 w-[12%]">GROSS SALARY</th>
                   <th className="py-3 px-4 w-[12%]">NET SALARY</th>
-                  <th className="py-3 px-4 w-[10%]">STATUS</th>
+                  <th className="py-3 px-4 w-[12%]">STATUS</th>
                   <th className="py-3 px-4 w-[15%]">ACTIONS</th>
                 </tr>
               </thead>
@@ -383,13 +556,23 @@ function AdminEmployeePayrollPage() {
                           {record.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => handleEditPayroll(record.id)}
-                          className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
-                        >
-                          Edit Payroll
-                        </button>
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEditPayroll(record.id)}
+                            className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
+                          >
+                            Edit Payroll
+                          </button>
+                          {record.payrollRecord && (
+                            <button
+                              onClick={() => handleDeletePayroll(record.id, record.user?.id)}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -413,11 +596,7 @@ function AdminEmployeePayrollPage() {
 
           {/* Footer Section */}
           <div className="flex justify-between items-center mt-4">
-            <div>
-              <p className="text-white">
-                Showing {currentRecords.length} of {sortedPayrollData.length} employees
-              </p>
-            </div>
+            <div></div>
             <div className="flex space-x-2">
               <button
                 onClick={prevPage}

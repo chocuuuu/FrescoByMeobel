@@ -1,10 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useNavigate } from "react-router-dom"
 import NavBar from "../components/Nav_Bar.jsx"
 import { API_BASE_URL } from "../config/api"
 
 function AdminEmployeeAttendancePage() {
+  const navigate = useNavigate()
+
   // Calculate biweekly date range (today to 14 days from today)
   const today = new Date()
   const twoWeeksLater = new Date(today)
@@ -18,6 +21,7 @@ function AdminEmployeeAttendancePage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const recordsPerPage = 7
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   // Fetch employees for the dropdown
   useEffect(() => {
@@ -145,6 +149,7 @@ function AdminEmployeeAttendancePage() {
         employeeMap.set(userId, {
           name: `${employee.first_name} ${employee.last_name}`,
           employeeNumber: employee.employee_number,
+          id: employee.id, // Store the employee ID for schedule lookup
         })
       }
     })
@@ -160,6 +165,7 @@ function AdminEmployeeAttendancePage() {
         ...record,
         employee_name: employeeInfo ? employeeInfo.name : `Unknown (ID: ${userId})`,
         employee_id: employeeInfo ? employeeInfo.employeeNumber : `User ID: ${userId}`,
+        employment_info_id: employeeInfo ? employeeInfo.id : null, // Add employment_info_id for schedule lookup
         // Format times for display
         time_in: formatTime(record.check_in_time),
         time_out: formatTime(record.check_out_time),
@@ -186,6 +192,101 @@ function AdminEmployeeAttendancePage() {
     } catch (error) {
       console.error("Error formatting time:", error)
       return timeString // Return original if parsing fails
+    }
+  }
+
+  // Handle delete attendance record
+  const handleDeleteAttendance = async (attendanceId, userId, date, checkInTime, checkOutTime) => {
+    if (!window.confirm("Are you sure you want to delete this attendance record?")) {
+      return
+    }
+
+    setDeleteLoading(true)
+    try {
+      const accessToken = localStorage.getItem("access_token")
+
+      // 1. First, fetch biometric data to find matching records
+      const bioResponse = await fetch(`${API_BASE_URL}/biometricdata/`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!bioResponse.ok) {
+        throw new Error(`Failed to fetch biometric data: ${bioResponse.status} ${bioResponse.statusText}`)
+      }
+
+      const bioData = await bioResponse.json()
+      console.log("Fetched biometric data:", bioData)
+
+      // 2. Filter biometric records that match this attendance record
+      // Convert attendance date to YYYY-MM-DD format for comparison
+      const attendanceDate = new Date(date).toISOString().split("T")[0]
+
+      const matchingBioRecords = bioData.filter((record) => {
+        // Match by employee ID
+        const empIdMatch = record.emp_id === userId
+
+        // Match by date (compare only the date part of the timestamp)
+        const bioDate = new Date(record.time).toISOString().split("T")[0]
+        const dateMatch = bioDate === attendanceDate
+
+        // Match by time (either check-in or check-out)
+        // Extract just the time part for comparison (HH:MM:SS)
+        const bioTime = new Date(record.time).toISOString().split("T")[1].substring(0, 8)
+        const checkInMatch = bioTime === checkInTime
+        const checkOutMatch = bioTime === checkOutTime
+
+        return empIdMatch && dateMatch && (checkInMatch || checkOutMatch)
+      })
+
+      console.log("Matching biometric records to delete:", matchingBioRecords)
+
+      // 3. Delete each matching biometric record
+      const bioDeletionPromises = matchingBioRecords.map((record) =>
+        fetch(`${API_BASE_URL}/biometricdata/${record.id}/`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        }),
+      )
+
+      // Wait for all biometric deletions to complete
+      const bioResults = await Promise.allSettled(bioDeletionPromises)
+      console.log("Biometric deletion results:", bioResults)
+
+      // Check if any biometric deletions failed
+      const failedBioDeletions = bioResults.filter((result) => result.status === "rejected")
+      if (failedBioDeletions.length > 0) {
+        console.warn(`${failedBioDeletions.length} biometric records failed to delete`)
+      }
+
+      // 4. Delete the attendance record
+      const attendanceResponse = await fetch(`${API_BASE_URL}/attendance/${attendanceId}/`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!attendanceResponse.ok) {
+        throw new Error(
+          `Failed to delete attendance record: ${attendanceResponse.status} ${attendanceResponse.statusText}`,
+        )
+      }
+
+      // 5. Remove the deleted record from the state
+      setRawAttendanceData((prevData) => prevData.filter((record) => record.id !== attendanceId))
+      alert("Attendance record and associated biometric data deleted successfully")
+    } catch (error) {
+      console.error("Error deleting records:", error)
+      alert(`Failed to delete records: ${error.message}`)
+    } finally {
+      setDeleteLoading(false)
     }
   }
 
@@ -249,16 +350,15 @@ function AdminEmployeeAttendancePage() {
           {/* Attendance Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full table-fixed">
-            <thead>
+              <thead>
                 <tr className="text-left text-white border-b border-white/20">
-                  
                   <th className="py-3 px-4 w-[10%]">DATE</th>
-                  <th className="py-3 px-4 w-[15%]">EMPLOYEE ID</th>
+                  <th className="py-3 px-4 w-[10%]">EMPLOYEE ID</th>
                   <th className="py-3 px-4 w-[30%]">NAME</th>
-                  <th className="py-3 px-4 w-[15%]">TIME IN</th>
-                  <th className="py-3 px-4 w-[15%]">TIME OUT</th>
-                  <th className="py-3 px-4 w-[15%]">STATUS</th>
-
+                  <th className="py-3 px-4 w-[12%]">TIME IN</th>
+                  <th className="py-3 px-4 w-[12%]">TIME OUT</th>
+                  <th className="py-3 px-4 w-[12%]">STATUS</th>
+                  <th className="py-3 px-4 w-[15%]">ACTIONS</th>
                 </tr>
               </thead>
               <tbody className="text-white">
@@ -271,16 +371,36 @@ function AdminEmployeeAttendancePage() {
                       <td className="py-3 px-4">{record.time_in}</td>
                       <td className="py-3 px-4">{record.time_out}</td>
                       <td className="py-3 px-4">
-                        <span className={`px-4 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(record.status)}`}>
-
+                        <span
+                          className={`px-4 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(record.status)}`}
+                        >
                           {record.status || "Unknown"}
                         </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() =>
+                              handleDeleteAttendance(
+                                record.id,
+                                record.user,
+                                record.date,
+                                record.check_in_time,
+                                record.check_out_time,
+                              )
+                            }
+                            disabled={deleteLoading}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="py-4 text-center">
+                    <td colSpan="7" className="py-4 text-center">
                       No attendance records found
                     </td>
                   </tr>
@@ -289,7 +409,7 @@ function AdminEmployeeAttendancePage() {
                 {currentRecords.length > 0 &&
                   [...Array(Math.max(0, recordsPerPage - currentRecords.length))].map((_, index) => (
                     <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
-                      <td colSpan="6"></td>
+                      <td colSpan="7"></td>
                     </tr>
                   ))}
               </tbody>

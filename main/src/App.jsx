@@ -13,7 +13,7 @@ import AdminDashboardPage from "./pages/Admin_Dashboard_Page"
 import AdminEmployeePayrollPage from "./pages/Admin_Employee_Payroll_Page"
 import AdminEmployeePage from "./pages/Admin_Employees_Page"
 import PayslipPage from "./pages/Payslip_Page"
-import Admin_Employee_Edit_Schedule_Page from "./pages/Admin_Employee_Edit_Schedule_Page"
+import AdminEmployeeEditSchedulePage from "./pages/Admin_Employee_Edit_Schedule_Page"
 import AdminEmployeeAttendancePage from './pages/Admin_Employee_Attendance_Page'
 import { API_BASE_URL } from "./config/api"
 
@@ -172,7 +172,7 @@ function App() {
         <Route path="/payslip" element={<PayslipPage />} />
         <Route path="/employee" element={<AdminEmployeePage />} />
         <Route path="/payroll" element={<AdminEmployeePayrollPage />} />
-        <Route path="/employee/schedule/:employeeId" element={<Admin_Employee_Edit_Schedule_Page />} />
+        <Route path="/employee/schedule/:employeeId" element={<AdminEmployeeEditSchedulePage />} />
         <Route path="/attendance" element={<AdminEmployeeAttendancePage />} />
       </Routes>
     </Router>
