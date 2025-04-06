@@ -596,7 +596,11 @@ function AdminEmployeePayrollPage() {
 
           {/* Footer Section */}
           <div className="flex justify-between items-center mt-4">
-            <div></div>
+            <div>
+              <p className="text-white">
+                Showing {currentRecords.length} of {sortedPayrollData.length} employees
+              </p>
+            </div>
             <div className="flex space-x-2">
               <button
                 onClick={prevPage}
