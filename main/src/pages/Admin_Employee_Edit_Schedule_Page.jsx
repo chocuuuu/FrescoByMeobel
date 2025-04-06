@@ -1873,7 +1873,7 @@ function AdminEmployeeEditSchedulePage() {
             </div>
 
             {/* Employee Schedule Panel - Fixed size with max-height */}
-            <div className="bg-[#3A4D2B] rounded-lg p-4 lg:w-1/3 h-auto max-h-[800px] overflow-auto flex flex-col">
+            <div className="bg-[#3A4D2B] rounded-lg p-4 lg:w-1/3 h-auto max-h-[800px] overflow-y-auto scrollbar-hide flex flex-col">
               {/* Employee Info - Horizontal layout */}
               <div className="flex items-center mb-6 bg-[#5C7346] p-3 rounded-lg">
                 <div className="h-14 w-14 bg-white rounded-full flex items-center justify-center mr-3">
@@ -1958,22 +1958,22 @@ function AdminEmployeeEditSchedulePage() {
                   </div>
 
                   {/* Custom Shift Selection - Improved layout */}
-                  <div className="flex flex-col md:flex-row gap-2 items-center">
-                    {/* Custom Shift Button */}
+                  <div>
+                    {/* Custom Shift Button - Full width when not selected */}
                     <button
-                      className={`py-2 px-3 w-full md:w-1/3 rounded-md text-sm font-medium transition-all ${
+                      className={`py-2 px-3 w-full rounded-md text-sm font-medium transition-all ${
                         selectedShift === "custom"
                           ? "bg-white text-[#5C7346]"
                           : "bg-[#5C7346] text-white hover:bg-opacity-80"
                       }`}
                       onClick={() => handleShiftSelection("custom")}
                     >
-                      <span className="text-lg font-bold w-full">Custom</span>
+                      <span className="text-lg font-bold">Custom</span>
                     </button>
 
-                    {/* Time Inputs - Shown inline on desktop, below on mobile */}
+                    {/* Time Inputs - Only shown when custom is selected */}
                     {selectedShift === "custom" && (
-                      <div className="flex items-center gap-2 md:w-2/3 bg-[#5C7346] p-2 rounded-md">
+                      <div className="flex items-center gap-2 mt-2 bg-[#5C7346] p-2 rounded-md">
                         <input
                           type="time"
                           value={customShiftStart}
@@ -2170,7 +2170,19 @@ function AdminEmployeeEditSchedulePage() {
           </div>
         </div>
       </div>
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        
+        .scrollbar-hide {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+      `}</style>
     </div>
+
+    
   )
 }
 
