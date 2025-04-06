@@ -15,6 +15,9 @@ function AdminEmployeeEditSchedulePage() {
   const [employee, setEmployee] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [saveSuccess, setSaveSuccess] = useState(false)
+  const [saveMessage, setSaveMessage] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
 
   // State for calendar and schedule
   const currentYear = dayjs().format("YYYY")
@@ -492,7 +495,7 @@ function AdminEmployeeEditSchedulePage() {
     fetchShifts()
   }, [])
 
-  // Fetch schedule data
+  // Fetch schedule data - CRITICAL FIX: Ensure we're fetching the correct employee's schedule
   useEffect(() => {
     const fetchScheduleData = async () => {
       try {
@@ -530,6 +533,9 @@ function AdminEmployeeEditSchedulePage() {
         // Reset selected shift
         setSelectedShift("")
 
+        // Reset day status to clear any events from previous employees
+        setDayStatus({})
+
         const accessToken = localStorage.getItem("access_token")
         if (!accessToken) {
           console.error("No access token found")
@@ -541,13 +547,14 @@ function AdminEmployeeEditSchedulePage() {
         const userId = employee?.user?.id
         if (!userId) {
           console.warn("No user ID found in employee data, using employeeId as fallback")
+          setLoading(false)
+          return
         }
 
-        const queryId = userId || employeeId
-        console.log(`Fetching schedule for user/employee ID: ${queryId}`)
+        console.log(`Fetching schedule for user ID: ${userId}`)
 
-        // Try to fetch the schedule data
-        const response = await fetch(`${API_BASE_URL}/schedule/?user_id=${queryId}`, {
+        // CRITICAL FIX: Use the exact user_id parameter to ensure we get only this employee's schedule
+        const response = await fetch(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
@@ -569,84 +576,91 @@ function AdminEmployeeEditSchedulePage() {
         console.log(`Fetched schedule data:`, data)
 
         if (data && data.length > 0) {
-          const scheduleData = data[0]
-          console.log("Found schedule:", scheduleData)
+          // CRITICAL FIX: Filter to ensure we only get schedules for this specific user
+          const userSchedules = data.filter((schedule) => schedule.user_id === userId)
 
-          // Set the schedule regardless of user_id match - we'll display whatever we find
-          setSchedule(scheduleData)
+          if (userSchedules.length > 0) {
+            const scheduleData = userSchedules[0]
+            console.log("Found schedule for this user:", scheduleData)
 
-          // Set selected days based on schedule
-          const daysMap = {
-            Monday: "M",
-            Tuesday: "T",
-            Wednesday: "W",
-            Thursday: "T2",
-            Friday: "F",
-            Saturday: "S2",
-            Sunday: "S",
-          }
+            // Set the schedule
+            setSchedule(scheduleData)
 
-          const newSelectedDays = {
-            S: false,
-            M: false,
-            T: false,
-            W: false,
-            T2: false,
-            F: false,
-            S2: false,
-          }
+            // Set selected days based on schedule
+            const daysMap = {
+              Monday: "M",
+              Tuesday: "T",
+              Wednesday: "W",
+              Thursday: "T2",
+              Friday: "F",
+              Saturday: "S2",
+              Sunday: "S",
+            }
 
-          if (scheduleData.days && Array.isArray(scheduleData.days)) {
-            scheduleData.days.forEach((day) => {
-              if (daysMap[day]) {
-                newSelectedDays[daysMap[day]] = true
-              }
-            })
+            const newSelectedDays = {
+              S: false,
+              M: false,
+              T: false,
+              W: false,
+              T2: false,
+              F: false,
+              S2: false,
+            }
 
-            console.log("Setting selected days based on schedule:", newSelectedDays)
-            setSelectedDays(newSelectedDays)
-          } else {
-            console.warn("Schedule days is not an array or is undefined:", scheduleData.days)
-          }
-
-          // Determine shift type based on shift_ids
-          if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
-            // Fetch the first shift to determine the type
-            try {
-              const shiftResponse = await fetch(`${API_BASE_URL}/shift/${scheduleData.shift_ids[0]}/`, {
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "Content-Type": "application/json",
-                },
+            if (scheduleData.days && Array.isArray(scheduleData.days)) {
+              scheduleData.days.forEach((day) => {
+                if (daysMap[day]) {
+                  newSelectedDays[daysMap[day]] = true
+                }
               })
 
-              if (shiftResponse.ok) {
-                const shiftData = await shiftResponse.json()
-                console.log("First shift data:", shiftData)
-
-                // Determine shift type based on start/end times
-                const startTime = shiftData.shift_start
-                const endTime = shiftData.shift_end
-
-                if (startTime === "10:00:00" && endTime === "19:00:00") {
-                  setSelectedShift("morning")
-                } else if (startTime === "12:00:00" && endTime === "21:00:00") {
-                  setSelectedShift("midday")
-                } else if (startTime === "19:00:00" && endTime === "23:00:00") {
-                  setSelectedShift("night")
-                } else {
-                  setSelectedShift("custom")
-                  // Convert 24h format to 12h format for display
-                  setCustomShiftStart(convertTimeFormatToTimeString(startTime))
-                  setCustomShiftEnd(convertTimeFormatToTimeString(endTime))
-                }
-              }
-            } catch (error) {
-              console.error("Error fetching shift details:", error)
+              console.log("Setting selected days based on schedule:", newSelectedDays)
+              setSelectedDays(newSelectedDays)
+            } else {
+              console.warn("Schedule days is not an array or is undefined:", scheduleData.days)
             }
+
+            // Determine shift type based on shift_ids
+            if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
+              // Fetch the first shift to determine the type
+              try {
+                const shiftResponse = await fetch(`${API_BASE_URL}/shift/${scheduleData.shift_ids[0]}/`, {
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
+                  },
+                })
+
+                if (shiftResponse.ok) {
+                  const shiftData = await shiftResponse.json()
+                  console.log("First shift data:", shiftData)
+
+                  // Determine shift type based on start/end times
+                  const startTime = shiftData.shift_start
+                  const endTime = shiftData.shift_end
+
+                  if (startTime === "10:00:00" && endTime === "19:00:00") {
+                    setSelectedShift("morning")
+                  } else if (startTime === "12:00:00" && endTime === "21:00:00") {
+                    setSelectedShift("midday")
+                  } else if (startTime === "19:00:00" && endTime === "23:00:00") {
+                    setSelectedShift("night")
+                  } else {
+                    setSelectedShift("custom")
+                    // Convert 24h format to 12h format for display
+                    setCustomShiftStart(convertTimeFormatToTimeString(startTime))
+                    setCustomShiftEnd(convertTimeFormatToTimeString(endTime))
+                  }
+                }
+              } catch (error) {
+                console.error("Error fetching shift details:", error)
+              }
+            }
+          } else {
+            console.log(`No schedule found for employee ${employeeId} with user ID ${userId}`)
           }
         } else {
-          console.log(`No schedule found for employee ${employeeId}`)
+          console.log(`No schedules found at all`)
         }
 
         setLoading(false)
@@ -1065,8 +1079,69 @@ function AdminEmployeeEditSchedulePage() {
     setSchedule(newSchedule)
   }
 
+  // New function to save only events without modifying the schedule
+  const handleSaveEvents = async () => {
+    if (isSaving) return
+    setIsSaving(true)
+    setSaveSuccess(false)
+    setSaveMessage("")
+
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      if (!accessToken) {
+        throw new Error("No access token found")
+      }
+
+      // Check if we have a schedule ID
+      if (!schedule.id) {
+        // If no schedule exists, we need to create one first
+        await handleSaveSchedule()
+        return
+      }
+
+      // Collect all events from dayStatus
+      const events = {
+        sickleave: schedule.sickleave,
+        regularholiday: schedule.regularholiday || [],
+        specialholiday: schedule.specialholiday || [],
+        nightdiff: schedule.nightdiff || [],
+        oncall: schedule.oncall || [],
+        vacationleave: schedule.vacationleave || [],
+      }
+
+      // Update only the event fields in the schedule
+      const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(events),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to save events: ${response.statusText}`)
+      }
+
+      const updatedSchedule = await response.json()
+      setSchedule(updatedSchedule)
+      setSaveSuccess(true)
+      setSaveMessage("Events saved successfully!")
+    } catch (error) {
+      console.error("Error saving events:", error)
+      setSaveSuccess(false)
+      setSaveMessage(`Error: ${error.message}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleSaveSchedule = async () => {
     try {
+      setIsSaving(true)
+      setSaveSuccess(false)
+      setSaveMessage("")
+
       // Convert selected days to array of day names
       const daysMap = {
         S: "Sunday",
@@ -1084,13 +1159,15 @@ function AdminEmployeeEditSchedulePage() {
 
       // Check if we have any selected days
       if (selectedDaysArray.length === 0) {
-        alert("Please select at least one day for the schedule.")
+        setSaveSuccess(false)
+        setSaveMessage("Please select at least one day for the schedule.")
         return
       }
 
       // Check if we have a shift type selected
       if (!selectedShift) {
-        alert("Please select a shift type (Morning, Midday, Night, or Custom).")
+        setSaveSuccess(false)
+        setSaveMessage("Please select a shift type (Morning, Midday, Night, or Custom).")
         return
       }
 
@@ -1122,7 +1199,8 @@ function AdminEmployeeEditSchedulePage() {
 
       // If we still don't have shifts, create a default shift for each day
       if (shiftIds.length === 0) {
-        alert("Unable to create shifts automatically. Please try selecting the shift type again.")
+        setSaveSuccess(false)
+        setSaveMessage("Unable to create shifts automatically. Please try selecting the shift type again.")
         return
       }
 
@@ -1181,20 +1259,18 @@ function AdminEmployeeEditSchedulePage() {
       // Force a re-render of the calendar by updating the current date slightly
       setCurrentDate((prev) => dayjs(prev))
 
-      // Show a more detailed success message
-      alert(`Schedule saved successfully! 
-    
-Days scheduled: ${selectedDaysArray.join(", ")}
-Shift type: ${selectedShift.charAt(0).toUpperCase() + selectedShift.slice(1)}
-    
-The calendar has been updated to show the scheduled days.`)
+      setSaveSuccess(true)
+      setSaveMessage("Schedule saved successfully!")
 
       // Add a debug button to show the current schedule
       console.log("Current schedule after save:", savedData)
       console.log("Current day status after save:", dayStatus)
     } catch (error) {
       console.error("Error saving schedule:", error)
-      alert(error.message)
+      setSaveSuccess(false)
+      setSaveMessage(`Error: ${error.message}`)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -1453,7 +1529,7 @@ The calendar has been updated to show the scheduled days.`)
   }, [currentDate.month(), currentDate.year()])
 
   useEffect(() => {
-    if (schedule && schedule.id && schedule.days && schedule.days.length > 0) {
+    if (schedule && schedule.days && schedule.days.length > 0) {
       console.log("Schedule data changed, updating calendar with days:", schedule.days)
 
       // Small delay to ensure all state is updated
@@ -1526,7 +1602,7 @@ The calendar has been updated to show the scheduled days.`)
                         day,
                       )} rounded-lg h-20 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90 relative p-2 sm:p-3 md:p-4
                       ${
-                        day.date.format("YYYY-MM-DD") === currentDate.format("YYYY-MM-DD")
+                        day.date.format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")
                           ? "ring-4 ring-blue-500 font-bold shadow-lg"
                           : ""
                       }`}
@@ -1799,19 +1875,41 @@ The calendar has been updated to show the scheduled days.`)
                 </div>
               </div>
 
+              {/* Success/Error Message */}
+              {saveMessage && (
+                <div
+                  className={`mb-4 p-3 rounded-md text-center ${
+                    saveSuccess ? "bg-green-500 text-white" : "bg-red-500 text-white"
+                  }`}
+                >
+                  {saveMessage}
+                </div>
+              )}
+
               {/* Action Buttons */}
-              <div className="flex flex-wrap gap-2 justify-end">
+              <div className="flex flex-wrap gap-2 justify-end mt-auto">
                 <button
                   className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
                   onClick={() => navigate(`/payslip?employeeId=${employeeId}`)}
                 >
                   Payslip
                 </button>
+
+                {/* New button to save only events */}
+                <button
+                  className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
+                  onClick={handleSaveEvents}
+                  disabled={isSaving}
+                >
+                  {isSaving ? "Saving..." : "Save Events Only"}
+                </button>
+
                 <button
                   className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
                   onClick={handleSaveSchedule}
+                  disabled={isSaving}
                 >
-                  Confirm
+                  {isSaving ? "Saving..." : "Confirm"}
                 </button>
               </div>
             </div>
