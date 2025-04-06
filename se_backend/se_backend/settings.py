@@ -101,6 +101,7 @@ INSTALLED_APPS = [
     "benefits",
     "activity_log",
     "totalpayroll",
+    "mastercalendar",
 
 ]
 
