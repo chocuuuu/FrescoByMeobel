@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import NavBar from "../components/Nav_Bar"
-import { ArrowLeft, ArrowRight, User2, Calendar, Clock, CheckSquare } from "lucide-react"
+import { ArrowLeft, ArrowRight, User2, Calendar, Clock, CheckSquare, Trash2 } from "lucide-react"
 import dayjs from "dayjs"
 import { API_BASE_URL } from "../config/api"
 
@@ -18,6 +18,8 @@ function AdminEmployeeEditSchedulePage() {
   const [saveSuccess, setSaveSuccess] = useState(false)
   const [saveMessage, setSaveMessage] = useState("")
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // State for calendar and schedule
   const currentYear = dayjs().format("YYYY")
@@ -63,11 +65,22 @@ function AdminEmployeeEditSchedulePage() {
   // State to track if we're currently processing shifts to prevent duplicates
   const [isProcessingShifts, setIsProcessingShifts] = useState(false)
 
+  // State to track day-specific shifts
+  const [dayShifts, setDayShifts] = useState({
+    Sunday: { type: "", start: "", end: "" },
+    Monday: { type: "", start: "", end: "" },
+    Tuesday: { type: "", start: "", end: "" },
+    Wednesday: { type: "", start: "", end: "" },
+    Thursday: { type: "", start: "", end: "" },
+    Friday: { type: "", start: "", end: "" },
+    Saturday: { type: "", start: "", end: "" },
+  })
+
   // Generate shifts for all instances of a specific day in the current month
   const generateShiftsForDay = async (dayName) => {
     try {
       // If no shift type is selected, select a default one
-      if (!selectedShift) {
+      if (!selectedShift && !dayShifts[dayName].type) {
         setSelectedShift("morning")
         console.log("No shift selected, defaulting to morning shift")
       }
@@ -77,7 +90,9 @@ function AdminEmployeeEditSchedulePage() {
       const month = currentDate.month()
       const daysInMonth = currentDate.daysInMonth()
 
-      console.log(`Generating shifts for ${dayName} with shift type: ${selectedShift}`)
+      // Use day-specific shift if available, otherwise use the selected shift
+      const shiftType = dayShifts[dayName].type || selectedShift
+      console.log(`Generating shifts for ${dayName} with shift type: ${shiftType}`)
 
       // Find all dates in the current month that match the day name
       const matchingDates = []
@@ -92,28 +107,35 @@ function AdminEmployeeEditSchedulePage() {
 
       // Get shift times based on selected shift type
       let shiftStart, shiftEnd
-      switch (selectedShift) {
-        case "morning":
-          shiftStart = "10:00:00"
-          shiftEnd = "19:00:00"
-          break
-        case "midday":
-          shiftStart = "12:00:00"
-          shiftEnd = "21:00:00"
-          break
-        case "night":
-          shiftStart = "19:00:00"
-          shiftEnd = "23:00:00"
-          break
-        case "custom":
-          shiftStart = convertTimeStringToTimeFormat(customShiftStart)
-          shiftEnd = convertTimeStringToTimeFormat(customShiftEnd)
-          break
-        default:
-          // Default to morning shift if somehow no shift is selected
-          shiftStart = "10:00:00"
-          shiftEnd = "19:00:00"
-          break
+      if (dayShifts[dayName].start && dayShifts[dayName].end) {
+        // Use day-specific shift times
+        shiftStart = dayShifts[dayName].start
+        shiftEnd = dayShifts[dayName].end
+      } else {
+        // Use global shift times
+        switch (shiftType) {
+          case "morning":
+            shiftStart = "10:00:00"
+            shiftEnd = "19:00:00"
+            break
+          case "midday":
+            shiftStart = "12:00:00"
+            shiftEnd = "21:00:00"
+            break
+          case "night":
+            shiftStart = "19:00:00"
+            shiftEnd = "23:00:00"
+            break
+          case "custom":
+            shiftStart = convertTimeStringToTimeFormat(customShiftStart)
+            shiftEnd = convertTimeStringToTimeFormat(customShiftEnd)
+            break
+          default:
+            // Default to morning shift if somehow no shift is selected
+            shiftStart = "10:00:00"
+            shiftEnd = "19:00:00"
+            break
+        }
       }
 
       // Create shifts for each matching date
@@ -312,6 +334,12 @@ function AdminEmployeeEditSchedulePage() {
         shift_ids: shiftsToKeep,
       }))
 
+      // Reset the day-specific shift
+      setDayShifts((prev) => ({
+        ...prev,
+        [dayName]: { type: "", start: "", end: "" },
+      }))
+
       // **Batch delete shifts in chunks (e.g., 10 at a time)**
       const chunkSize = 10
       for (let i = 0; i < shiftsToRemove.length; i += chunkSize) {
@@ -336,6 +364,88 @@ function AdminEmployeeEditSchedulePage() {
       }
     } catch (error) {
       console.error(`Error removing shifts for ${dayName}:`, error)
+    }
+  }
+
+  // Delete the entire schedule
+  const handleDeleteSchedule = async () => {
+    if (isDeleting) return
+
+    try {
+      setIsDeleting(true)
+      setSaveSuccess(false)
+      setSaveMessage("")
+
+      if (!schedule.id) {
+        setSaveMessage("No schedule to delete")
+        setSaveSuccess(false)
+        setShowDeleteConfirm(false)
+        return
+      }
+
+      const accessToken = localStorage.getItem("access_token")
+
+      // Delete the schedule
+      const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete schedule: ${response.statusText}`)
+      }
+
+      // Reset all state
+      setSchedule({
+        id: null,
+        user_id: employee?.user?.id || null,
+        shift_ids: [],
+        days: [],
+        sickleave: null,
+        regularholiday: [],
+        specialholiday: [],
+        nightdiff: [],
+        oncall: [],
+        vacationleave: [],
+        payroll_period: "",
+        hours: 8,
+        bi_weekly_start: "",
+      })
+
+      setSelectedDays({
+        S: false,
+        M: false,
+        T: false,
+        W: false,
+        T2: false,
+        F: false,
+        S2: false,
+      })
+
+      setSelectedShift("")
+      setDayStatus({})
+      setDayShifts({
+        Sunday: { type: "", start: "", end: "" },
+        Monday: { type: "", start: "", end: "" },
+        Tuesday: { type: "", start: "", end: "" },
+        Wednesday: { type: "", start: "", end: "" },
+        Thursday: { type: "", start: "", end: "" },
+        Friday: { type: "", start: "", end: "" },
+        Saturday: { type: "", start: "", end: "" },
+      })
+
+      setSaveSuccess(true)
+      setSaveMessage("Schedule deleted successfully")
+      setShowDeleteConfirm(false)
+    } catch (error) {
+      console.error("Error deleting schedule:", error)
+      setSaveSuccess(false)
+      setSaveMessage(`Error: ${error.message}`)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -536,6 +646,17 @@ function AdminEmployeeEditSchedulePage() {
         // Reset day status to clear any events from previous employees
         setDayStatus({})
 
+        // Reset day-specific shifts
+        setDayShifts({
+          Sunday: { type: "", start: "", end: "" },
+          Monday: { type: "", start: "", end: "" },
+          Tuesday: { type: "", start: "", end: "" },
+          Wednesday: { type: "", start: "", end: "" },
+          Thursday: { type: "", start: "", end: "" },
+          Friday: { type: "", start: "", end: "" },
+          Saturday: { type: "", start: "", end: "" },
+        })
+
         const accessToken = localStorage.getItem("access_token")
         if (!accessToken) {
           console.error("No access token found")
@@ -622,34 +743,94 @@ function AdminEmployeeEditSchedulePage() {
 
             // Determine shift type based on shift_ids
             if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
-              // Fetch the first shift to determine the type
+              // Fetch all shifts to determine day-specific shifts
               try {
-                const shiftResponse = await fetch(`${API_BASE_URL}/shift/${scheduleData.shift_ids[0]}/`, {
-                  headers: {
-                    Authorization: `Bearer ${accessToken}`,
-                    "Content-Type": "application/json",
-                  },
+                const shiftPromises = scheduleData.shift_ids.map((shiftId) =>
+                  fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
+                    headers: {
+                      Authorization: `Bearer ${accessToken}`,
+                      "Content-Type": "application/json",
+                    },
+                  }).then((res) => (res.ok ? res.json() : null)),
+                )
+
+                const shiftsData = await Promise.all(shiftPromises)
+                const validShifts = shiftsData.filter((shift) => shift !== null)
+
+                // Group shifts by day of week
+                const shiftsByDay = {}
+                validShifts.forEach((shift) => {
+                  const date = dayjs(shift.date)
+                  const dayOfWeek = date.format("dddd")
+
+                  if (!shiftsByDay[dayOfWeek]) {
+                    shiftsByDay[dayOfWeek] = []
+                  }
+
+                  shiftsByDay[dayOfWeek].push(shift)
                 })
 
-                if (shiftResponse.ok) {
-                  const shiftData = await shiftResponse.json()
-                  console.log("First shift data:", shiftData)
+                // Determine shift type for each day
+                const newDayShifts = { ...dayShifts }
 
-                  // Determine shift type based on start/end times
-                  const startTime = shiftData.shift_start
-                  const endTime = shiftData.shift_end
+                Object.entries(shiftsByDay).forEach(([day, dayShifts]) => {
+                  if (dayShifts.length > 0) {
+                    // Use the first shift for this day to determine type
+                    const shift = dayShifts[0]
+                    const startTime = shift.shift_start
+                    const endTime = shift.shift_end
 
-                  if (startTime === "10:00:00" && endTime === "19:00:00") {
-                    setSelectedShift("morning")
-                  } else if (startTime === "12:00:00" && endTime === "21:00:00") {
-                    setSelectedShift("midday")
-                  } else if (startTime === "19:00:00" && endTime === "23:00:00") {
-                    setSelectedShift("night")
-                  } else {
-                    setSelectedShift("custom")
-                    // Convert 24h format to 12h format for display
-                    setCustomShiftStart(convertTimeFormatToTimeString(startTime))
-                    setCustomShiftEnd(convertTimeFormatToTimeString(endTime))
+                    let shiftType = ""
+                    if (startTime === "10:00:00" && endTime === "19:00:00") {
+                      shiftType = "morning"
+                    } else if (startTime === "12:00:00" && endTime === "21:00:00") {
+                      shiftType = "midday"
+                    } else if (startTime === "19:00:00" && endTime === "23:00:00") {
+                      shiftType = "night"
+                    } else {
+                      shiftType = "custom"
+                    }
+
+                    newDayShifts[day] = {
+                      type: shiftType,
+                      start: startTime,
+                      end: endTime,
+                    }
+                  }
+                })
+
+                setDayShifts(newDayShifts)
+
+                // Set the global shift type based on the most common shift
+                const shiftCounts = { morning: 0, midday: 0, night: 0, custom: 0 }
+                Object.values(newDayShifts).forEach(({ type }) => {
+                  if (type) {
+                    shiftCounts[type]++
+                  }
+                })
+
+                // Find the most common shift type
+                let mostCommonShift = ""
+                let maxCount = 0
+                Object.entries(shiftCounts).forEach(([type, count]) => {
+                  if (count > maxCount) {
+                    mostCommonShift = type
+                    maxCount = count
+                  }
+                })
+
+                if (mostCommonShift) {
+                  setSelectedShift(mostCommonShift)
+
+                  // If custom is the most common, set the custom times
+                  if (mostCommonShift === "custom") {
+                    // Find a day with custom shift
+                    const customShiftDay = Object.entries(newDayShifts).find(([_, data]) => data.type === "custom")
+                    if (customShiftDay) {
+                      const [_, data] = customShiftDay
+                      setCustomShiftStart(convertTimeFormatToTimeString(data.start))
+                      setCustomShiftEnd(convertTimeFormatToTimeString(data.end))
+                    }
                   }
                 }
               } catch (error) {
@@ -934,8 +1115,54 @@ function AdminEmployeeEditSchedulePage() {
     }
   }
 
+  // Handle shift selection for a specific day
+  const handleDayShiftSelection = (dayName, shiftType) => {
+    // If the same shift is selected, unselect it
+    if (dayShifts[dayName].type === shiftType) {
+      setDayShifts((prev) => ({
+        ...prev,
+        [dayName]: { type: "", start: "", end: "" },
+      }))
+    } else {
+      // Set the shift type and times for this day
+      let shiftStart, shiftEnd
+      switch (shiftType) {
+        case "morning":
+          shiftStart = "10:00:00"
+          shiftEnd = "19:00:00"
+          break
+        case "midday":
+          shiftStart = "12:00:00"
+          shiftEnd = "21:00:00"
+          break
+        case "night":
+          shiftStart = "19:00:00"
+          shiftEnd = "23:00:00"
+          break
+        case "custom":
+          shiftStart = convertTimeStringToTimeFormat(customShiftStart)
+          shiftEnd = convertTimeStringToTimeFormat(customShiftEnd)
+          break
+        default:
+          shiftStart = ""
+          shiftEnd = ""
+      }
+
+      setDayShifts((prev) => ({
+        ...prev,
+        [dayName]: { type: shiftType, start: shiftStart, end: shiftEnd },
+      }))
+    }
+  }
+
   // Handle shift selection
   const handleShiftSelection = async (shift) => {
+    // If the same shift is selected, unselect it
+    if (selectedShift === shift) {
+      setSelectedShift("")
+      return
+    }
+
     // Prevent multiple operations at once
     if (isProcessingShifts) return
 
@@ -966,11 +1193,14 @@ function AdminEmployeeEditSchedulePage() {
 
       // Process each day one at a time to avoid race conditions
       for (const dayName of selectedDayNames) {
-        // Remove existing shifts for this day
-        await removeShiftsForDay(dayName)
+        // Only update days that don't have a specific shift type set
+        if (!dayShifts[dayName].type) {
+          // Remove existing shifts for this day
+          await removeShiftsForDay(dayName)
 
-        // Generate new shifts with the updated shift type
-        await generateShiftsForDay(dayName)
+          // Generate new shifts with the updated shift type
+          await generateShiftsForDay(dayName)
+        }
       }
 
       // If we have no selected days but have selected a shift type,
@@ -1161,13 +1391,6 @@ function AdminEmployeeEditSchedulePage() {
       if (selectedDaysArray.length === 0) {
         setSaveSuccess(false)
         setSaveMessage("Please select at least one day for the schedule.")
-        return
-      }
-
-      // Check if we have a shift type selected
-      if (!selectedShift) {
-        setSaveSuccess(false)
-        setSaveMessage("Please select a shift type (Morning, Midday, Night, or Custom).")
         return
       }
 
@@ -1734,23 +1957,23 @@ function AdminEmployeeEditSchedulePage() {
                     ))}
                   </div>
 
-                  {/* Custom Shift Selection */}
-                  <div>
+                  {/* Custom Shift Selection - Improved layout */}
+                  <div className="flex flex-col md:flex-row gap-2 items-center">
                     {/* Custom Shift Button */}
                     <button
-                      className={`py-2 px-3 w-full rounded-md text-sm font-medium transition-all mb-2 ${
+                      className={`py-2 px-3 w-full md:w-1/3 rounded-md text-sm font-medium transition-all ${
                         selectedShift === "custom"
                           ? "bg-white text-[#5C7346]"
                           : "bg-[#5C7346] text-white hover:bg-opacity-80"
                       }`}
                       onClick={() => handleShiftSelection("custom")}
                     >
-                      <span className="text-lg font-bold">Custom</span>
+                      <span className="text-lg font-bold w-full">Custom</span>
                     </button>
 
-                    {/* Time Inputs - Only shown when custom is selected */}
+                    {/* Time Inputs - Shown inline on desktop, below on mobile */}
                     {selectedShift === "custom" && (
-                      <div className="flex items-center gap-2 mt-2 bg-[#5C7346] p-2 rounded-md">
+                      <div className="flex items-center gap-2 md:w-2/3 bg-[#5C7346] p-2 rounded-md">
                         <input
                           type="time"
                           value={customShiftStart}
@@ -1886,8 +2109,39 @@ function AdminEmployeeEditSchedulePage() {
                 </div>
               )}
 
+              {/* Delete Confirmation Dialog */}
+              {showDeleteConfirm && (
+                <div className="mb-4 p-3 bg-red-100 border border-red-400 rounded-md">
+                  <p className="text-red-700 mb-2 font-medium">Are you sure you want to delete this schedule?</p>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      className="bg-gray-500 text-white px-3 py-1 rounded-md hover:bg-gray-600"
+                      onClick={() => setShowDeleteConfirm(false)}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="bg-red-600 text-white px-3 py-1 rounded-md hover:bg-red-700 flex items-center"
+                      onClick={handleDeleteSchedule}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? "Deleting..." : "Delete"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-2 justify-end mt-auto">
+                <button
+                  className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors flex items-center gap-1"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={!schedule.id || isDeleting}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete
+                </button>
+
                 <button
                   className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
                   onClick={() => navigate(`/payslip?employeeId=${employeeId}`)}
