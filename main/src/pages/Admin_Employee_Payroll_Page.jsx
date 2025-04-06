@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar.jsx"
 import EditPayroll from "../components/Edit_Payroll.jsx"
 import { API_BASE_URL } from "../config/api"
+import SetPayrollPeriods from "../components/Set_Payroll_Periods"
 
 function AdminEmployeePayrollPage() {
   const [employees, setEmployees] = useState([])
@@ -17,6 +18,12 @@ function AdminEmployeePayrollPage() {
   const recordsPerPage = 5
   const [yearFilter, setYearFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all")
+  const [isPayrollPeriodsModalOpen, setIsPayrollPeriodsModalOpen] = useState(false)
+  const [payrollPeriods, setPayrollPeriods] = useState({
+    payrollPeriodStart: "",
+    payrollPeriodEnd: "",
+    payDate: "",
+  })
 
   // Fetch payroll data from API
   const fetchPayrollData = async () => {
@@ -398,6 +405,17 @@ function AdminEmployeePayrollPage() {
     }
   }
 
+  // Handle payroll periods update
+  const handlePayrollPeriodsUpdate = (updatedPeriods) => {
+    console.log("Updating payroll periods:", updatedPeriods)
+    setPayrollPeriods(updatedPeriods)
+
+    // Refresh data after a short delay to get the updated periods
+    setTimeout(() => {
+      fetchPayrollData()
+    }, 1000)
+  }
+
   // Filter payroll data based on search term, year, and role
   const filteredPayrollData = payrollData.filter((record) => {
     const matchesSearch =
@@ -479,6 +497,12 @@ function AdminEmployeePayrollPage() {
             <h2 className="text-2xl font-semibold text-white">Employee Payroll</h2>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <button
+                onClick={() => setIsPayrollPeriodsModalOpen(true)}
+                className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
+              >
+                Set Payroll Periods
+              </button>
+              <button
                 onClick={() => {
                   // Refresh payroll data
                   fetchPayrollData()
@@ -532,11 +556,11 @@ function AdminEmployeePayrollPage() {
               <thead>
                 <tr className="text-left text-white border-b border-white/20">
                   <th className="py-3 px-4 w-[10%]">ID</th>
-                  <th className="py-3 px-4 w-[20%]">NAME</th>
+                  <th className="py-3 px-4 w-[30%]">NAME</th>
                   <th className="py-3 px-4 w-[15%]">POSITION</th>
                   <th className="py-3 px-4 w-[12%]">GROSS SALARY</th>
                   <th className="py-3 px-4 w-[12%]">NET SALARY</th>
-                  <th className="py-3 px-4 w-[12%]">STATUS</th>
+                  <th className="py-3 px-4 w-[10%]">STATUS</th>
                   <th className="py-3 px-4 w-[15%]">ACTIONS</th>
                 </tr>
               </thead>
@@ -556,7 +580,7 @@ function AdminEmployeePayrollPage() {
                           {record.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4 whitespace-nowrap">
+                      <td className="py-3 px-4">
                         <div className="flex space-x-2">
                           <button
                             onClick={() => handleEditPayroll(record.id)}
@@ -596,7 +620,11 @@ function AdminEmployeePayrollPage() {
 
           {/* Footer Section */}
           <div className="flex justify-between items-center mt-4">
-            <div></div>
+            <div>
+              <p className="text-white">
+                Showing {currentRecords.length} of {sortedPayrollData.length} employees
+              </p>
+            </div>
             <div className="flex space-x-2">
               <button
                 onClick={prevPage}
@@ -633,6 +661,13 @@ function AdminEmployeePayrollPage() {
         }}
         employeeData={selectedEmployee}
         onUpdate={handlePayrollUpdate}
+      />
+
+      {/* Set Payroll Periods Modal */}
+      <SetPayrollPeriods
+        isOpen={isPayrollPeriodsModalOpen}
+        onClose={() => setIsPayrollPeriodsModalOpen(false)}
+        onSuccess={handlePayrollPeriodsUpdate}
       />
     </div>
   )
