@@ -35,6 +35,18 @@ app.conf.beat_schedule = {
         "task": "totalpayroll.tasks.calculate_total_payroll",
         "schedule": crontab(minute=30, hour=12), # run every 12:30 pm
     },
+    "sync-holidays-daily": {
+        'task': 'mastercalendar.tasks.sync_holidays_for_new_calendar_entries',
+        #'schedule': crontab(hour=0, minute=0),
+        # "schedule": crontab(minute="*"),
+        "schedule": crontab(minute="*/5"), # every 5 mins
+    },
+    "full-holiday-sync-weekly": {
+        'task': 'mastercalendar.tasks.update_schedule_holidays',
+        #'schedule': crontab(day_of_week=0, hour=1, minute=0),
+        # "schedule": crontab(minute="*"),
+        "schedule": crontab(minute="*/5"),  # every 5 mins
+    },
 }
 
 """
