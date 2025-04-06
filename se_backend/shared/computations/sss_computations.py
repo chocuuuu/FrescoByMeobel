@@ -75,12 +75,12 @@ def compute_sss_contribution(basic_salary):
     # Determine the correct SSS contributions based on the salary
     for min_salary, msc, employer_ss, employee_ss, ec, er_mpf, ee_mpf in sss_table:
         if basic_salary >= min_salary:
-            selected_msc = msc
-            employer_contribution = employer_ss
-            employee_contribution = employee_ss
-            ec_contribution = ec
-            er_mpf_contribution = er_mpf
-            ee_mpf_contribution = ee_mpf
+            selected_msc = msc /2
+            employer_contribution = employer_ss /2
+            employee_contribution = employee_ss /2
+            ec_contribution = ec /2
+            er_mpf_contribution = er_mpf /2
+            ee_mpf_contribution = ee_mpf /2
         else:
             break  # Stop at the correct salary bracket
 
