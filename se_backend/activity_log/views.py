@@ -14,11 +14,11 @@ class CRUDEventViewSet(viewsets.ReadOnlyModelViewSet):
     filter_backends = (filters.DjangoFilterBackend,)
     filterset_class = CRUDEventFilter
 
-    @role_required(["admin", "owner"])
     def get_queryset(self):
-        # Only models that should be logged
+        user = self.request.user
+        if not user.is_authenticated or user.role not in ["admin", "owner"]:
+            return CRUDEvent.objects.none()  # Or raise PermissionDenied
         included_models = {
-            # Product
             "admin",
             "attendance",
             "attendancesummary",
@@ -32,9 +32,7 @@ class CRUDEventViewSet(viewsets.ReadOnlyModelViewSet):
             "owner",
         }
         content_types = ContentType.objects.filter(model__in=included_models)
-        return CRUDEvent.objects.filter(content_type__in=content_types).order_by(
-            "-datetime"
-        )
+        return CRUDEvent.objects.filter(content_type__in=content_types).order_by("-datetime")
 
 class LoginEventViewSet(viewsets.ReadOnlyModelViewSet):
 
