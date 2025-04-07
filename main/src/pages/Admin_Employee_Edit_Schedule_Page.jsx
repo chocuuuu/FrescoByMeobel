@@ -2159,23 +2159,6 @@ function AdminEmployeeEditSchedulePage() {
                       )
                     })}
                   </div>
-                  {/* Display selected shift types for each day */}
-                  <div className="mt-2 text-sm">
-                    {Object.entries(dayShifts).map(([day, data]) => {
-                      if (data.type) {
-                        return (
-                          <div
-                            key={day}
-                            className="flex justify-between items-center mb-1 bg-[#5C7346] p-1 rounded text-white"
-                          >
-                            <span>{day}:</span>
-                            <span className="capitalize">{data.type}</span>
-                          </div>
-                        )
-                      }
-                      return null
-                    })}
-                  </div>
                 </div>
               </div>
 
