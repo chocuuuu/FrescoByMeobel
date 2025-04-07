@@ -222,6 +222,48 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
       const totalOvertimeData = await totalOvertimeResponse.json()
 
+      // Fetch schedule data to get payroll periods
+      const scheduleResponse = await fetch(`${API_BASE_URL}/schedule/?user_id=${userId}`, { headers })
+      if (scheduleResponse.ok) {
+        const scheduleData = await scheduleResponse.json()
+        if (scheduleData.length > 0) {
+          const userSchedule = scheduleData.find((schedule) => schedule.user_id === userId)
+          if (userSchedule) {
+            console.log("Found schedule with payroll periods:", userSchedule)
+
+            // Update form data with payroll periods if available
+            if (userSchedule.payroll_period_start && userSchedule.payroll_period_end) {
+              // Format dates from YYYY-MM-DD to MM/DD/YY
+              const formatDate = (dateStr) => {
+                if (!dateStr) return ""
+                const date = new Date(dateStr)
+                const month = (date.getMonth() + 1).toString().padStart(2, "0")
+                const day = date.getDate().toString().padStart(2, "0")
+                const year = date.getFullYear().toString().slice(2)
+                return `${month}/${day}/${year}`
+              }
+
+              setFormData((prevData) => ({
+                ...prevData,
+                payrollPeriodStart: formatDate(userSchedule.payroll_period_start),
+                payrollPeriodEnd: formatDate(userSchedule.payroll_period_end),
+                // Keep the existing pay date or calculate it (typically 5 days after period end)
+                payDate:
+                  prevData.payDate ||
+                  (() => {
+                    if (userSchedule.payroll_period_end) {
+                      const endDate = new Date(userSchedule.payroll_period_end)
+                      endDate.setDate(endDate.getDate() + 5) // Pay date is typically 5 days after period end
+                      return `${(endDate.getMonth() + 1).toString().padStart(2, "0")}/${endDate.getDate().toString().padStart(2, "0")}/${endDate.getFullYear()}`
+                    }
+                    return prevData.payDate
+                  })(),
+              }))
+            }
+          }
+        }
+      }
+
       // Fetch overtime hours data - add user filter parameter
       const overtimeResponse = await fetch(`${API_BASE_URL}/overtimehours/?user=${userId}`, { headers })
       if (!overtimeResponse.ok) throw new Error("Failed to fetch overtime data")
@@ -1016,13 +1058,13 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                       <input
                         type="text"
                         value={formData.payrollPeriodStart}
-                        onChange={(e) => handleInputChange(e, "payrollPeriodStart")}
+                        readOnly
                         className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                       />
                       <input
                         type="text"
                         value={formData.payrollPeriodEnd}
-                        onChange={(e) => handleInputChange(e, "payrollPeriodEnd")}
+                        readOnly
                         className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                       />
                     </div>
@@ -1032,7 +1074,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     <input
                       type="text"
                       value={formData.payDate}
-                      onChange={(e) => handleInputChange(e, "payDate")}
+                      readOnly
                       className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
