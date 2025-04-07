@@ -9,7 +9,7 @@ def update_holidays_on_schedule_change(sender, instance, created, **kwargs):
     When a schedule is created or its payroll period changes,
     queue a Celery task to update its holidays.
     """
-    from mastercalendar.tasks import update_schedule_holidays
+    from master_calendar.tasks import update_schedule_holidays
 
     # Check if it's a new schedule or if payroll period fields were updated
     if created or kwargs.get('update_fields') and any(field in kwargs.get('update_fields', [])
