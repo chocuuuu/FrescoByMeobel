@@ -1,5 +1,6 @@
 from django.test import TestCase
 from employment_info.models import EmploymentInfo
+from datetime import date
 
 
 class EmploymentInfoModelTestCase(TestCase):
@@ -12,7 +13,7 @@ class EmploymentInfoModelTestCase(TestCase):
             last_name="Doe",
             position="Developer",
             address="123 Street",
-            hire_date="2021-01-01",
+            hire_date=date(2021, 1, 1),
             active=True
         )
 
