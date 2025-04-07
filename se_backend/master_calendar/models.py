@@ -20,3 +20,18 @@ class MasterCalendar(models.Model):
     class Meta:
         ordering = ['date']
         unique_together = ['date', 'holiday_type']
+
+
+class MasterCalendarPayroll(models.Model):
+    payroll_period_start = models.DateField(null=True, blank=True)
+    payroll_period_end = models.DateField(null=True, blank=True)
+    date_created = models.DateTimeField(auto_now_add=True)
+    date_modified = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.payroll_period_start} - {self.payroll_period_end}"
+
+    class Meta:
+        ordering = ['payroll_period_start', 'payroll_period_end']
+        unique_together = ['payroll_period_start', 'payroll_period_end']
+
