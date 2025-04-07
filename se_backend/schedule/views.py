@@ -37,10 +37,26 @@ class ScheduleViewSet(GenericViewset):
         """Update Schedule record. Only Owners and Admins can update Schedule records."""
         partial = kwargs.pop("partial", False)
         instance = self.get_object()
+
+        # Extract special shift handling keys before serialization
+        add_shift_ids = request.data.pop("add_shift_ids", [])
+        remove_shift_ids = request.data.pop("remove_shift_ids", [])
+
+        # Handle full update of the schedule
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
+
+        # Handle adding new shifts
+        if add_shift_ids:
+            instance.shift_ids.add(*add_shift_ids)
+        # Handle removing shifts
+        if remove_shift_ids:
+            instance.shift_ids.remove(*remove_shift_ids)
+
+        # Return updated serialized data
+        updated_serializer = self.get_serializer(instance)
+        return Response(updated_serializer.data, status=status.HTTP_200_OK)
 
     @role_required(["owner", "admin"])
     def partial_update(self, request, *args, **kwargs):
