@@ -140,9 +140,33 @@ function AdminEmployeeEditSchedulePage() {
         }
       }
 
-      // Create shifts for each matching date
+      // Check for existing shifts for these dates to avoid duplicates
+      const existingShifts = {}
+      if (schedule.shift_ids && schedule.shift_ids.length > 0) {
+        const shiftRequests = schedule.shift_ids.map((shiftId) =>
+          fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          }).then((response) => (response.ok ? response.json() : null)),
+        )
+
+        const shiftDataArray = await Promise.all(shiftRequests)
+        shiftDataArray.filter(Boolean).forEach((shift) => {
+          existingShifts[shift.date] = true
+        })
+      }
+
+      // Create shifts for each matching date (only if no shift exists for that date)
       const newShiftIds = []
       for (const dateStr of matchingDates) {
+        // Skip if we already have a shift for this date
+        if (existingShifts[dateStr]) {
+          console.log(`Skipping shift creation for ${dateStr} - shift already exists`)
+          continue
+        }
+
         // Create a new shift
         const shiftResponse = await fetch(`${API_BASE_URL}/shift/`, {
           method: "POST",
@@ -180,7 +204,9 @@ function AdminEmployeeEditSchedulePage() {
           (schedule.oncall && schedule.oncall.includes(dateStr)) ||
           (schedule.vacationleave && schedule.vacationleave.includes(dateStr))
 
-        if (!hasSpecialStatus) {
+        // Don't change past days that are marked as absent
+        const isPastDay = dayjs(dateStr).isBefore(dayjs(), "day")
+        if (!hasSpecialStatus && !(isPastDay && newDayStatus[dateStr] === "absent")) {
           newDayStatus[dateStr] = "selected"
         }
       })
@@ -306,6 +332,25 @@ function AdminEmployeeEditSchedulePage() {
 
       console.log(`Removing ${shiftsToRemove.length} shifts, keeping ${shiftsToKeep.length} shifts`)
 
+      // Update the day status for the removed days
+      const newDayStatus = { ...dayStatus }
+      const today = dayjs()
+
+      matchingDates.forEach((dateStr) => {
+        const date = dayjs(dateStr)
+        const isPastDay = date.isBefore(today, "day")
+
+        // For past days, mark as absent
+        if (isPastDay) {
+          newDayStatus[dateStr] = "absent"
+        } else {
+          // For future days, mark as unselected
+          newDayStatus[dateStr] = "unselected"
+        }
+      })
+
+      setDayStatus(newDayStatus)
+
       // **Optimistically update UI BEFORE waiting for the API response**
       setSchedule((prev) => ({
         ...prev,
@@ -318,6 +363,31 @@ function AdminEmployeeEditSchedulePage() {
         ...prev,
         [dayName]: { type: "", start: "", end: "" },
       }))
+
+      // If we have shifts to remove and a schedule ID, update the schedule
+      if (shiftsToRemove.length > 0 && schedule.id) {
+        // Update the schedule to remove the day from the days array
+        const updatedDays = schedule.days.filter((d) => d !== dayName)
+
+        const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            remove_shift_ids: shiftsToRemove,
+            days: updatedDays,
+          }),
+        })
+
+        if (response.ok) {
+          const updatedSchedule = await response.json()
+          console.log("Successfully updated schedule after removing shifts:", updatedSchedule)
+        } else {
+          console.error("Failed to update schedule after removing shifts")
+        }
+      }
 
       // **Batch delete shifts in chunks (e.g., 10 at a time)**
       const chunkSize = 10
@@ -1113,7 +1183,7 @@ function AdminEmployeeEditSchedulePage() {
         const newShiftIds = await generateShiftsForDay(dayName)
 
         // If we have an existing schedule, update it with the new shifts
-        if (schedule.id) {
+        if (schedule.id && newShiftIds.length > 0) {
           const accessToken = localStorage.getItem("access_token")
 
           // Update the schedule with add_shift_ids
@@ -1125,6 +1195,7 @@ function AdminEmployeeEditSchedulePage() {
             },
             body: JSON.stringify({
               add_shift_ids: newShiftIds,
+              days: [...(schedule.days || []), dayName].filter((d, i, arr) => arr.indexOf(d) === i), // Add day if not already present
             }),
           })
 
@@ -1190,8 +1261,11 @@ function AdminEmployeeEditSchedulePage() {
                 // Day is being deselected
                 if (isPastDay && hasAttendanceRecord) {
                   // Keep the attendance status for past days with records
+                } else if (isPastDay) {
+                  // Keep past days as "absent"
+                  newDayStatus[dateStr] = "absent"
                 } else {
-                  // Reset to unselected for future days or days without attendance
+                  // Reset to unselected for future days without attendance
                   newDayStatus[dateStr] = "unselected"
                 }
               }
@@ -1265,42 +1339,9 @@ function AdminEmployeeEditSchedulePage() {
       setSelectedShift(shift)
       console.log(`Selected shift type: ${shift}`)
 
-      // Regenerate shifts for all selected days with the new shift type
-      const selectedDayNames = []
-      Object.entries(selectedDays).forEach(([day, isSelected]) => {
-        if (isSelected) {
-          const dayName = {
-            S: "Sunday",
-            M: "Monday",
-            T: "Tuesday",
-            W: "Wednesday",
-            T2: "Thursday",
-            F: "Friday",
-            S2: "Saturday",
-          }[day]
-          selectedDayNames.push(dayName)
-        }
-      })
-
-      console.log(`Regenerating shifts for ${selectedDayNames.length} days with new shift type`)
-
-      // Process each day one at a time to avoid race conditions
-      for (const dayName of selectedDayNames) {
-        // Only update days that don't have a specific shift type set
-        if (!dayShifts[dayName].type) {
-          // Remove existing shifts for this day
-          await removeShiftsForDay(dayName)
-
-          // Generate new shifts with the updated shift type
-          await generateShiftsForDay(dayName)
-        }
-      }
-
-      // If we have no selected days but have selected a shift type,
-      // we should still update the state to remember the shift type
-      if (selectedDayNames.length === 0) {
-        console.log("No days selected, but shift type has been set for future use")
-      }
+      // We'll just set the shift type but not regenerate shifts
+      // This will be used for any new days that are selected
+      console.log(`Set shift type to ${shift} for future use`)
     } catch (error) {
       console.error("Error handling shift selection:", error)
     } finally {
@@ -1864,7 +1905,7 @@ function AdminEmployeeEditSchedulePage() {
         updateCalendarWithSchedule(schedule, schedule.days)
       }, 100)
     }
-  }, [currentDate.month(), currentDate.year()])
+  }, [currentDate.month(), currentDate.year(), schedule.id])
 
   useEffect(() => {
     if (schedule && schedule.days && schedule.days.length > 0) {
