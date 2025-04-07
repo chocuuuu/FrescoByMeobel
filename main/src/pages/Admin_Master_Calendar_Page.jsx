@@ -8,8 +8,8 @@ import { API_BASE_URL } from "../config/api"
 import dayjs from "dayjs"
 
 // Components for the Master Calendar
-import Master_Calendar_View from "../components/Master_Calendar_View"
-import Add_Holiday from "../components/Add_Holiday"
+import MasterCalendarView from "../components/Master_Calendar_View"
+import AddHoliday from "../components/Add_Holiday"
 
 function AdminMasterCalendarPage() {
   const navigate = useNavigate()
@@ -118,6 +118,18 @@ function AdminMasterCalendarPage() {
         setHolidays([...holidays, response.data])
       }
 
+      // Trigger the update of employee schedules
+      try {
+        await axios.post(
+          `${API_BASE_URL}/master-calendar/sync-holidays/`,
+          { holiday_id: response.data.id },
+          { headers },
+        )
+        console.log("Holiday synced to employee schedules")
+      } catch (syncError) {
+        console.error("Error syncing holiday to employee schedules:", syncError)
+      }
+
       // Close the panel
       setIsPanelOpen(false)
       setSelectedHoliday(null)
@@ -155,6 +167,14 @@ function AdminMasterCalendarPage() {
 
       // Remove the deleted holiday from the holidays state
       setHolidays(holidays.filter((holiday) => holiday.id !== id))
+
+      // Trigger the update of employee schedules to remove the holiday
+      try {
+        await axios.post(`${API_BASE_URL}/master-calendar/sync-holidays/`, {}, { headers })
+        console.log("Holiday removal synced to employee schedules")
+      } catch (syncError) {
+        console.error("Error syncing holiday removal to employee schedules:", syncError)
+      }
 
       // Close the panel
       setIsPanelOpen(false)
@@ -198,7 +218,7 @@ function AdminMasterCalendarPage() {
         ) : (
           <div className="flex">
             <div className={`flex-1 transition-all duration-300 ${isPanelOpen ? "pr-80" : ""}`}>
-              <Master_Calendar_View
+              <MasterCalendarView
                 holidays={holidays}
                 payrollPeriods={payrollPeriods}
                 onDateSelect={handleDateSelect}
@@ -206,8 +226,8 @@ function AdminMasterCalendarPage() {
             </div>
 
             {isPanelOpen && (
-              <div className="fixed right-0 top-0 h-full w-80 bg-white shadow-lg z-10 pt-16 overflow-y-auto">
-                <Add_Holiday
+              <div className="fixed right-0 top-[112px] h-[calc(100vh-64px)] w-80 bg-white shadow-lg z-[1] overflow-y-auto">
+                <AddHoliday
                   selectedDate={selectedDate}
                   holiday={selectedHoliday}
                   onSave={handleSaveHoliday}

@@ -69,8 +69,8 @@ const AddHoliday = ({ selectedDate, holiday, onSave, onDelete, onClose }) => {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-gray-50 p-4 rounded-lg mb-6">
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="bg-gray-50 p-4 rounded-lg mb-5">
           <label className="block text-sm font-medium text-gray-700 mb-2">Selected Date</label>
           <div className="text-lg font-medium">{dayjs(formData.date).format("MMMM D, YYYY")}</div>
           <input type="hidden" name="date" value={formData.date} />
@@ -116,7 +116,7 @@ const AddHoliday = ({ selectedDate, holiday, onSave, onDelete, onClose }) => {
           <textarea
             id="description"
             name="description"
-            rows="4"
+            rows="3"
             value={formData.description}
             onChange={handleChange}
             className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-[#5C7346] focus:border-[#5C7346] transition-colors"
@@ -124,33 +124,35 @@ const AddHoliday = ({ selectedDate, holiday, onSave, onDelete, onClose }) => {
           ></textarea>
         </div>
 
-        <div className="flex justify-between pt-4 border-t border-gray-200">
-          <div>
-            {holiday && holiday.id && (
+        <div className="pt-4 border-t border-gray-200 mt-6">
+          <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
+            {holiday && holiday.id ? (
               <button
                 type="button"
                 onClick={handleDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg shadow-sm hover:bg-red-700 transition-colors"
+                className="w-full sm:w-auto px-4 py-2 bg-red-600 text-white rounded-lg shadow-sm hover:bg-red-700 transition-colors text-sm"
               >
                 Delete Holiday
               </button>
+            ) : (
+              <div></div> // Empty div to maintain layout when no delete button
             )}
-          </div>
 
-          <div className="flex space-x-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 bg-gray-200 rounded-lg shadow-sm hover:bg-gray-300 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-[#5C7346] text-white rounded-lg shadow-sm hover:bg-[#4a5c38] transition-colors"
-            >
-              {holiday ? "Update Holiday" : "Save Holiday"}
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full sm:w-auto px-4 py-2 bg-gray-200 rounded-lg shadow-sm hover:bg-gray-300 transition-colors text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="w-full sm:w-auto px-4 py-2 bg-[#5C7346] text-white rounded-lg shadow-sm hover:bg-[#4a5c38] transition-colors text-sm"
+              >
+                {holiday ? "Update Holiday" : "Save Holiday"}
+              </button>
+            </div>
           </div>
         </div>
       </form>
