@@ -40,6 +40,8 @@ function AdminEmployeeEditSchedulePage() {
     payroll_period: "",
     hours: 8,
     bi_weekly_start: "",
+    payroll_period_start: null,
+    payroll_period_end: null,
   })
 
   // State for selected days and shifts - start with none selected
@@ -165,29 +167,6 @@ function AdminEmployeeEditSchedulePage() {
       }
 
       console.log(`Created ${newShiftIds.length} new shifts`)
-
-      // Update the schedule with the new shift IDs
-      setSchedule((prev) => {
-        // Get existing shift IDs that don't conflict with new ones
-        const existingShiftIds = prev.shift_ids || []
-
-        // Combine with new shift IDs
-        const combinedShiftIds = [...existingShiftIds, ...newShiftIds]
-
-        // Add the day to the days array if it's not already there
-        const updatedDays = [...prev.days]
-        if (!updatedDays.includes(dayName)) {
-          updatedDays.push(dayName)
-        }
-
-        console.log(`Updated schedule with ${combinedShiftIds.length} total shifts`)
-
-        return {
-          ...prev,
-          shift_ids: combinedShiftIds,
-          days: updatedDays,
-        }
-      })
 
       // Update the day status to show selected days as blue instead of green
       const newDayStatus = { ...dayStatus }
@@ -367,6 +346,90 @@ function AdminEmployeeEditSchedulePage() {
     }
   }
 
+  // Add shifts for a specific day without affecting other days
+  const addShiftsForDay = async (dayName) => {
+    try {
+      setIsSaving(true)
+      setSaveSuccess(false)
+      setSaveMessage("")
+
+      // Check if we already have this day in the schedule
+      if (schedule.days && schedule.days.includes(dayName)) {
+        setSaveSuccess(false)
+        setSaveMessage(`${dayName} is already in the schedule.`)
+        setIsSaving(false)
+        return
+      }
+
+      // Generate shifts for this day
+      const newShiftIds = await generateShiftsForDay(dayName)
+
+      if (newShiftIds.length === 0) {
+        setSaveSuccess(false)
+        setSaveMessage(`Failed to create shifts for ${dayName}.`)
+        setIsSaving(false)
+        return
+      }
+
+      // If we have a schedule ID, use the add-shifts endpoint
+      if (schedule.id) {
+        const accessToken = localStorage.getItem("access_token")
+
+        // Call the add-shifts endpoint
+        const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/add-shifts/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            shift_ids: newShiftIds,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to add shifts: ${response.statusText}`)
+        }
+
+        const updatedSchedule = await response.json()
+        console.log("Successfully added shifts:", updatedSchedule)
+
+        // Update the schedule state
+        setSchedule(updatedSchedule)
+
+        // Update the selected days
+        const daysMap = {
+          Sunday: "S",
+          Monday: "M",
+          Tuesday: "T",
+          Wednesday: "W",
+          Thursday: "T2",
+          Friday: "F",
+          Saturday: "S2",
+        }
+
+        if (daysMap[dayName]) {
+          setSelectedDays((prev) => ({
+            ...prev,
+            [daysMap[dayName]]: true,
+          }))
+        }
+
+        setSaveSuccess(true)
+        setSaveMessage(`Successfully added ${dayName} to the schedule.`)
+      } else {
+        // If no schedule exists, create one
+        await handleSaveSchedule()
+      }
+    } catch (error) {
+      console.error(`Error adding shifts for ${dayName}:`, error)
+      setSaveSuccess(false)
+      setSaveMessage(`Error: ${error.message}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   // Delete the entire schedule
   const handleDeleteSchedule = async () => {
     if (isDeleting) return
@@ -413,6 +476,8 @@ function AdminEmployeeEditSchedulePage() {
         payroll_period: "",
         hours: 8,
         bi_weekly_start: "",
+        payroll_period_start: null,
+        payroll_period_end: null,
       })
 
       setSelectedDays({
@@ -627,6 +692,8 @@ function AdminEmployeeEditSchedulePage() {
           payroll_period: "",
           hours: 8,
           bi_weekly_start: "",
+          payroll_period_start: null,
+          payroll_period_end: null,
         })
 
         // Reset selected days to none selected
@@ -1023,12 +1090,11 @@ function AdminEmployeeEditSchedulePage() {
     setIsProcessingShifts(true)
 
     try {
-      const newSelectedDays = {
-        ...selectedDays,
-        [day]: !selectedDays[day],
-      }
-
-      setSelectedDays(newSelectedDays)
+      // Update the UI state first for immediate feedback
+      setSelectedDays((prev) => ({
+        ...prev,
+        [day]: !prev[day],
+      }))
 
       // Get the day name from the key
       const dayName = {
@@ -1043,10 +1109,37 @@ function AdminEmployeeEditSchedulePage() {
 
       // If the day is being selected (not deselected)
       if (!selectedDays[day]) {
-        // Generate shifts for all instances of this day in the current month
-        await generateShiftsForDay(dayName)
+        // Generate shifts for this day
+        const newShiftIds = await generateShiftsForDay(dayName)
+
+        // If we have an existing schedule, update it with the new shifts
+        if (schedule.id) {
+          const accessToken = localStorage.getItem("access_token")
+
+          // Update the schedule with add_shift_ids
+          const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              add_shift_ids: newShiftIds,
+            }),
+          })
+
+          if (response.ok) {
+            const updatedSchedule = await response.json()
+            setSchedule(updatedSchedule)
+
+            // Update the calendar with the new schedule
+            updateCalendarWithSchedule(updatedSchedule, updatedSchedule.days)
+          } else {
+            console.error("Failed to update schedule with new shifts")
+          }
+        }
       } else {
-        // Remove this day from the schedule
+        // If the day is being deselected, remove it
         await removeShiftsForDay(dayName)
       }
 
@@ -1084,7 +1177,7 @@ function AdminEmployeeEditSchedulePage() {
 
             // Only update if it doesn't have a special status
             if (!hasSpecialStatus) {
-              if (!selectedDays[day]) {
+              if (selectedDays[day]) {
                 // Day is being selected - mark as "selected" unless it has attendance data
                 if (isPastDay && hasAttendanceRecord) {
                   // Keep the attendance status for past days with records
@@ -1391,103 +1484,125 @@ function AdminEmployeeEditSchedulePage() {
       if (selectedDaysArray.length === 0) {
         setSaveSuccess(false)
         setSaveMessage("Please select at least one day for the schedule.")
+        setIsSaving(false)
         return
       }
 
-      // Force create shifts for all selected days
-      console.log("Creating shifts for all selected days before saving...")
+      // Get the correct user ID from the employee data
+      const userId = employee?.user?.id || Number.parseInt(employeeId)
+      const accessToken = localStorage.getItem("access_token")
+
+      // Create new shifts for the selected days
+      console.log("Creating shifts for selected days...")
       setIsProcessingShifts(true)
 
+      const newShiftIds = []
       try {
-        // Clear existing shift IDs to avoid duplicates
-        setSchedule((prev) => ({ ...prev, shift_ids: [] }))
-
         // Process each selected day to create shifts
         for (const dayName of selectedDaysArray) {
-          await generateShiftsForDay(dayName)
+          // Only create shifts for days that aren't already in the schedule
+          if (!schedule.days || !schedule.days.includes(dayName)) {
+            const shiftIds = await generateShiftsForDay(dayName)
+            newShiftIds.push(...shiftIds)
+          }
         }
-
-        // Small delay to ensure state updates
-        await new Promise((resolve) => setTimeout(resolve, 500))
       } catch (error) {
         console.error("Error creating shifts:", error)
       } finally {
         setIsProcessingShifts(false)
       }
 
-      // Get the updated shift IDs after creation
-      const shiftIds = schedule.shift_ids || []
+      console.log(`Created ${newShiftIds.length} new shifts`)
 
-      console.log(`After creating shifts, we have ${shiftIds.length} shift IDs`)
+      // If we have a schedule ID, use PATCH with add_shift_ids
+      if (schedule.id) {
+        console.log(`Updating existing schedule ${schedule.id} with add_shift_ids:`, newShiftIds)
 
-      // If we still don't have shifts, create a default shift for each day
-      if (shiftIds.length === 0) {
-        setSaveSuccess(false)
-        setSaveMessage("Unable to create shifts automatically. Please try selecting the shift type again.")
-        return
+        // Prepare the update data with add_shift_ids
+        const updateData = {
+          add_shift_ids: newShiftIds,
+          // Include other fields that might have changed
+          sickleave: schedule.sickleave,
+          regularholiday: schedule.regularholiday || [],
+          specialholiday: schedule.specialholiday || [],
+          nightdiff: schedule.nightdiff || [],
+          oncall: schedule.oncall || [],
+          vacationleave: schedule.vacationleave || [],
+        }
+
+        // Update the schedule using PATCH to add new shifts
+        const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(updateData),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(`Failed to update schedule: ${JSON.stringify(errorData)}`)
+        }
+
+        const updatedSchedule = await response.json()
+        console.log("Schedule updated successfully:", updatedSchedule)
+        setSchedule(updatedSchedule)
+
+        // Update the calendar with the new schedule
+        updateCalendarWithSchedule(updatedSchedule, updatedSchedule.days)
+
+        setSaveSuccess(true)
+        setSaveMessage("Schedule updated successfully!")
+      } else {
+        // If no schedule exists, create a new one
+        console.log("Creating new schedule with shifts:", newShiftIds)
+
+        // Prepare the new schedule data
+        const scheduleData = {
+          user_id: userId,
+          shift_ids: newShiftIds,
+          days: selectedDaysArray,
+          sickleave: schedule.sickleave,
+          regularholiday: schedule.regularholiday || [],
+          specialholiday: schedule.specialholiday || [],
+          nightdiff: schedule.nightdiff || [],
+          oncall: schedule.oncall || [],
+          vacationleave: schedule.vacationleave || [],
+          payroll_period_start: schedule.payroll_period_start || null,
+          payroll_period_end: schedule.payroll_period_end || null,
+          hours: 8,
+          bi_weekly_start: schedule.bi_weekly_start || dayjs().format("YYYY-MM-DD"),
+        }
+
+        // Create a new schedule
+        const response = await fetch(`${API_BASE_URL}/schedule/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(scheduleData),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(`Failed to create schedule: ${JSON.stringify(errorData)}`)
+        }
+
+        const newSchedule = await response.json()
+        console.log("Schedule created successfully:", newSchedule)
+        setSchedule(newSchedule)
+
+        // Update the calendar with the new schedule
+        updateCalendarWithSchedule(newSchedule, newSchedule.days)
+
+        setSaveSuccess(true)
+        setSaveMessage("Schedule created successfully!")
       }
 
-      // Get the correct user ID from the employee data
-      const userId = employee?.user?.id || Number.parseInt(employeeId)
-
-      // Prepare the schedule data
-      const scheduleData = {
-        user_id: userId,
-        shift_ids: shiftIds,
-        days: selectedDaysArray,
-        sickleave: schedule.sickleave,
-        regularholiday: schedule.regularholiday || [],
-        specialholiday: schedule.specialholiday || [],
-        nightdiff: schedule.nightdiff || [],
-        oncall: schedule.oncall || [],
-        vacationleave: schedule.vacationleave || [],
-        payroll_period: "2025-04-15",
-        hours: 8,
-        bi_weekly_start: "2025-04-01",
-      }
-
-      console.log("Saving schedule data:", scheduleData)
-
-      const accessToken = localStorage.getItem("access_token")
-      const method = schedule.id ? "PUT" : "POST"
-      const url = schedule.id ? `${API_BASE_URL}/schedule/${schedule.id}/` : `${API_BASE_URL}/schedule/`
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(scheduleData),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(`Failed to save schedule: ${JSON.stringify(errorData)}`)
-      }
-
-      const savedData = await response.json()
-      console.log("Schedule saved successfully:", savedData)
-
-      // Update the local schedule state with the saved data
-      setSchedule(savedData)
-
-      // Make sure we're using the correct days array for updating the calendar
-      const daysToUse = savedData.days || selectedDaysArray
-      console.log("Using these days to update calendar:", daysToUse)
-
-      // Immediately update the calendar to show the newly scheduled days
-      updateCalendarWithSchedule(savedData, daysToUse)
-
-      // Force a re-render of the calendar by updating the current date slightly
+      // Force a re-render of the calendar
       setCurrentDate((prev) => dayjs(prev))
-
-      setSaveSuccess(true)
-      setSaveMessage("Schedule saved successfully!")
-
-      // Add a debug button to show the current schedule
-      console.log("Current schedule after save:", savedData)
-      console.log("Current day status after save:", dayStatus)
     } catch (error) {
       console.error("Error saving schedule:", error)
       setSaveSuccess(false)
@@ -2181,8 +2296,6 @@ function AdminEmployeeEditSchedulePage() {
         }
       `}</style>
     </div>
-
-    
   )
 }
 
