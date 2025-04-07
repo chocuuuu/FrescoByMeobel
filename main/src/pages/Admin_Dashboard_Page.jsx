@@ -136,6 +136,12 @@ function AdminDashboardPage() {
           <button onClick={() => navigate("/payslip")} className="bg-gray-800 text-white px-6 py-2 rounded-md w-32">
             Payslip
           </button>
+          <button
+            onClick={() => navigate("/master-calendar")}
+            className="bg-gray-800 text-white px-6 py-2 rounded-md w-32"
+          >
+            Calendar
+          </button>
         </div>
       </div>
     </div>
