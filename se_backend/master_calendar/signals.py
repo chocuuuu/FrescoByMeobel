@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-from .models import MasterCalendar
+from .models import MasterCalendar, MasterCalendarPayroll
 
 
 @receiver([post_save], sender=MasterCalendar)
@@ -20,3 +20,8 @@ def trigger_full_update_on_delete(sender, instance, **kwargs):
     """
     from .tasks import sync_holidays_for_new_calendar_entries
     sync_holidays_for_new_calendar_entries.delay()
+
+@receiver([post_save], sender=MasterCalendarPayroll)
+def trigger_create_biweekly(sender, instance, **kwargs):
+    from schedule.tasks import create_biweekly_schedules
+    create_biweekly_schedules.delay()
