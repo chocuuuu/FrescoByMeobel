@@ -2,6 +2,7 @@ from django.test import TestCase
 from users.models import CustomUser
 from employment_info.models import EmploymentInfo
 from employees.models import Employee
+from datetime import date
 
 
 class EmployeeModelTestCase(TestCase):
@@ -14,14 +15,15 @@ class EmployeeModelTestCase(TestCase):
             role="employee"
         )
 
-        # Creating a test employment info
+
+        # Inside setUp()
         self.employment_info = EmploymentInfo.objects.create(
             employee_number=12345,
             first_name="John",
             last_name="Doe",
             position="Developer",
             address="123 Street",
-            hire_date="2021-01-01",
+            hire_date=date(2021, 1, 1),
             active=True
         )
 
