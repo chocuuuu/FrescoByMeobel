@@ -78,15 +78,40 @@ function AdminEmployeeEditSchedulePage() {
     Saturday: { type: "", start: "", end: "" },
   })
 
+  // Helper function to convert time string (e.g., "8:00 AM") to time format (e.g., "08:00:00")
+  const convertTimeStringToTimeFormat = (timeString) => {
+    if (!timeString) return "00:00:00"
+
+    const [time, modifier] = timeString.split(" ")
+    let [hours, minutes] = time.split(":")
+    hours = Number.parseInt(hours)
+
+    if (modifier === "PM" && hours !== 12) hours = hours + 12
+    if (modifier === "AM" && hours === 12) hours = 0
+
+    hours = hours.toString().padStart(2, "0")
+    minutes = minutes.padStart(2, "0")
+
+    return `${hours}:${minutes}:00`
+  }
+
+  // Helper function to convert time format (e.g., "08:00:00") to time string (e.g., "8:00 AM")
+  const convertTimeFormatToTimeString = (timeFormat) => {
+    if (!timeFormat) return "12:00 AM"
+
+    const [hours, minutes, seconds] = timeFormat.split(":")
+    let hour = Number.parseInt(hours)
+    const modifier = hour >= 12 ? "PM" : "AM"
+
+    hour = hour % 12
+    hour = hour ? hour : 12 // the hour '0' should be '12'
+
+    return `${hour}:${minutes} ${modifier}`
+  }
+
   // Generate shifts for all instances of a specific day in the current month
   const generateShiftsForDay = async (dayName) => {
     try {
-      // If no shift type is selected, select a default one
-      if (!selectedShift && !dayShifts[dayName].type) {
-        setSelectedShift("morning")
-        console.log("No shift selected, defaulting to morning shift")
-      }
-
       const accessToken = localStorage.getItem("access_token")
       const year = currentDate.year()
       const month = currentDate.month()
@@ -109,13 +134,39 @@ function AdminEmployeeEditSchedulePage() {
 
       // Get shift times based on selected shift type
       let shiftStart, shiftEnd
-      if (dayShifts[dayName].start && dayShifts[dayName].end) {
-        // Use day-specific shift times
-        shiftStart = dayShifts[dayName].start
-        shiftEnd = dayShifts[dayName].end
+      if (dayShifts[dayName].type) {
+        // Use day-specific shift times if available
+        const shiftType = dayShifts[dayName].type
+        if (dayShifts[dayName].start && dayShifts[dayName].end) {
+          shiftStart = dayShifts[dayName].start
+          shiftEnd = dayShifts[dayName].end
+        } else {
+          // Calculate times based on the day-specific shift type
+          switch (shiftType) {
+            case "morning":
+              shiftStart = "10:00:00"
+              shiftEnd = "19:00:00"
+              break
+            case "midday":
+              shiftStart = "12:00:00"
+              shiftEnd = "21:00:00"
+              break
+            case "night":
+              shiftStart = "14:00:00" // Corrected night shift start time
+              shiftEnd = "23:00:00"
+              break
+            case "custom":
+              shiftStart = convertTimeStringToTimeFormat(customShiftStart)
+              shiftEnd = convertTimeStringToTimeFormat(customShiftEnd)
+              break
+            default:
+              shiftStart = "10:00:00"
+              shiftEnd = "19:00:00"
+          }
+        }
       } else {
-        // Use global shift times
-        switch (shiftType) {
+        // Use global shift type if no day-specific type is set
+        switch (selectedShift) {
           case "morning":
             shiftStart = "10:00:00"
             shiftEnd = "19:00:00"
@@ -125,7 +176,7 @@ function AdminEmployeeEditSchedulePage() {
             shiftEnd = "21:00:00"
             break
           case "night":
-            shiftStart = "19:00:00"
+            shiftStart = "14:00:00" // Corrected night shift start time
             shiftEnd = "23:00:00"
             break
           case "custom":
@@ -136,7 +187,6 @@ function AdminEmployeeEditSchedulePage() {
             // Default to morning shift if somehow no shift is selected
             shiftStart = "10:00:00"
             shiftEnd = "19:00:00"
-            break
         }
       }
 
@@ -909,13 +959,14 @@ function AdminEmployeeEditSchedulePage() {
 
                 // Determine shift type for each day
                 const newDayShifts = { ...dayShifts }
+                let startTime, endTime
 
                 Object.entries(shiftsByDay).forEach(([day, dayShifts]) => {
                   if (dayShifts.length > 0) {
                     // Use the first shift for this day to determine type
                     const shift = dayShifts[0]
-                    const startTime = shift.shift_start
-                    const endTime = shift.shift_end
+                    startTime = shift.shift_start
+                    endTime = shift.shift_end
 
                     let shiftType = ""
                     if (startTime === "10:00:00" && endTime === "19:00:00") {
@@ -927,7 +978,6 @@ function AdminEmployeeEditSchedulePage() {
                     } else {
                       shiftType = "custom"
                     }
-
                     newDayShifts[day] = {
                       type: shiftType,
                       start: startTime,
@@ -1166,27 +1216,74 @@ function AdminEmployeeEditSchedulePage() {
         [day]: !prev[day],
       }))
 
-      // Get the day name from the key
-      const dayName = {
-        S: "Sunday",
-        M: "Monday",
-        T: "Tuesday",
-        W: "Wednesday",
-        T2: "Thursday",
-        F: "Friday",
-        S2: "Saturday",
-      }[day]
-
       // If the day is being selected (not deselected)
       if (!selectedDays[day]) {
+        // Get the day name from the key
+        const dayName = {
+          S: "Sunday",
+          M: "Monday",
+          T: "Tuesday",
+          W: "Wednesday",
+          T2: "Thursday",
+          F: "Friday",
+          S2: "Saturday",
+        }[day]
+
+        // Set the day-specific shift type if not already set
+        if (!dayShifts[dayName].type) {
+          // Use the currently selected shift type
+          const shiftType = selectedShift || "morning"
+          let shiftStart, shiftEnd
+
+          switch (shiftType) {
+            case "morning":
+              shiftStart = "10:00:00"
+              shiftEnd = "19:00:00"
+              break
+            case "midday":
+              shiftStart = "12:00:00"
+              shiftEnd = "21:00:00"
+              break
+            case "night":
+              shiftStart = "14:00:00"
+              shiftEnd = "23:00:00"
+              break
+            case "custom":
+              shiftStart = convertTimeStringToTimeFormat(customShiftStart)
+              shiftEnd = convertTimeStringToTimeFormat(customShiftEnd)
+              break
+            default:
+              shiftStart = "10:00:00"
+              shiftEnd = "19:00:00"
+          }
+
+          setDayShifts((prev) => ({
+            ...prev,
+            [dayName]: {
+              type: shiftType,
+              start: shiftStart,
+              end: shiftEnd,
+            },
+          }))
+        }
+
         // Generate shifts for this day
         const newShiftIds = await generateShiftsForDay(dayName)
 
         // If we have an existing schedule, update it with the new shifts
-        if (schedule.id && newShiftIds.length > 0) {
+        if (schedule.id) {
           const accessToken = localStorage.getItem("access_token")
 
-          // Update the schedule with add_shift_ids
+          // CRITICAL FIX: Create an updated days array with the new day added
+          // Make sure to preserve existing days
+          const updatedDays = [...(schedule.days || [])]
+          if (!updatedDays.includes(dayName)) {
+            updatedDays.push(dayName)
+          }
+
+          console.log(`Updating schedule with days: ${updatedDays.join(", ")}`)
+
+          // Update the schedule with add_shift_ids and the updated days array
           const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
             method: "PATCH",
             headers: {
@@ -1195,7 +1292,7 @@ function AdminEmployeeEditSchedulePage() {
             },
             body: JSON.stringify({
               add_shift_ids: newShiftIds,
-              days: [...(schedule.days || []), dayName].filter((d, i, arr) => arr.indexOf(d) === i), // Add day if not already present
+              days: updatedDays,
             }),
           })
 
@@ -1521,6 +1618,8 @@ function AdminEmployeeEditSchedulePage() {
         .filter(([_, isSelected]) => isSelected)
         .map(([day, _]) => daysMap[day])
 
+      console.log("Selected days for schedule:", selectedDaysArray)
+
       // Check if we have any selected days
       if (selectedDaysArray.length === 0) {
         setSaveSuccess(false)
@@ -1533,7 +1632,7 @@ function AdminEmployeeEditSchedulePage() {
       const userId = employee?.user?.id || Number.parseInt(employeeId)
       const accessToken = localStorage.getItem("access_token")
 
-      // Create new shifts for the selected days
+      // CRITICAL FIX: For each selected day, create shifts with the correct shift type
       console.log("Creating shifts for selected days...")
       setIsProcessingShifts(true)
 
@@ -1543,6 +1642,10 @@ function AdminEmployeeEditSchedulePage() {
         for (const dayName of selectedDaysArray) {
           // Only create shifts for days that aren't already in the schedule
           if (!schedule.days || !schedule.days.includes(dayName)) {
+            // CRITICAL FIX: Use the correct shift type for each day
+            // Set the day-specific shift type if not already set
+            const shiftTypeToUse = selectedShift
+
             const shiftIds = await generateShiftsForDay(dayName)
             newShiftIds.push(...shiftIds)
           }
@@ -1559,9 +1662,25 @@ function AdminEmployeeEditSchedulePage() {
       if (schedule.id) {
         console.log(`Updating existing schedule ${schedule.id} with add_shift_ids:`, newShiftIds)
 
+        // CRITICAL FIX: Preserve existing days when updating
+        // Get the current days from the schedule
+        const existingDays = schedule.days || []
+
+        // Add any new selected days that aren't already in the schedule
+        const updatedDays = [...existingDays]
+        selectedDaysArray.forEach((day) => {
+          if (!updatedDays.includes(day)) {
+            updatedDays.push(day)
+          }
+        })
+
+        console.log(`Updating schedule with days: ${updatedDays.join(", ")}`)
+
         // Prepare the update data with add_shift_ids
         const updateData = {
           add_shift_ids: newShiftIds,
+          // IMPORTANT: Always include the complete days array
+          days: updatedDays,
           // Include other fields that might have changed
           sickleave: schedule.sickleave,
           regularholiday: schedule.regularholiday || [],
@@ -1792,98 +1911,55 @@ function AdminEmployeeEditSchedulePage() {
     }
   }
 
-  // Get status color for calendar day
-  const getDayStatusColor = (day) => {
-    if (!day.isCurrentMonth) return "bg-gray-400 text-white cursor-default pointer-events-none"
-
-    const dateStr = day.date.format("YYYY-MM-DD")
-    const status = dayStatus[dateStr]
-    const isPastDay = day.date.isBefore(dayjs(), "day")
-
-    switch (status) {
-      case "attended":
-        return "bg-green-500 text-white" // Attended (past)
-      case "absent":
-        return "bg-red-500 text-white" // Absent (past)
-      case "selected":
-        return isPastDay
-          ? "bg-yellow-200 text-yellow-800" // Scheduled but in the past (should have attendance)
-          : "bg-blue-200 text-blue-800" // Scheduled future day
-      case "sickleave":
-        return "bg-orange-400 text-white"
-      case "regularholiday":
-        return "bg-orange-400 text-white"
-      case "specialholiday":
-        return "bg-orange-400 text-white"
-      case "vacationleave":
-        return "bg-orange-400 text-white"
-      case "nightdiff":
-        return "bg-blue-500 text-white"
-      case "oncall":
-        return "bg-purple-500 text-white"
-      default:
-        return "bg-white"
-    }
-  }
-
-  // Get event status for selected date
+  // Helper function to get the event status for a specific event type
   const getEventStatus = (eventType) => {
     if (!selectedDate) return false
 
     const dateStr = selectedDate.format("YYYY-MM-DD")
-    const status = dayStatus[dateStr]
 
-    return status === eventType
-  }
-
-  // In your Admin_Employee_Edit_Schedule_Page.jsx or another component
-  useEffect(() => {
-    console.log("API_BASE_URL:", API_BASE_URL)
-  }, [])
-
-  // Helper function to convert time strings like "10:00 AM" to "10:00:00" format
-  const convertTimeStringToTimeFormat = (timeString) => {
-    try {
-      // Parse the time string
-      const [time, period] = timeString.split(" ")
-      let [hours, minutes] = time.split(":").map(Number)
-
-      // Convert to 24-hour format
-      if (period === "PM" && hours < 12) {
-        hours += 12
-      } else if (period === "AM" && hours === 12) {
-        hours = 0
-      }
-
-      // Format as HH:MM:00
-      return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:00`
-    } catch (error) {
-      console.error("Error converting time string:", error)
-      return "00:00:00" // Default fallback
+    switch (eventType) {
+      case "sickleave":
+        return schedule.sickleave === dateStr
+      case "regularholiday":
+        return schedule.regularholiday?.includes(dateStr) || false
+      case "specialholiday":
+        return schedule.specialholiday?.includes(dateStr) || false
+      case "nightdiff":
+        return schedule.nightdiff?.includes(dateStr) || false
+      case "oncall":
+        return schedule.oncall?.includes(dateStr) || false
+      case "vacationleave":
+        return schedule.vacationleave?.includes(dateStr) || false
+      default:
+        return false
     }
   }
 
-  // Helper function to convert time format like "10:00:00" to "10:00 AM"
-  const convertTimeFormatToTimeString = (timeFormat) => {
-    try {
-      const [hours, minutes] = timeFormat.split(":").map(Number)
+  // Function to determine the background color of a calendar day based on its status
+  const getDayStatusColor = (day) => {
+    if (!day.isCurrentMonth) {
+      return "bg-gray-200 text-gray-400" // Light gray for days outside the current month
+    }
 
-      // Convert to 12-hour format
-      let period = "AM"
-      let displayHours = hours
+    const dateStr = day.date.format("YYYY-MM-DD")
+    const status = dayStatus[dateStr]
 
-      if (hours >= 12) {
-        period = "PM"
-        displayHours = hours === 12 ? 12 : hours - 12
-      }
-      if (displayHours === 0) {
-        displayHours = 12
-      }
-
-      return `${displayHours}:${minutes.toString().padStart(2, "0")} ${period}`
-    } catch (error) {
-      console.error("Error converting time format:", error)
-      return "12:00 AM" // Default fallback
+    switch (status) {
+      case "attended":
+        return "bg-green-500 text-white" // Green for attended days
+      case "absent":
+        return "bg-red-500 text-white" // Red for absent days
+      case "selected":
+        return "bg-blue-200 text-gray-800" // Blue for selected days
+      case "sickleave":
+      case "specialholiday":
+      case "regularholiday":
+      case "vacationleave":
+      case "nightdiff":
+      case "oncall":
+        return "bg-orange-400 text-white" // Orange for events
+      default:
+        return "bg-white text-gray-700" // White for unselected days
     }
   }
 
@@ -1905,7 +1981,7 @@ function AdminEmployeeEditSchedulePage() {
         updateCalendarWithSchedule(schedule, schedule.days)
       }, 100)
     }
-  }, [currentDate.month(), currentDate.year(), schedule.id])
+  }, [currentDate.month(), currentDate.year(), schedule])
 
   useEffect(() => {
     if (schedule && schedule.days && schedule.days.length > 0) {
@@ -1916,7 +1992,7 @@ function AdminEmployeeEditSchedulePage() {
         updateCalendarWithSchedule(schedule, schedule.days)
       }, 100)
     }
-  }, [schedule.id, JSON.stringify(schedule.days)])
+  }, [schedule.id, schedule])
 
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>
   if (error) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">{error}</div>
@@ -2081,6 +2157,23 @@ function AdminEmployeeEditSchedulePage() {
                           {day}
                         </button>
                       )
+                    })}
+                  </div>
+                  {/* Display selected shift types for each day */}
+                  <div className="mt-2 text-sm">
+                    {Object.entries(dayShifts).map(([day, data]) => {
+                      if (data.type) {
+                        return (
+                          <div
+                            key={day}
+                            className="flex justify-between items-center mb-1 bg-[#5C7346] p-1 rounded text-white"
+                          >
+                            <span>{day}:</span>
+                            <span className="capitalize">{data.type}</span>
+                          </div>
+                        )
+                      }
+                      return null
                     })}
                   </div>
                 </div>
