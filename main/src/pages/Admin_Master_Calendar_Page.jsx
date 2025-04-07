@@ -8,8 +8,8 @@ import { API_BASE_URL } from "../config/api"
 import dayjs from "dayjs"
 
 // Components for the Master Calendar
-import MasterCalendarView from "../components/Master_Calendar_View"
-import AddHoliday from "../components/Add_Holiday"
+import Master_Calendar_View from "../components/Master_Calendar_View"
+import Add_Holiday from "../components/Add_Holiday"
 
 function AdminMasterCalendarPage() {
   const navigate = useNavigate()
@@ -26,14 +26,20 @@ function AdminMasterCalendarPage() {
     const fetchData = async () => {
       setIsLoading(true)
       try {
-        // Get the authentication token
-        // In this system, the token might be stored differently or not required for some endpoints
-        // Let's try to fetch without a token first
-        const headers = {}
+        // Get the authentication token from localStorage
+        const token = localStorage.getItem("access_token")
+
+        // Set up headers with authentication token
+        const headers = token
+          ? {
+              Authorization: `Bearer ${token}`,
+            }
+          : {}
 
         try {
           // Try to fetch holidays
           const holidaysResponse = await axios.get(`${API_BASE_URL}/master-calendar/holiday/`, { headers })
+          console.log("Holidays response:", holidaysResponse.data)
           setHolidays(holidaysResponse.data.results || holidaysResponse.data || [])
         } catch (holidayError) {
           console.warn("Could not fetch holidays:", holidayError)
@@ -82,17 +88,31 @@ function AdminMasterCalendarPage() {
   // Handle holiday save
   const handleSaveHoliday = async (holidayData) => {
     try {
+      // Get the authentication token from localStorage
+      const token = localStorage.getItem("access_token")
+
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.")
+      }
+
+      // Set up headers with authentication token
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      }
+
       let response
 
       if (selectedHoliday && selectedHoliday.id) {
         // Update existing holiday
-        response = await axios.put(`${API_BASE_URL}/master-calendar/holiday/${selectedHoliday.id}/`, holidayData)
+        response = await axios.put(`${API_BASE_URL}/master-calendar/holiday/${selectedHoliday.id}/`, holidayData, {
+          headers,
+        })
 
         // Update the holidays state
         setHolidays(holidays.map((holiday) => (holiday.id === selectedHoliday.id ? response.data : holiday)))
       } else {
         // Create new holiday
-        response = await axios.post(`${API_BASE_URL}/master-calendar/holiday/`, holidayData)
+        response = await axios.post(`${API_BASE_URL}/master-calendar/holiday/`, holidayData, { headers })
 
         // Add the new holiday to the holidays state
         setHolidays([...holidays, response.data])
@@ -104,7 +124,11 @@ function AdminMasterCalendarPage() {
       setSelectedDate(null)
     } catch (err) {
       console.error("Error saving holiday:", err)
-      alert("Failed to save holiday. Please try again.")
+      if (err.response && err.response.status === 401) {
+        alert("Authentication error. Please log in again.")
+      } else {
+        alert("Failed to save holiday. Please try again.")
+      }
     }
   }
 
@@ -115,7 +139,19 @@ function AdminMasterCalendarPage() {
     }
 
     try {
-      await axios.delete(`${API_BASE_URL}/master-calendar/holiday/${id}/`)
+      // Get the authentication token from localStorage
+      const token = localStorage.getItem("access_token")
+
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.")
+      }
+
+      // Set up headers with authentication token
+      const headers = {
+        Authorization: `Bearer ${token}`,
+      }
+
+      await axios.delete(`${API_BASE_URL}/master-calendar/holiday/${id}/`, { headers })
 
       // Remove the deleted holiday from the holidays state
       setHolidays(holidays.filter((holiday) => holiday.id !== id))
@@ -126,7 +162,11 @@ function AdminMasterCalendarPage() {
       setSelectedDate(null)
     } catch (err) {
       console.error("Error deleting holiday:", err)
-      alert("Failed to delete holiday. Please try again.")
+      if (err.response && err.response.status === 401) {
+        alert("Authentication error. Please log in again.")
+      } else {
+        alert("Failed to delete holiday. Please try again.")
+      }
     }
   }
 
@@ -142,20 +182,23 @@ function AdminMasterCalendarPage() {
       <NavBar />
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 pt-16">
+      <div className="container mx-auto px-4 pt-16 pb-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold">Master Calendar</h1>
-          <p className="text-gray-600">Manage holidays and payroll periods</p>
+          <h1 className="text-3xl font-bold text-[#5C7346]">Master Calendar</h1>
+          <p className="text-gray-600">Manage holidays and payroll periods for all employees</p>
         </div>
 
         {isLoading ? (
           <div className="flex justify-center items-center h-64">
-            <p className="text-xl">Loading calendar data...</p>
+            <div className="flex flex-col items-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#5C7346]"></div>
+              <p className="mt-4 text-xl text-gray-700">Loading calendar data...</p>
+            </div>
           </div>
         ) : (
           <div className="flex">
             <div className={`flex-1 transition-all duration-300 ${isPanelOpen ? "pr-80" : ""}`}>
-              <MasterCalendarView
+              <Master_Calendar_View
                 holidays={holidays}
                 payrollPeriods={payrollPeriods}
                 onDateSelect={handleDateSelect}
@@ -164,7 +207,7 @@ function AdminMasterCalendarPage() {
 
             {isPanelOpen && (
               <div className="fixed right-0 top-0 h-full w-80 bg-white shadow-lg z-10 pt-16 overflow-y-auto">
-                <AddHoliday
+                <Add_Holiday
                   selectedDate={selectedDate}
                   holiday={selectedHoliday}
                   onSave={handleSaveHoliday}

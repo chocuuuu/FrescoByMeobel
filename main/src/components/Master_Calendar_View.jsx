@@ -99,7 +99,7 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
     const isWeekendDay = isWeekend(day)
     const isTodayDate = day.isToday()
 
-    let cellClasses = "relative h-12 border border-gray-200 p-1 cursor-pointer transition-colors"
+    let cellClasses = "relative h-14 border border-gray-200 p-1 cursor-pointer transition-colors rounded-md"
 
     // Apply styling based on day type
     if (holiday) {
@@ -121,13 +121,14 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
     return (
       <div key={day.format("YYYY-MM-DD")} className={cellClasses} onClick={() => handleDateClick(day)}>
         <div className="flex flex-col h-full">
-          <span className="text-sm">{day.format("D")}</span>
+          <span className="text-sm font-medium">{day.format("D")}</span>
           {holiday && (
             <div className="mt-auto">
               <span
                 className={`text-xs truncate block ${
                   holiday.holiday_type === "regular" ? "text-red-700" : "text-blue-700"
                 }`}
+                title={holiday.name}
               >
                 {holiday.name}
               </span>
@@ -144,20 +145,20 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 
     // Calculate the day of the week for the first day of the month (0-6)
-    const firstDayOfMonth = month.day()
+    const firstDayOfMonth = month.startOf("month").day()
 
     // Create empty cells for days before the first day of the month
     const emptyCells = Array.from({ length: firstDayOfMonth }, (_, i) => (
-      <div key={`empty-${i}`} className="h-12 border border-gray-200 bg-gray-50"></div>
+      <div key={`empty-${i}`} className="h-14 border border-gray-200 bg-gray-50 rounded-md"></div>
     ))
 
     return (
       <div key={month.format("YYYY-MM")} className="mb-8">
-        <h3 className="text-xl font-semibold mb-2">{month.format("MMMM YYYY")}</h3>
-        <div className="grid grid-cols-7 gap-0">
+        <h3 className="text-xl font-semibold mb-2 text-[#5C7346]">{month.format("MMMM YYYY")}</h3>
+        <div className="grid grid-cols-7 gap-1">
           {/* Day headers */}
           {dayNames.map((day) => (
-            <div key={day} className="h-8 flex items-center justify-center font-medium bg-gray-100">
+            <div key={day} className="h-8 flex items-center justify-center font-medium bg-gray-100 rounded-md">
               {day}
             </div>
           ))}
@@ -178,22 +179,34 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="bg-white rounded-lg shadow-md p-6">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div className="flex space-x-2">
-          <button onClick={goToPrevious} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+          <button
+            onClick={goToPrevious}
+            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors shadow-sm"
+          >
             {viewMode === "year" ? "Previous Year" : "Previous"}
           </button>
-          <button onClick={goToCurrent} className="px-4 py-2 bg-[#5C7346] text-white rounded hover:bg-[#4a5c38]">
+          <button
+            onClick={goToCurrent}
+            className="px-4 py-2 bg-[#5C7346] text-white rounded-md hover:bg-[#4a5c38] transition-colors shadow-sm"
+          >
             Today
           </button>
-          <button onClick={goToNext} className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">
+          <button
+            onClick={goToNext}
+            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors shadow-sm"
+          >
             {viewMode === "year" ? "Next Year" : "Next"}
           </button>
         </div>
 
         <div className="flex items-center space-x-4">
-          <button onClick={toggleViewMode} className="px-4 py-2 bg-[#5C7346] text-white rounded hover:bg-[#4a5c38]">
+          <button
+            onClick={toggleViewMode}
+            className="px-4 py-2 bg-[#5C7346] text-white rounded-md hover:bg-[#4a5c38] transition-colors shadow-sm"
+          >
             {viewMode === "year" ? "Switch to Month View" : "Switch to Year View"}
           </button>
 
@@ -206,7 +219,7 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
                 id="visibleMonths"
                 value={visibleMonths}
                 onChange={handleVisibleMonthsChange}
-                className="border rounded p-1"
+                className="border rounded-md p-1 shadow-sm"
               >
                 <option value="1">1</option>
                 <option value="3">3</option>
@@ -217,26 +230,27 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
         </div>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-6 p-4 bg-gray-50 rounded-lg shadow-sm">
+        <h4 className="font-medium mb-2 text-gray-700">Legend</h4>
         <div className="flex flex-wrap gap-4">
           <div className="flex items-center">
-            <div className="w-4 h-4 bg-red-100 border border-red-300 mr-2"></div>
+            <div className="w-5 h-5 bg-red-100 border border-red-300 mr-2 rounded-md"></div>
             <span className="text-sm">Regular Holiday</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 bg-blue-100 border border-blue-300 mr-2"></div>
+            <div className="w-5 h-5 bg-blue-100 border border-blue-300 mr-2 rounded-md"></div>
             <span className="text-sm">Special Holiday</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 bg-green-50 border border-green-300 mr-2"></div>
+            <div className="w-5 h-5 bg-green-50 border border-green-300 mr-2 rounded-md"></div>
             <span className="text-sm">Payroll Period</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 bg-gray-100 border border-gray-300 mr-2"></div>
+            <div className="w-5 h-5 bg-gray-100 border border-gray-300 mr-2 rounded-md"></div>
             <span className="text-sm">Weekend</span>
           </div>
           <div className="flex items-center">
-            <div className="w-4 h-4 border border-gray-300 mr-2 ring-2 ring-[#5C7346]"></div>
+            <div className="w-5 h-5 border border-gray-300 mr-2 ring-2 ring-[#5C7346] rounded-md"></div>
             <span className="text-sm">Today</span>
           </div>
         </div>
