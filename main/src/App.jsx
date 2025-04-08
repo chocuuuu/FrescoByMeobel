@@ -15,6 +15,7 @@ import AdminEmployeePage from "./pages/Admin_Employees_Page"
 import PayslipPage from "./pages/Payslip_Page"
 import AdminEmployeeEditSchedulePage from "./pages/Admin_Employee_Edit_Schedule_Page"
 import AdminEmployeeAttendancePage from './pages/Admin_Employee_Attendance_Page'
+import AdminMasterCalendarPage from "./pages/Admin_Master_Calendar_Page"
 import { API_BASE_URL } from "./config/api"
 
 function LoginPage() {
@@ -174,6 +175,7 @@ function App() {
         <Route path="/payroll" element={<AdminEmployeePayrollPage />} />
         <Route path="/employee/schedule/:employeeId" element={<AdminEmployeeEditSchedulePage />} />
         <Route path="/attendance" element={<AdminEmployeeAttendancePage />} />
+        <Route path="/master-calendar" element={<AdminMasterCalendarPage />} />
       </Routes>
     </Router>
   )
