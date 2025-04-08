@@ -93,7 +93,7 @@ class EmploymentInfoViewset(GenericViewset, viewsets.ModelViewSet):
         """Partially update EmployeeInfo record. Accessible by owners and admins."""
         return self.update(request, *args, partial=True, **kwargs)
 
-    @role_required(["owner"])
+    @role_required(["owner", "admin"])
     def destroy(self, request, *args, **kwargs):
         """Delete EmploymentInfo. Only owners can delete."""
         instance = self.get_object()

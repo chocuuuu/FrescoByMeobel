@@ -1,4 +1,6 @@
 from rest_framework import serializers
+
+from employment_info.models import EmploymentInfo
 from payroll.models import Payroll
 from salary.models import Salary
 from earnings.models import Earnings
@@ -6,6 +8,7 @@ from deductions.models import Deductions
 from totalovertime.models import TotalOvertime
 from benefits.models import SSS, Philhealth, Pagibig
 from schedule.models import Schedule
+from employment_info.models import EmploymentInfo
 
 class EarningsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -55,9 +58,15 @@ class ScheduleSerializer(serializers.ModelSerializer):
         model = Schedule
         fields = ['user_id','payroll_period_start', 'payroll_period_end', 'hours']
 
+class EmploymentInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmploymentInfo
+        fields = ['employee_number','first_name', 'last_name', 'position']
+
 class PayrollSerializer(serializers.ModelSerializer):
     salary_id = SalarySerializer()
     schedule_id = ScheduleSerializer(read_only=True)
+    employment_info_id = EmploymentInfoSerializer(read_only=True)
 
     class Meta:
         model = Payroll
