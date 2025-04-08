@@ -18,8 +18,7 @@ class TotalOvertime(models.Model):
     biweek_start = models.DateField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
-        # Compute total_overtime if it's either None or 0
-        if self.total_overtime is None or self.total_overtime == 0:
+        if self.total_overtime is None:
             self.total_overtime = (
                 self.total_regularot +
                 self.total_regularholiday +

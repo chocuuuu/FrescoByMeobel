@@ -32,8 +32,8 @@ class PayrollModelTestCase(TestCase):
         )
         overtime = TotalOvertime.objects.create(
             user=self.user,
-            regularot=10,
-            regularholiday=5
+            total_regularot=10,
+            total_regularholiday=5
         )
         sss = SSS.objects.create(user=self.user, basic_salary=800.00)
         philhealth = Philhealth.objects.create(user=self.user, basic_salary=800.00)

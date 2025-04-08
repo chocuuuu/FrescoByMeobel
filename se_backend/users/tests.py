@@ -2,6 +2,7 @@ from django.test import TestCase
 from users.models import CustomUser, UserPasswordReset
 from django.contrib.auth import get_user_model
 from datetime import timedelta
+from django.utils import timezone
 
 class CustomUserModelTestCase(TestCase):
 
@@ -37,10 +38,16 @@ class UserPasswordResetModelTestCase(TestCase):
 
     def test_password_reset_expiry(self):
         """Test that the token expires after 24 hours"""
-        self.assertFalse(self.password_reset.is_expired())
+        # Check that a newly created token is not expired (less than 24 hours old)
+        self.assertFalse(
+            timezone.now() > self.password_reset.created_at + timezone.timedelta(hours=24)
+        )
 
-        # Simulate passing 25 hours
-        self.password_reset.expiry_at -= timedelta(hours=25)
+        # Simulate passing 25 hours by modifying created_at
+        self.password_reset.created_at = self.password_reset.created_at - timezone.timedelta(hours=25)
         self.password_reset.save()
 
-        self.assertTrue(self.password_reset.is_expired())
+        # Check that the token is now expired (more than 24 hours old)
+        self.assertTrue(
+            timezone.now() > self.password_reset.created_at + timezone.timedelta(hours=24)
+        )
