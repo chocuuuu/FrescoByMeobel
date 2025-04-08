@@ -99,3 +99,19 @@ class EmploymentInfoViewset(GenericViewset, viewsets.ModelViewSet):
         instance = self.get_object()
         self.perform_destroy(instance)
         return Response({"detail": "Employment info deleted."}, status=status.HTTP_204_NO_CONTENT)
+
+    from rest_framework.decorators import action
+    from rest_framework.response import Response
+    from rest_framework import status
+
+    @role_required(["owner", "admin", "employee"])
+    @action(detail=False, methods=["get"], url_path="employee-number/(?P<employee_number>[^/.]+)")
+    def lookup_by_employee_number(self, request, employee_number=None):
+        """Custom endpoint to retrieve EmploymentInfo by employee_number."""
+        try:
+            employment_info = EmploymentInfo.objects.get(employee_number=employee_number)
+        except EmploymentInfo.DoesNotExist:
+            return Response({"detail": "Employment info not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = self.get_serializer(employment_info)
+        return Response(serializer.data)
