@@ -21,15 +21,18 @@ app.conf.broker_connection_retry_on_startup = True
 app.conf.beat_schedule = {
     "generate_salary_entries": {
         "task": "salary.tasks.generate_salary_entries",
-        "schedule": crontab(minute=0, hour="*"),
+        # "schedule": crontab(minute=0, hour="*"),
+        "schedule": crontab(minute="*/5"), # every 5 mins
     },
     "generate_payroll_entries": {
         "task": "payroll.tasks.generate_payroll_entries",
-        "schedule": crontab(minute=0, hour="*"),
+        # "schedule": crontab(minute=0, hour="*"),
+        "schedule": crontab(minute="*/5"), # every 5 mins
     },
     "generate_payslip_entries": {
         "task": "payslip.tasks.generate_payslip_entries",
-        "schedule": crontab(minute=0, hour="*"),
+        # "schedule": crontab(minute=0, hour="*"),
+        "schedule": crontab(minute="*/5"), # every 5 mins
     },
     "calculate_total_payroll": {
         "task": "totalpayroll.tasks.calculate_total_payroll",
@@ -52,6 +55,7 @@ app.conf.beat_schedule = {
         #'schedule': crontab(day_of_week=1, hour=0, minute=0),
         "schedule": crontab(minute="*"),
     },
+
 }
 
 """
