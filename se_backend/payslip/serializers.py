@@ -57,7 +57,7 @@ class SalarySerializer(serializers.ModelSerializer):
 class ScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Schedule
-        fields = ['user_id','payroll_period_start', 'payroll_period_end']
+        fields = ['user_id','payroll_period_start', 'payroll_period_end', 'hours']
 
 class PayrollSerializer(serializers.ModelSerializer):
     salary_id = SalarySerializer()
