@@ -6,6 +6,7 @@ from earnings.models import Earnings
 from deductions.models import Deductions
 from totalovertime.models import TotalOvertime
 from benefits.models import SSS, Philhealth, Pagibig
+from schedule.models import Schedule
 
 class EarningsSerializer(serializers.ModelSerializer):
     class Meta:
@@ -53,12 +54,19 @@ class SalarySerializer(serializers.ModelSerializer):
         model = Salary
         fields = '__all__'
 
+class ScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Schedule
+        fields = ['user_id','payroll_period_start', 'payroll_period_end']
+
 class PayrollSerializer(serializers.ModelSerializer):
     salary_id = SalarySerializer()
+    schedule_id = ScheduleSerializer(read_only=True)
 
     class Meta:
         model = Payroll
         fields = '__all__'
+
 
 class PayslipSerializer(serializers.ModelSerializer):
     payroll_id = PayrollSerializer()
