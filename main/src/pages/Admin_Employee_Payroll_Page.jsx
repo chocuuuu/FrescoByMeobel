@@ -514,9 +514,9 @@ function AdminEmployeePayrollPage() {
 
           {/* Payroll Table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full table-fixed">
+            <table className="w-full">
               <thead>
-                <tr className="text-left text-white border-b border-white/20">
+                <tr className="text-left text-white border-b border-white/20 whitespace-nowrap">
                   <th className="py-3 px-4 w-[10%]">ID</th>
                   <th className="py-3 px-4 w-[30%]">NAME</th>
                   <th className="py-3 px-4 w-[15%]">POSITION</th>
@@ -542,7 +542,7 @@ function AdminEmployeePayrollPage() {
                           {record.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 whitespace-nowrap">
                         <div className="flex space-x-2">
                           <button
                             onClick={() => handleEditPayroll(record.id)}
