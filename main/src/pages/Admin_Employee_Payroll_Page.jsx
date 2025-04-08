@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar.jsx"
 import EditPayroll from "../components/Edit_Payroll.jsx"
 import { API_BASE_URL } from "../config/api"
-import SetPayrollPeriods from "../components/Set_Payroll_Periods"
 
 function AdminEmployeePayrollPage() {
   const [employees, setEmployees] = useState([])
@@ -18,12 +17,6 @@ function AdminEmployeePayrollPage() {
   const recordsPerPage = 5
   const [yearFilter, setYearFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all")
-  const [isPayrollPeriodsModalOpen, setIsPayrollPeriodsModalOpen] = useState(false)
-  const [payrollPeriods, setPayrollPeriods] = useState({
-    payrollPeriodStart: "",
-    payrollPeriodEnd: "",
-    payDate: "",
-  })
 
   // Fetch payroll data from API
   const fetchPayrollData = async () => {
@@ -346,7 +339,6 @@ function AdminEmployeePayrollPage() {
               deductions: 0,
               net_salary: 0,
               status: "Pending",
-              payrollRecord: null,
             }
           }
           return emp
@@ -399,15 +391,6 @@ function AdminEmployeePayrollPage() {
       setIsEditModalOpen(false)
       setSelectedEmployee(null)
     }
-  }
-
-  // Handle payroll periods update
-  const handlePayrollPeriodsUpdate = (updatedPeriods) => {
-    console.log("Updating payroll periods:", updatedPeriods)
-    setPayrollPeriods(updatedPeriods)
-
-    // No need to refresh the entire page, just fetch the data again
-    fetchPayrollData()
   }
 
   // Filter payroll data based on search term, year, and role
@@ -490,12 +473,6 @@ function AdminEmployeePayrollPage() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <h2 className="text-2xl font-semibold text-white">Employee Payroll</h2>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <button
-                onClick={() => setIsPayrollPeriodsModalOpen(true)}
-                className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
-              >
-                Set Payroll Periods
-              </button>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="search"
@@ -566,7 +543,7 @@ function AdminEmployeePayrollPage() {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <div className="flex space-x-2 whitespace-nowrap">
+                        <div className="flex space-x-2">
                           <button
                             onClick={() => handleEditPayroll(record.id)}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
@@ -647,16 +624,8 @@ function AdminEmployeePayrollPage() {
         employeeData={selectedEmployee}
         onUpdate={handlePayrollUpdate}
       />
-
-      {/* Set Payroll Periods Modal */}
-      <SetPayrollPeriods
-        isOpen={isPayrollPeriodsModalOpen}
-        onClose={() => setIsPayrollPeriodsModalOpen(false)}
-        onSuccess={handlePayrollPeriodsUpdate}
-      />
     </div>
   )
 }
 
 export default AdminEmployeePayrollPage
-

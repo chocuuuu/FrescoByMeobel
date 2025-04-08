@@ -6,6 +6,7 @@ import NavBar from "../components/Nav_Bar"
 import { ArrowLeft, ArrowRight, User2, Calendar, Clock, CheckSquare, Trash2 } from "lucide-react"
 import dayjs from "dayjs"
 import { API_BASE_URL } from "../config/api"
+import axios from "axios"
 
 function AdminEmployeeEditSchedulePage() {
   const { employeeId } = useParams()
@@ -374,7 +375,7 @@ function AdminEmployeeEditSchedulePage() {
           if (shiftData && matchingDates.includes(shiftData.date)) {
             shiftsToRemove.push(schedule.shift_ids[index])
             console.log(`Found shift ${schedule.shift_ids[index]} to remove for date ${shiftData.date}`)
-          } else {
+          } else if (shiftData) {
             shiftsToKeep.push(schedule.shift_ids[index])
           }
         })
@@ -434,6 +435,9 @@ function AdminEmployeeEditSchedulePage() {
         if (response.ok) {
           const updatedSchedule = await response.json()
           console.log("Successfully updated schedule after removing shifts:", updatedSchedule)
+
+          // Update the schedule state with the server response
+          setSchedule(updatedSchedule)
         } else {
           console.error("Failed to update schedule after removing shifts")
         }
@@ -851,7 +855,7 @@ function AdminEmployeeEditSchedulePage() {
           return
         }
 
-        // Use the user ID from the employee data if available, otherwise use employeeId
+        // Use the user ID from the employee data if available
         const userId = employee?.user?.id
         if (!userId) {
           console.warn("No user ID found in employee data, using employeeId as fallback")
@@ -862,173 +866,170 @@ function AdminEmployeeEditSchedulePage() {
         console.log(`Fetching schedule for user ID: ${userId}`)
 
         // CRITICAL FIX: Use the exact user_id parameter to ensure we get only this employee's schedule
-        const response = await fetch(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        const responseText = await response.text()
-        console.log("Raw schedule API response:", responseText)
-
-        let data
+        // Use axios instead of fetch for better error handling
         try {
-          data = JSON.parse(responseText)
-        } catch (e) {
-          console.error("Failed to parse schedule response:", e)
-          setLoading(false)
-          return
-        }
+          const response = await axios.get(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          })
 
-        console.log(`Fetched schedule data:`, data)
+          console.log(`Fetched schedule data:`, response.data)
 
-        if (data && data.length > 0) {
-          // CRITICAL FIX: Filter to ensure we only get schedules for this specific user
-          const userSchedules = data.filter((schedule) => schedule.user_id === userId)
+          if (response.data && response.data.length > 0) {
+            // CRITICAL FIX: Filter to ensure we only get schedules for this specific user
+            // and sort by ID to get the most recent schedule first
+            const userSchedules = response.data
+              .filter((schedule) => schedule.user_id === userId)
+              .sort((a, b) => b.id - a.id) // Sort by ID in descending order
 
-          if (userSchedules.length > 0) {
-            const scheduleData = userSchedules[0]
-            console.log("Found schedule for this user:", scheduleData)
+            if (userSchedules.length > 0) {
+              // Always use the most recent schedule (highest ID)
+              const scheduleData = userSchedules[0]
+              console.log("Found most recent schedule for this user:", scheduleData)
 
-            // Set the schedule
-            setSchedule(scheduleData)
+              // Set the schedule
+              setSchedule(scheduleData)
 
-            // Set selected days based on schedule
-            const daysMap = {
-              Monday: "M",
-              Tuesday: "T",
-              Wednesday: "W",
-              Thursday: "T2",
-              Friday: "F",
-              Saturday: "S2",
-              Sunday: "S",
-            }
-
-            const newSelectedDays = {
-              S: false,
-              M: false,
-              T: false,
-              W: false,
-              T2: false,
-              F: false,
-              S2: false,
-            }
-
-            if (scheduleData.days && Array.isArray(scheduleData.days)) {
-              scheduleData.days.forEach((day) => {
-                if (daysMap[day]) {
-                  newSelectedDays[daysMap[day]] = true
-                }
-              })
-
-              console.log("Setting selected days based on schedule:", newSelectedDays)
-              setSelectedDays(newSelectedDays)
-            } else {
-              console.warn("Schedule days is not an array or is undefined:", scheduleData.days)
-            }
-
-            // Determine shift type based on shift_ids
-            if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
-              // Fetch all shifts to determine day-specific shifts
-              try {
-                const shiftPromises = scheduleData.shift_ids.map((shiftId) =>
-                  fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
-                    headers: {
-                      Authorization: `Bearer ${accessToken}`,
-                      "Content-Type": "application/json",
-                    },
-                  }).then((res) => (res.ok ? res.json() : null)),
-                )
-
-                const shiftsData = await Promise.all(shiftPromises)
-                const validShifts = shiftsData.filter((shift) => shift !== null)
-
-                // Group shifts by day of week
-                const shiftsByDay = {}
-                validShifts.forEach((shift) => {
-                  const date = dayjs(shift.date)
-                  const dayOfWeek = date.format("dddd")
-
-                  if (!shiftsByDay[dayOfWeek]) {
-                    shiftsByDay[dayOfWeek] = []
-                  }
-
-                  shiftsByDay[dayOfWeek].push(shift)
-                })
-
-                // Determine shift type for each day
-                const newDayShifts = { ...dayShifts }
-                let startTime, endTime
-
-                Object.entries(shiftsByDay).forEach(([day, dayShifts]) => {
-                  if (dayShifts.length > 0) {
-                    // Use the first shift for this day to determine type
-                    const shift = dayShifts[0]
-                    startTime = shift.shift_start
-                    endTime = shift.shift_end
-
-                    let shiftType = ""
-                    if (startTime === "10:00:00" && endTime === "19:00:00") {
-                      shiftType = "morning"
-                    } else if (startTime === "12:00:00" && endTime === "21:00:00") {
-                      shiftType = "midday"
-                    } else if (startTime === "19:00:00" && endTime === "23:00:00") {
-                      shiftType = "night"
-                    } else {
-                      shiftType = "custom"
-                    }
-                    newDayShifts[day] = {
-                      type: shiftType,
-                      start: startTime,
-                      end: endTime,
-                    }
-                  }
-                })
-
-                setDayShifts(newDayShifts)
-
-                // Set the global shift type based on the most common shift
-                const shiftCounts = { morning: 0, midday: 0, night: 0, custom: 0 }
-                Object.values(newDayShifts).forEach(({ type }) => {
-                  if (type) {
-                    shiftCounts[type]++
-                  }
-                })
-
-                // Find the most common shift type
-                let mostCommonShift = ""
-                let maxCount = 0
-                Object.entries(shiftCounts).forEach(([type, count]) => {
-                  if (count > maxCount) {
-                    mostCommonShift = type
-                    maxCount = count
-                  }
-                })
-
-                if (mostCommonShift) {
-                  setSelectedShift(mostCommonShift)
-
-                  // If custom is the most common, set the custom times
-                  if (mostCommonShift === "custom") {
-                    // Find a day with custom shift
-                    const customShiftDay = Object.entries(newDayShifts).find(([_, data]) => data.type === "custom")
-                    if (customShiftDay) {
-                      const [_, data] = customShiftDay
-                      setCustomShiftStart(convertTimeFormatToTimeString(data.start))
-                      setCustomShiftEnd(convertTimeFormatToTimeString(data.end))
-                    }
-                  }
-                }
-              } catch (error) {
-                console.error("Error fetching shift details:", error)
+              // Set selected days based on schedule
+              const daysMap = {
+                Monday: "M",
+                Tuesday: "T",
+                Wednesday: "W",
+                Thursday: "T2",
+                Friday: "F",
+                Saturday: "S2",
+                Sunday: "S",
               }
+
+              const newSelectedDays = {
+                S: false,
+                M: false,
+                T: false,
+                W: false,
+                T2: false,
+                F: false,
+                S2: false,
+              }
+
+              if (scheduleData.days && Array.isArray(scheduleData.days)) {
+                scheduleData.days.forEach((day) => {
+                  if (daysMap[day]) {
+                    newSelectedDays[daysMap[day]] = true
+                  }
+                })
+
+                console.log("Setting selected days based on schedule:", newSelectedDays)
+                setSelectedDays(newSelectedDays)
+              } else {
+                console.warn("Schedule days is not an array or is undefined:", scheduleData.days)
+              }
+
+              // Determine shift type based on shift_ids
+              if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
+                // Fetch all shifts to determine day-specific shifts
+                try {
+                  const shiftPromises = scheduleData.shift_ids.map((shiftId) =>
+                    fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
+                      headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        "Content-Type": "application/json",
+                      },
+                    }).then((res) => (res.ok ? res.json() : null)),
+                  )
+
+                  const shiftsData = await Promise.all(shiftPromises)
+                  const validShifts = shiftsData.filter((shift) => shift !== null)
+
+                  // Group shifts by day of week
+                  const shiftsByDay = {}
+                  validShifts.forEach((shift) => {
+                    const date = dayjs(shift.date)
+                    const dayOfWeek = date.format("dddd")
+
+                    if (!shiftsByDay[dayOfWeek]) {
+                      shiftsByDay[dayOfWeek] = []
+                    }
+
+                    shiftsByDay[dayOfWeek].push(shift)
+                  })
+
+                  // Determine shift type for each day
+                  const newDayShifts = { ...dayShifts }
+                  let startTime, endTime
+
+                  Object.entries(shiftsByDay).forEach(([day, dayShifts]) => {
+                    if (dayShifts.length > 0) {
+                      // Use the first shift for this day to determine type
+                      const shift = dayShifts[0]
+                      startTime = shift.shift_start
+                      endTime = shift.shift_end
+
+                      let shiftType = ""
+                      if (startTime === "10:00:00" && endTime === "19:00:00") {
+                        shiftType = "morning"
+                      } else if (startTime === "12:00:00" && endTime === "21:00:00") {
+                        shiftType = "midday"
+                      } else if (startTime === "19:00:00" && endTime === "23:00:00") {
+                        shiftType = "night"
+                      } else {
+                        shiftType = "custom"
+                      }
+                      newDayShifts[day] = {
+                        type: shiftType,
+                        start: startTime,
+                        end: endTime,
+                      }
+                    }
+                  })
+
+                  setDayShifts(newDayShifts)
+
+                  // Set the global shift type based on the most common shift
+                  const shiftCounts = { morning: 0, midday: 0, night: 0, custom: 0 }
+                  Object.values(newDayShifts).forEach(({ type }) => {
+                    if (type) {
+                      shiftCounts[type]++
+                    }
+                  })
+
+                  // Find the most common shift type
+                  let mostCommonShift = ""
+                  let maxCount = 0
+                  Object.entries(shiftCounts).forEach(([type, count]) => {
+                    if (count > maxCount) {
+                      mostCommonShift = type
+                      maxCount = count
+                    }
+                  })
+
+                  if (mostCommonShift) {
+                    setSelectedShift(mostCommonShift)
+
+                    // If custom is the most common, set the custom times
+                    if (mostCommonShift === "custom") {
+                      // Find a day with custom shift
+                      const customShiftDay = Object.entries(newDayShifts).find(([_, data]) => data.type === "custom")
+                      if (customShiftDay) {
+                        const [_, data] = customShiftDay
+                        setCustomShiftStart(convertTimeFormatToTimeString(data.start))
+                        setCustomShiftEnd(convertTimeFormatToTimeString(data.end))
+                      }
+                    }
+                  }
+                } catch (error) {
+                  console.error("Error fetching shift details:", error)
+                }
+              }
+            } else {
+              console.log(`No schedule found for employee ${employeeId} with user ID ${userId}`)
             }
           } else {
-            console.log(`No schedule found for employee ${employeeId} with user ID ${userId}`)
+            console.log(`No schedules found at all`)
           }
-        } else {
-          console.log(`No schedules found at all`)
+        } catch (error) {
+          console.error("Error fetching schedule:", error)
         }
 
         setLoading(false)
@@ -1189,9 +1190,41 @@ function AdminEmployeeEditSchedulePage() {
       console.log(`Initialized ${scheduledDates.length} scheduled dates for ${currentDate.format("MMMM")}`)
     }
 
+    // CRITICAL FIX: Process holidays from the schedule
+    if (schedule && (schedule.regularholiday?.length > 0 || schedule.specialholiday?.length > 0)) {
+      console.log("Processing holidays from schedule:", {
+        regularHolidays: schedule.regularholiday,
+        specialHolidays: schedule.specialholiday,
+      })
+
+      // Process regular holidays
+      if (schedule.regularholiday && Array.isArray(schedule.regularholiday)) {
+        schedule.regularholiday.forEach((dateStr) => {
+          // Only update if it's in the current month
+          const holidayDate = dayjs(dateStr)
+          if (holidayDate.month() === month && holidayDate.year() === year) {
+            console.log(`Marking regular holiday: ${dateStr}`)
+            newDayStatus[dateStr] = "regularholiday"
+          }
+        })
+      }
+
+      // Process special holidays
+      if (schedule.specialholiday && Array.isArray(schedule.specialholiday)) {
+        schedule.specialholiday.forEach((dateStr) => {
+          // Only update if it's in the current month
+          const holidayDate = dayjs(dateStr)
+          if (holidayDate.month() === month && holidayDate.year() === year) {
+            console.log(`Marking special holiday: ${dateStr}`)
+            newDayStatus[dateStr] = "specialholiday"
+          }
+        })
+      }
+    }
+
     setDayStatus(newDayStatus)
     console.log("Calendar days generated:", calendarDays.length)
-    console.log("Day status after generation:", dayStatus)
+    console.log("Day status after generation:", newDayStatus)
     console.log("Schedule days being used:", schedule.days)
   }, [currentDate, schedule, employeeId, attendanceData])
 
@@ -1210,24 +1243,36 @@ function AdminEmployeeEditSchedulePage() {
     setIsProcessingShifts(true)
 
     try {
+      // Get the day name from the key
+      const daysMap = {
+        S: "Sunday",
+        M: "Monday",
+        T: "Tuesday",
+        W: "Wednesday",
+        T2: "Thursday",
+        F: "Friday",
+        S2: "Saturday",
+      }
+      const dayName = daysMap[day]
+
+      // Check if the day is currently selected
+      const isCurrentlySelected = selectedDays[day]
+
       // Update the UI state first for immediate feedback
       setSelectedDays((prev) => ({
         ...prev,
         [day]: !prev[day],
       }))
 
-      // If the day is being selected (not deselected)
-      if (!selectedDays[day]) {
-        // Get the day name from the key
-        const dayName = {
-          S: "Sunday",
-          M: "Monday",
-          T: "Tuesday",
-          W: "Wednesday",
-          T2: "Thursday",
-          F: "Friday",
-          S2: "Saturday",
-        }[day]
+      // If the day is being deselected
+      if (isCurrentlySelected) {
+        console.log(`Deselecting day: ${dayName}`)
+
+        // Remove the day from the schedule
+        await removeShiftsForDay(dayName)
+      } else {
+        // If the day is being selected
+        console.log(`Selecting day: ${dayName}`)
 
         // Set the day-specific shift type if not already set
         if (!dayShifts[dayName].type) {
@@ -1306,9 +1351,6 @@ function AdminEmployeeEditSchedulePage() {
             console.error("Failed to update schedule with new shifts")
           }
         }
-      } else {
-        // If the day is being deselected, remove it
-        await removeShiftsForDay(dayName)
       }
 
       // Update calendar colors for all instances of this day
@@ -1852,6 +1894,29 @@ function AdminEmployeeEditSchedulePage() {
         }
       })
 
+      // CRITICAL FIX: Process holidays from the schedule
+      if (savedSchedule.regularholiday && Array.isArray(savedSchedule.regularholiday)) {
+        savedSchedule.regularholiday.forEach((dateStr) => {
+          // Only update if it's in the current month
+          const holidayDate = dayjs(dateStr)
+          if (holidayDate.month() === currentDate.month() && holidayDate.year() === currentDate.year()) {
+            console.log(`Marking regular holiday: ${dateStr}`)
+            newStatus[dateStr] = "regularholiday"
+          }
+        })
+      }
+
+      if (savedSchedule.specialholiday && Array.isArray(savedSchedule.specialholiday)) {
+        savedSchedule.specialholiday.forEach((dateStr) => {
+          // Only update if it's in the current month
+          const holidayDate = dayjs(dateStr)
+          if (holidayDate.month() === currentDate.month() && holidayDate.year() === currentDate.year()) {
+            console.log(`Marking special holiday: ${dateStr}`)
+            newStatus[dateStr] = "specialholiday"
+          }
+        })
+      }
+
       console.log("Updated day status:", newStatus)
       return newStatus
     })
@@ -1896,10 +1961,21 @@ function AdminEmployeeEditSchedulePage() {
   const handleMonthChange = (direction) => {
     const newDate = direction === "next" ? currentDate.add(1, "month") : currentDate.subtract(1, "month")
 
+    // Reset the day status for the new month to avoid showing selected days from previous month
+    setDayStatus({})
+
+    // Update the current date
     setCurrentDate(newDate)
 
     // Also update the selected date to the first day of the new month
     setSelectedDate(dayjs(new Date(newDate.year(), newDate.month(), 1)))
+
+    // Force refresh the calendar with the current schedule
+    setTimeout(() => {
+      if (schedule && schedule.days && schedule.days.length > 0) {
+        updateCalendarWithSchedule(schedule, schedule.days)
+      }
+    }, 100)
   }
 
   // Add this function after the handleMonthChange function:
@@ -1938,7 +2014,7 @@ function AdminEmployeeEditSchedulePage() {
   // Function to determine the background color of a calendar day based on its status
   const getDayStatusColor = (day) => {
     if (!day.isCurrentMonth) {
-      return "bg-gray-200 text-gray-400" // Light gray for days outside the current month
+      return "bg-gray-400 text-white" // Light gray for days outside the current month
     }
 
     const dateStr = day.date.format("YYYY-MM-DD")
@@ -2417,4 +2493,3 @@ function AdminEmployeeEditSchedulePage() {
 }
 
 export default AdminEmployeeEditSchedulePage
-
