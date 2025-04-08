@@ -1,10 +1,33 @@
 from django.test import TestCase
+from django.db.models.signals import post_save
+from schedule.models import Schedule
+from attendance_summary.signals import handle_schedule_update  # Assuming this is where the signal is defined
 from users.models import CustomUser
 from shift.models import Shift
-from schedule.models import Schedule
 from datetime import date
 
+
 class ScheduleModelTestCase(TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        # Disconnect the post_save signal for the Schedule model at the class level
+        post_save.disconnect(
+            receiver=handle_schedule_update,
+            sender=Schedule,
+            dispatch_uid="handle_schedule_update"
+        )
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        # Reconnect the post_save signal after tests have run
+        post_save.connect(
+            receiver=handle_schedule_update,
+            sender=Schedule,
+            dispatch_uid="handle_schedule_update"
+        )
+        super().tearDownClass()
 
     def setUp(self):
         # Create test CustomUser instance
@@ -23,7 +46,8 @@ class ScheduleModelTestCase(TestCase):
         # Create Schedule instance
         self.schedule = Schedule.objects.create(
             user_id=self.user,
-            payroll_period=date(2025, 4, 1),
+            payroll_period_start=date(2025, 4, 1),
+            payroll_period_end=date(2025, 4, 15),
             hours=8,
             bi_weekly_start=date(2025, 4, 1),
         )
@@ -40,7 +64,8 @@ class ScheduleModelTestCase(TestCase):
         schedule = Schedule.objects.get(id=self.schedule.id)
         self.assertEqual(schedule.user_id, self.user)
         self.assertEqual(schedule.hours, 8)
-        self.assertEqual(schedule.payroll_period, date(2025, 4, 1))
+        self.assertEqual(schedule.payroll_period_start, date(2025, 4, 1))
+        self.assertEqual(schedule.payroll_period_end, date(2025, 4, 15))
 
     def test_update_schedule(self):
         self.schedule.hours = 10
@@ -78,4 +103,3 @@ class ScheduleModelTestCase(TestCase):
         self.assertEqual(updated_schedule.nightdiff, [date(2025, 4, 10)])
         self.assertEqual(updated_schedule.oncall, [date(2025, 4, 11)])
         self.assertEqual(updated_schedule.vacationleave, [date(2025, 4, 12)])
-
