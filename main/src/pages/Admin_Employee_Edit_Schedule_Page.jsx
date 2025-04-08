@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import NavBar from "../components/Nav_Bar"
-import { ArrowLeft, ArrowRight, User2, Calendar, Clock, CheckSquare, Trash2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, User2, Calendar, Clock, CheckSquare, Trash2, CalendarDays } from "lucide-react"
 import dayjs from "dayjs"
 import { API_BASE_URL } from "../config/api"
 import axios from "axios"
@@ -45,6 +45,11 @@ function AdminEmployeeEditSchedulePage() {
     payroll_period_end: null,
   })
 
+  // State for biweekly periods
+  const [payrollPeriodStart, setPayrollPeriodStart] = useState(null)
+  const [payrollPeriodEnd, setPayrollPeriodEnd] = useState(null)
+  const [isEditingPayrollPeriod, setIsEditingPayrollPeriod] = useState(false)
+
   // State for selected days and shifts - start with none selected
   const [selectedDays, setSelectedDays] = useState({
     S: false,
@@ -79,6 +84,17 @@ function AdminEmployeeEditSchedulePage() {
     Saturday: { type: "", start: "", end: "" },
   })
 
+  // Helper function to check if a date is within the current payroll period
+  const isDateInPayrollPeriod = (date) => {
+    if (!payrollPeriodStart || !payrollPeriodEnd) return true // If no period set, allow all dates
+
+    const dateObj = dayjs(date)
+    const startDate = dayjs(payrollPeriodStart)
+    const endDate = dayjs(payrollPeriodEnd)
+
+    return dateObj.isAfter(startDate.subtract(1, "day")) && dateObj.isBefore(endDate.add(1, "day"))
+  }
+
   // Helper function to convert time string (e.g., "8:00 AM") to time format (e.g., "08:00:00")
   const convertTimeStringToTimeFormat = (timeString) => {
     if (!timeString) return "00:00:00"
@@ -110,7 +126,7 @@ function AdminEmployeeEditSchedulePage() {
     return `${hour}:${minutes} ${modifier}`
   }
 
-  // Generate shifts for all instances of a specific day in the current month
+  // Generate shifts for all instances of a specific day in the current payroll period
   const generateShiftsForDay = async (dayName) => {
     try {
       const accessToken = localStorage.getItem("access_token")
@@ -122,16 +138,20 @@ function AdminEmployeeEditSchedulePage() {
       const shiftType = dayShifts[dayName].type || selectedShift
       console.log(`Generating shifts for ${dayName} with shift type: ${shiftType}`)
 
-      // Find all dates in the current month that match the day name
+      // Find all dates in the current month that match the day name AND are within the payroll period
       const matchingDates = []
       for (let i = 1; i <= daysInMonth; i++) {
         const date = dayjs(new Date(year, month, i))
         if (date.format("dddd") === dayName) {
-          matchingDates.push(date.format("YYYY-MM-DD"))
+          const dateStr = date.format("YYYY-MM-DD")
+          // Only include dates within the payroll period
+          if (isDateInPayrollPeriod(dateStr)) {
+            matchingDates.push(dateStr)
+          }
         }
       }
 
-      console.log(`Found ${matchingDates.length} matching dates for ${dayName}:`, matchingDates)
+      console.log(`Found ${matchingDates.length} matching dates for ${dayName} within payroll period:`, matchingDates)
 
       // Get shift times based on selected shift type
       let shiftStart, shiftEnd
@@ -344,12 +364,16 @@ function AdminEmployeeEditSchedulePage() {
 
       console.log(`Removing shifts for ${dayName}`)
 
-      // Find all dates in the current month that match the day name
+      // Find all dates in the current month that match the day name AND are within the payroll period
       const matchingDates = []
       for (let i = 1; i <= daysInMonth; i++) {
         const date = dayjs(new Date(year, month, i))
         if (date.format("dddd") === dayName) {
-          matchingDates.push(date.format("YYYY-MM-DD"))
+          const dateStr = date.format("YYYY-MM-DD")
+          // Only include dates within the payroll period
+          if (isDateInPayrollPeriod(dateStr)) {
+            matchingDates.push(dateStr)
+          }
         }
       }
 
@@ -892,6 +916,14 @@ function AdminEmployeeEditSchedulePage() {
               // Set the schedule
               setSchedule(scheduleData)
 
+              // Set payroll period dates
+              if (scheduleData.payroll_period_start) {
+                setPayrollPeriodStart(scheduleData.payroll_period_start)
+              }
+              if (scheduleData.payroll_period_end) {
+                setPayrollPeriodEnd(scheduleData.payroll_period_end)
+              }
+
               // Set selected days based on schedule
               const daysMap = {
                 Monday: "M",
@@ -1116,6 +1148,7 @@ function AdminEmployeeEditSchedulePage() {
         const dateStr = day.date.format("YYYY-MM-DD")
         const dayOfWeek = day.date.format("dddd")
         const isPastDay = day.date.isBefore(today, "day")
+        const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
         // Priority order for status:
         // 1. Special events (sickleave, holidays, etc.)
@@ -1146,8 +1179,8 @@ function AdminEmployeeEditSchedulePage() {
           } else if (lowerStatus === "late") {
             newDayStatus[dateStr] = "late"
           }
-        } else if (schedule.days?.includes(dayOfWeek)) {
-          // If it's a scheduled day
+        } else if (schedule.days?.includes(dayOfWeek) && isInPayrollPeriod) {
+          // If it's a scheduled day and in the payroll period
           if (isPastDay && !attendanceData[dateStr]) {
             // Past scheduled days without attendance records should be marked as absent
             newDayStatus[dateStr] = "absent"
@@ -1160,7 +1193,7 @@ function AdminEmployeeEditSchedulePage() {
           newDayStatus[dateStr] = "absent"
         } else {
           // Default status for future days
-          newDayStatus[dateStr] = "unselected"
+          newDayStatus[dateStr] = isInPayrollPeriod ? "unselected" : "outside-period"
         }
       }
     })
@@ -1171,9 +1204,10 @@ function AdminEmployeeEditSchedulePage() {
       for (let i = 1; i <= daysInMonth; i++) {
         const date = dayjs(new Date(year, month, i))
         const dayOfWeek = date.format("dddd")
+        const dateStr = date.format("YYYY-MM-DD")
+        const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
-        if (schedule.days.includes(dayOfWeek)) {
-          const dateStr = date.format("YYYY-MM-DD")
+        if (schedule.days.includes(dayOfWeek) && isInPayrollPeriod) {
           scheduledDates.push(dateStr)
 
           // Mark this date as scheduled if it's not already marked as something else
@@ -1226,7 +1260,7 @@ function AdminEmployeeEditSchedulePage() {
     console.log("Calendar days generated:", calendarDays.length)
     console.log("Day status after generation:", newDayStatus)
     console.log("Schedule days being used:", schedule.days)
-  }, [currentDate, schedule, employeeId, attendanceData])
+  }, [currentDate, schedule, employeeId, attendanceData, payrollPeriodStart, payrollPeriodEnd])
 
   // Handle day click in calendar
   const handleDayClick = (day) => {
@@ -1373,9 +1407,10 @@ function AdminEmployeeEditSchedulePage() {
 
           const isPastDay = calDay.date.isBefore(today, "day")
           const hasAttendanceRecord = attendanceData[dateStr] === "present" || attendanceData[dateStr] === "absent"
+          const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
           // If this day's checkbox was toggled, update its status
-          if (dayKey === day) {
+          if (dayKey === day && isInPayrollPeriod) {
             // Check if this day has any special status
             const hasSpecialStatus =
               schedule.sickleave === dateStr ||
@@ -1511,8 +1546,9 @@ function AdminEmployeeEditSchedulePage() {
       const dayOfWeek = selectedDate.format("dddd")
       const isWorkingDay = newSchedule.days?.includes(dayOfWeek)
       const isPastDay = selectedDate.isBefore(dayjs(), "day")
+      const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
-      if (isWorkingDay) {
+      if (isWorkingDay && isInPayrollPeriod) {
         if (isPastDay && !attendanceData[dateStr]) {
           // Past working day with no attendance
           setDayStatus((prev) => ({
@@ -1532,6 +1568,11 @@ function AdminEmployeeEditSchedulePage() {
             [dateStr]: "selected",
           }))
         }
+      } else if (!isInPayrollPeriod) {
+        setDayStatus((prev) => ({
+          ...prev,
+          [dateStr]: "outside-period",
+        }))
       } else {
         setDayStatus((prev) => ({
           ...prev,
@@ -1580,6 +1621,58 @@ function AdminEmployeeEditSchedulePage() {
 
     console.log(`Updated ${eventType} for ${dateStr}:`, newSchedule)
     setSchedule(newSchedule)
+  }
+
+  // Handle payroll period changes
+  const handlePayrollPeriodChange = () => {
+    if (isEditingPayrollPeriod) {
+      // Save the payroll period
+      if (payrollPeriodStart && payrollPeriodEnd) {
+        const accessToken = localStorage.getItem("access_token")
+
+        // Update the schedule with the new payroll period
+        if (schedule.id) {
+          fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
+            method: "PATCH",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              payroll_period_start: payrollPeriodStart,
+              payroll_period_end: payrollPeriodEnd,
+              bi_weekly_start: payrollPeriodStart, // Set bi_weekly_start to match payroll_period_start
+            }),
+          })
+            .then((response) => {
+              if (response.ok) {
+                return response.json()
+              }
+              throw new Error("Failed to update payroll period")
+            })
+            .then((updatedSchedule) => {
+              setSchedule(updatedSchedule)
+              setSaveSuccess(true)
+              setSaveMessage("Payroll period updated successfully!")
+
+              // Update the calendar to reflect the new payroll period
+              updateCalendarWithSchedule(updatedSchedule, updatedSchedule.days)
+            })
+            .catch((error) => {
+              console.error("Error updating payroll period:", error)
+              setSaveSuccess(false)
+              setSaveMessage(`Error: ${error.message}`)
+            })
+        } else {
+          // If no schedule exists yet, we'll save the payroll period when creating the schedule
+          setSaveSuccess(true)
+          setSaveMessage("Payroll period will be saved with the schedule")
+        }
+      }
+    }
+
+    // Toggle editing mode
+    setIsEditingPayrollPeriod(!isEditingPayrollPeriod)
   }
 
   // New function to save only events without modifying the schedule
@@ -1670,6 +1763,14 @@ function AdminEmployeeEditSchedulePage() {
         return
       }
 
+      // Check if we have payroll period dates
+      if (!payrollPeriodStart || !payrollPeriodEnd) {
+        setSaveSuccess(false)
+        setSaveMessage("Please set the payroll period dates.")
+        setIsSaving(false)
+        return
+      }
+
       // Get the correct user ID from the employee data
       const userId = employee?.user?.id || Number.parseInt(employeeId)
       const accessToken = localStorage.getItem("access_token")
@@ -1723,6 +1824,10 @@ function AdminEmployeeEditSchedulePage() {
           add_shift_ids: newShiftIds,
           // IMPORTANT: Always include the complete days array
           days: updatedDays,
+          // Include payroll period dates
+          payroll_period_start: payrollPeriodStart,
+          payroll_period_end: payrollPeriodEnd,
+          bi_weekly_start: payrollPeriodStart, // Set bi_weekly_start to match payroll_period_start
           // Include other fields that might have changed
           sickleave: schedule.sickleave,
           regularholiday: schedule.regularholiday || [],
@@ -1765,16 +1870,16 @@ function AdminEmployeeEditSchedulePage() {
           user_id: userId,
           shift_ids: newShiftIds,
           days: selectedDaysArray,
+          payroll_period_start: payrollPeriodStart,
+          payroll_period_end: payrollPeriodEnd,
+          bi_weekly_start: payrollPeriodStart, // Set bi_weekly_start to match payroll_period_start
           sickleave: schedule.sickleave,
           regularholiday: schedule.regularholiday || [],
           specialholiday: schedule.specialholiday || [],
           nightdiff: schedule.nightdiff || [],
           oncall: schedule.oncall || [],
           vacationleave: schedule.vacationleave || [],
-          payroll_period_start: schedule.payroll_period_start || null,
-          payroll_period_end: schedule.payroll_period_end || null,
           hours: 8,
-          bi_weekly_start: schedule.bi_weekly_start || dayjs().format("YYYY-MM-DD"),
         }
 
         // Create a new schedule
@@ -1834,9 +1939,10 @@ function AdminEmployeeEditSchedulePage() {
       // Create date with the correct month (month-1 because Date constructor uses 0-indexed months)
       const date = dayjs(new Date(year, currentDate.month(), i))
       const dayOfWeek = date.format("dddd")
+      const dateStr = date.format("YYYY-MM-DD")
+      const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
-      if (scheduledDays.includes(dayOfWeek)) {
-        const dateStr = date.format("YYYY-MM-DD")
+      if (scheduledDays.includes(dayOfWeek) && isInPayrollPeriod) {
         scheduledDates.push(dateStr)
         console.log(`Found scheduled date: ${dateStr} (${dayOfWeek})`)
       }
@@ -1862,7 +1968,8 @@ function AdminEmployeeEditSchedulePage() {
         const dateMonth = dateStr.split("-")[1] // Get month part (MM) from YYYY-MM-DD
         if (dateMonth === String(month).padStart(2, "0")) {
           if (newStatus[dateStr] === "selected" && !scheduledDates.includes(dateStr)) {
-            newStatus[dateStr] = "unselected"
+            const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
+            newStatus[dateStr] = isInPayrollPeriod ? "unselected" : "outside-period"
           }
         }
       })
@@ -1917,6 +2024,13 @@ function AdminEmployeeEditSchedulePage() {
         })
       }
 
+      // Mark days outside the payroll period
+      Object.keys(newStatus).forEach((dateStr) => {
+        if (!isDateInPayrollPeriod(dateStr) && newStatus[dateStr] !== "outside-period") {
+          newStatus[dateStr] = "outside-period"
+        }
+      })
+
       console.log("Updated day status:", newStatus)
       return newStatus
     })
@@ -1937,8 +2051,9 @@ function AdminEmployeeEditSchedulePage() {
       const date = dayjs(new Date(year, month, i))
       const dayOfWeek = date.format("dddd")
       const dateStr = date.format("YYYY-MM-DD")
+      const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
-      if (schedule.days && schedule.days.includes(dayOfWeek)) {
+      if (schedule.days && schedule.days.includes(dayOfWeek) && isInPayrollPeriod) {
         scheduledDates.push({
           date: dateStr,
           dayOfWeek,
@@ -2031,9 +2146,13 @@ function AdminEmployeeEditSchedulePage() {
       case "specialholiday":
       case "regularholiday":
       case "vacationleave":
-      case "nightdiff":
-      case "oncall":
         return "bg-orange-400 text-white" // Orange for events
+      case "nightdiff":
+        return "bg-blue-500 text-white" // Dark blue for night differential
+      case "oncall":
+        return "bg-purple-500 text-white" // Purple for on-call
+      case "outside-period":
+        return "bg-gray-200 text-gray-400" // Gray for days outside payroll period
       default:
         return "bg-white text-gray-700" // White for unselected days
     }
@@ -2110,6 +2229,52 @@ function AdminEmployeeEditSchedulePage() {
                 <div className="w-20"></div> {/* Spacer for alignment */}
               </div>
 
+              {/* Payroll Period Indicator */}
+              <div className="bg-[#A3BC84] rounded-lg p-3 mb-4 flex items-center justify-between">
+                <div className="flex items-center">
+                  <CalendarDays className="h-5 w-5 text-[#3A4D2B] mr-2" />
+                  <span className="text-[#3A4D2B] font-bold">Payroll Period:</span>
+                </div>
+
+                {isEditingPayrollPeriod ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={payrollPeriodStart || ""}
+                      onChange={(e) => setPayrollPeriodStart(e.target.value)}
+                      className="px-2 py-1 rounded border border-gray-300"
+                    />
+                    <span className="text-[#3A4D2B]">to</span>
+                    <input
+                      type="date"
+                      value={payrollPeriodEnd || ""}
+                      onChange={(e) => setPayrollPeriodEnd(e.target.value)}
+                      className="px-2 py-1 rounded border border-gray-300"
+                    />
+                    <button
+                      onClick={handlePayrollPeriodChange}
+                      className="bg-[#3A4D2B] text-white px-3 py-1 rounded-md hover:bg-[#2a3b1d]"
+                    >
+                      Save
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#3A4D2B] font-medium">
+                      {payrollPeriodStart && payrollPeriodEnd
+                        ? `${dayjs(payrollPeriodStart).format("MMM DD")} - ${dayjs(payrollPeriodEnd).format("MMM DD")}`
+                        : "Not set"}
+                    </span>
+                    <button
+                      onClick={handlePayrollPeriodChange}
+                      className="bg-[#3A4D2B] text-white px-3 py-1 rounded-md hover:bg-[#2a3b1d]"
+                    >
+                      Edit
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* Day headers */}
               <div className="grid grid-cols-7 gap-2 mb-2">
                 {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, i) => (
@@ -2125,6 +2290,7 @@ function AdminEmployeeEditSchedulePage() {
                 {calendarDays.map((day, index) => {
                   const dateStr = day.date.format("YYYY-MM-DD")
                   const status = day.isCurrentMonth ? dayStatus[dateStr] : null
+                  const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
                   return (
                     <div
@@ -2136,7 +2302,7 @@ function AdminEmployeeEditSchedulePage() {
                         day.date.format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")
                           ? "ring-4 ring-blue-500 font-bold shadow-lg"
                           : ""
-                      }`}
+                      } ${!isInPayrollPeriod && day.isCurrentMonth ? "opacity-50" : ""}`}
                       onClick={() => handleDayClick(day)}
                     >
                       <span className="text-md sm:text-lg md:text-xl font-bold">{day.dayOfMonth}</span>
@@ -2176,6 +2342,10 @@ function AdminEmployeeEditSchedulePage() {
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-orange-400 mr-2"></div>
                   <span className="text-white text-md">Events</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-gray-200 mr-2"></div>
+                  <span className="text-white text-md">Outside Period</span>
                 </div>
               </div>
             </div>
