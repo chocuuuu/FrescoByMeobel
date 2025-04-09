@@ -2,7 +2,6 @@
 
 import { useEffect } from "react"
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom"
-import { isSessionValid, initSessionMonitor, preventBackNavigation } from "./utils/sessionHandler"
 
 import LoginPage from "./pages/Login_Page"
 import ForgotPasswordPage from "./pages/Forgot_Password_Page"
@@ -16,42 +15,57 @@ import AdminEmployeeAttendancePage from "./pages/Admin_Employee_Attendance_Page"
 import AdminMasterCalendarPage from "./pages/Admin_Master_Calendar_Page"
 import EmployeeSchedulePage from "./pages/Employee_Schedule_Page"
 
-// Session wrapper component
-function SessionHandler({ children }) {
+// Session checker component
+function SessionChecker() {
   const navigate = useNavigate()
   const location = useLocation()
 
   useEffect(() => {
-    // Initialize session monitoring
-    const cleanupSessionMonitor = initSessionMonitor()
+    // Check if the current route is not a public route
+    const isPublicRoute =
+      location.pathname === "/" ||
+      location.pathname.startsWith("/forgot-password") ||
+      location.pathname.startsWith("/reset-password")
 
-    // Prevent back navigation
-    const cleanupBackNavigation = preventBackNavigation()
-
-    // Check session validity on route change
-    if (
-      !isSessionValid() &&
-      location.pathname !== "/" &&
-      !location.pathname.startsWith("/forgot-password") &&
-      !location.pathname.startsWith("/reset-password")
-    ) {
-      navigate("/", { replace: true })
+    if (!isPublicRoute) {
+      const token = localStorage.getItem("access_token")
+      if (!token) {
+        // Redirect to login if no token
+        navigate("/", { replace: true })
+      }
     }
 
+    // Prevent back navigation after logout
+    const handlePopState = () => {
+      const token = localStorage.getItem("access_token")
+      if (!token && !isPublicRoute) {
+        navigate("/", { replace: true })
+      }
+    }
+
+    window.addEventListener("popstate", handlePopState)
+
     return () => {
-      cleanupSessionMonitor()
-      cleanupBackNavigation()
+      window.removeEventListener("popstate", handlePopState)
     }
   }, [navigate, location])
 
-  return children
+  return null
 }
 
 // Protected route component
 function ProtectedRoute({ children, allowedRoles, redirectPath = "/" }) {
+  const navigate = useNavigate()
   const role = localStorage.getItem("user_role")
+  const isAuthenticated = !!localStorage.getItem("access_token")
 
-  if (!isSessionValid()) {
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/", { replace: true })
+    }
+  }, [isAuthenticated, navigate])
+
+  if (!isAuthenticated) {
     return <Navigate to="/" replace />
   }
 
@@ -72,85 +86,84 @@ function ProtectedRoute({ children, allowedRoles, redirectPath = "/" }) {
 function App() {
   return (
     <Router>
-      <SessionHandler>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/" element={<LoginPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+      <SessionChecker />
+      <Routes>
+        {/* Public routes */}
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
-          {/* Admin/Owner routes */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "owner"]}>
-                <AdminDashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/employee"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "owner"]}>
-                <AdminEmployeePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payroll"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "owner"]}>
-                <AdminEmployeePayrollPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/employee/schedule/:employeeId"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "owner"]}>
-                <AdminEmployeeEditSchedulePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/attendance"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "owner"]}>
-                <AdminEmployeeAttendancePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/master-calendar"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "owner"]}>
-                <AdminMasterCalendarPage />
-              </ProtectedRoute>
-            }
-          />
+        {/* Admin/Owner routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminEmployeePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payroll"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminEmployeePayrollPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/schedule/:employeeId"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminEmployeeEditSchedulePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/attendance"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminEmployeeAttendancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/master-calendar"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminMasterCalendarPage />
+            </ProtectedRoute>
+          }
+        />
 
-          {/* Employee routes */}
-          <Route
-            path="/employee/schedule"
-            element={
-              <ProtectedRoute allowedRoles={["employee"]}>
-                <EmployeeSchedulePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payslip"
-            element={
-              <ProtectedRoute allowedRoles={["admin", "owner", "employee"]}>
-                <PayslipPage />
-              </ProtectedRoute>
-            }
-          />
+        {/* Employee routes */}
+        <Route
+          path="/employee/schedule"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeSchedulePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payslip"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner", "employee"]}>
+              <PayslipPage />
+            </ProtectedRoute>
+          }
+        />
 
-          {/* Catch all route - redirect to appropriate dashboard or login */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </SessionHandler>
+        {/* Catch all route - redirect to appropriate dashboard or login */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Router>
   )
 }

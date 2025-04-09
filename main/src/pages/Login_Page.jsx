@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate, useLocation } from "react-router-dom"
+import { useNavigate } from "react-router-dom"
 import logo from "../assets/Login_Page/fresco_logo_black.png"
 import leaf_1 from "../assets/Login_Page/leaf-1.png"
 import leaf_2 from "../assets/Login_Page/leaf-2.png"
@@ -10,7 +10,6 @@ import { API_BASE_URL } from "../config/api"
 
 function LoginPage() {
   const navigate = useNavigate()
-  const location = useLocation()
   const [formData, setFormData] = useState({
     id: "",
     password: "",
