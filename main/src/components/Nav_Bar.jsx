@@ -1,14 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { UserCircle, LogOut } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import logo from "../assets/Login_Page/fresco_logo_white.png"
-import { endSession } from "../utils/sessionHandler"
 
 function NavBar() {
   const [userRole, setUserRole] = useState(null)
   const [showDropdown, setShowDropdown] = useState(false)
+  const dropdownRef = useRef(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -17,9 +17,34 @@ function NavBar() {
     setUserRole(role)
   }, [])
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowDropdown(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [dropdownRef])
+
   const handleLogout = () => {
-    // Use the endSession function from sessionHandler
-    endSession(navigate)
+    // Clear all localStorage items
+    localStorage.removeItem("access_token")
+    localStorage.removeItem("refresh_token")
+    localStorage.removeItem("user_id")
+    localStorage.removeItem("user_email")
+    localStorage.removeItem("user_role")
+    localStorage.removeItem("session_start")
+
+    // Prevent going back to protected pages
+    window.history.pushState(null, "", "/")
+
+    // Navigate to login page
+    navigate("/", { replace: true })
   }
 
   // Define navigation links based on user role
@@ -59,18 +84,21 @@ function NavBar() {
               {link.name}
             </Link>
           ))}
-          <div className="relative">
-            <UserCircle className="h-8 w-8 cursor-pointer" onClick={() => setShowDropdown(!showDropdown)} />
+          <div className="relative" ref={dropdownRef}>
+            <UserCircle
+              className="h-8 w-8 cursor-pointer hover:text-gray-300 transition-colors"
+              onClick={() => setShowDropdown(!showDropdown)}
+            />
 
             {/* Dropdown menu */}
             {showDropdown && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10">
                 <button
                   onClick={handleLogout}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center"
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center transition-colors duration-150"
                 >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Logout
+                  <LogOut className="h-4 w-4 mr-2 text-red-500" />
+                  <span className="font-medium">Logout</span>
                 </button>
               </div>
             )}
