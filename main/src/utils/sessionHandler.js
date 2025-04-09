@@ -47,11 +47,6 @@ export const initSessionMonitor = () => {
     }
   }
 
-  // Set up event listeners for user activity
-  window.addEventListener("mousemove", refreshOnActivity)
-  window.addEventListener("keydown", refreshOnActivity)
-  window.addEventListener("click", refreshOnActivity)
-  window.addEventListener("scroll", refreshOnActivity)
 
   // Check session validity periodically
   const intervalId = setInterval(() => {
