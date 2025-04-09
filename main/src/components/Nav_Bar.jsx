@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from "react"
 import { UserCircle, LogOut } from "lucide-react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom"
+import { endSession } from "../utils/sessionHandler"
 import logo from "../assets/Login_Page/fresco_logo_white.png"
 
 function NavBar() {
   const [userRole, setUserRole] = useState(null)
   const [showDropdown, setShowDropdown] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
     // Get user role from localStorage
@@ -17,21 +19,12 @@ function NavBar() {
   }, [])
 
   const handleLogout = () => {
-    // Clear all localStorage items
-    localStorage.removeItem("access_token")
-    localStorage.removeItem("refresh_token")
-    localStorage.removeItem("user_id")
-    localStorage.removeItem("user_email")
-    localStorage.removeItem("user_role")
-
-    // Navigate to login page
-    navigate("/")
+    endSession()
   }
 
   // Define navigation links based on user role
   const getNavLinks = () => {
-    if (userRole === "admin" || userRole === "owner" || !userRole) {
-      // For admin/owner or when role is not set yet, show all admin links
+    if (userRole === "admin" || userRole === "owner") {
       return [
         { name: "DASHBOARD", href: "/dashboard" },
         { name: "EMPLOYEE", href: "/employee" },
@@ -40,28 +33,31 @@ function NavBar() {
         { name: "MASTER CALENDAR", href: "/master-calendar" },
       ]
     } else if (userRole === "employee") {
-      // For employees, show only relevant links
       return [
         { name: "SCHEDULE", href: "/employee/schedule" },
         { name: "PAYSLIP", href: "/payslip" },
       ]
     }
-
-    // Default fallback
     return []
   }
 
   const navLinks = getNavLinks()
 
   return (
-    <nav className="bg-gray-800 text-white p-6">
+    <nav className="bg-gray-800 text-white p-4">
       <div className="container mx-auto flex justify-between items-center">
         <Link to={userRole === "employee" ? "/employee/schedule" : "/dashboard"}>
-          <img src={logo || "/placeholder.svg"} alt="Fresco Logo" className="h-16 w-auto" />
+          <img src={logo || "/placeholder.svg"} alt="Fresco Logo" className="h-12 w-auto" />
         </Link>
         <div className="flex items-center space-x-8">
           {navLinks.map((link) => (
-            <Link key={link.name} to={link.href} className="font-medium hover:text-gray-300">
+            <Link
+              key={link.name}
+              to={link.href}
+              className={`font-medium hover:text-gray-300 ${
+                location.pathname === link.href ? "text-white" : "text-gray-300"
+              }`}
+            >
               {link.name}
             </Link>
           ))}
