@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { BrowserRouter as Router, Routes, Route, useNavigate } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from "react-router-dom"
 
 import logo from "./assets/Login_Page/fresco_logo_black.png"
 import leaf_1 from "./assets/Login_Page/leaf-1.png"
@@ -14,9 +14,33 @@ import AdminEmployeePayrollPage from "./pages/Admin_Employee_Payroll_Page"
 import AdminEmployeePage from "./pages/Admin_Employees_Page"
 import PayslipPage from "./pages/Payslip_Page"
 import AdminEmployeeEditSchedulePage from "./pages/Admin_Employee_Edit_Schedule_Page"
-import AdminEmployeeAttendancePage from './pages/Admin_Employee_Attendance_Page'
+import AdminEmployeeAttendancePage from "./pages/Admin_Employee_Attendance_Page"
 import AdminMasterCalendarPage from "./pages/Admin_Master_Calendar_Page"
+import EmployeeSchedulePage from "./pages/Employee_Schedule_Page"
 import { API_BASE_URL } from "./config/api"
+
+// Protected route component
+function ProtectedRoute({ children, allowedRoles, redirectPath = "/" }) {
+  const role = localStorage.getItem("user_role")
+  const isAuthenticated = !!localStorage.getItem("access_token")
+
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />
+  }
+
+  if (allowedRoles && !allowedRoles.includes(role)) {
+    // Redirect to appropriate dashboard based on role
+    if (role === "employee") {
+      return <Navigate to="/employee/schedule" replace />
+    } else if (role === "admin" || role === "owner") {
+      return <Navigate to="/dashboard" replace />
+    } else {
+      return <Navigate to="/" replace />
+    }
+  }
+
+  return children
+}
 
 function LoginPage() {
   const navigate = useNavigate()
@@ -51,9 +75,17 @@ function LoginPage() {
           localStorage.setItem("refresh_token", data.refresh)
           localStorage.setItem("user_id", data.user)
           localStorage.setItem("user_email", data.email)
+          localStorage.setItem("user_role", data.role)
 
-          // Redirect to the dashboard
-          navigate("/dashboard")
+          // Redirect based on user role
+          if (data.role === "admin" || data.role === "owner") {
+            navigate("/dashboard")
+          } else if (data.role === "employee") {
+            navigate("/employee/schedule")
+          } else {
+            // Default fallback
+            navigate("/dashboard")
+          }
         } else {
           // If no tokens are returned, show an error
           setError("Login failed. Please check your credentials and try again.")
@@ -166,20 +198,81 @@ function App() {
   return (
     <Router>
       <Routes>
+        {/* Public routes */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-        <Route path="/dashboard" element={<AdminDashboardPage />} />
-        <Route path="/payslip" element={<PayslipPage />} />
-        <Route path="/employee" element={<AdminEmployeePage />} />
-        <Route path="/payroll" element={<AdminEmployeePayrollPage />} />
-        <Route path="/employee/schedule/:employeeId" element={<AdminEmployeeEditSchedulePage />} />
-        <Route path="/attendance" element={<AdminEmployeeAttendancePage />} />
-        <Route path="/master-calendar" element={<AdminMasterCalendarPage />} />
+
+        {/* Admin/Owner routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminDashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminEmployeePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payroll"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminEmployeePayrollPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employee/schedule/:employeeId"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminEmployeeEditSchedulePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/attendance"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminEmployeeAttendancePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/master-calendar"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminMasterCalendarPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Employee routes */}
+        <Route
+          path="/employee/schedule"
+          element={
+            <ProtectedRoute allowedRoles={["employee"]}>
+              <EmployeeSchedulePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payslip"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner", "employee"]}>
+              <PayslipPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </Router>
   )
 }
 
 export default App
-
