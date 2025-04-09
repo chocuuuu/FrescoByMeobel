@@ -671,24 +671,31 @@ function AdminEmployeeEditSchedulePage() {
         return
       }
 
-      // If we have a schedule ID and it has been saved, use the add-shifts endpoint
+      // If we have a schedule ID and it has been saved, update it with the new shifts
       if (schedule.id && hasScheduleBeenSaved) {
         const accessToken = localStorage.getItem("access_token")
 
-        // Call the add-shifts endpoint
-        const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/add-shifts/`, {
-          method: "POST",
+        // Update the schedule with the new shifts using PATCH
+        // Note: We're using the correct endpoint now (no /add-shifts/)
+        const updatedDays = [...(schedule.days || [])]
+        if (!updatedDays.includes(dayName)) {
+          updatedDays.push(dayName)
+        }
+
+        const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
+          method: "PATCH",
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            shift_ids: newShiftIds,
+            days: updatedDays,
+            add_shift_ids: newShiftIds, // This is the correct way to add shifts
           }),
         })
 
         if (!response.ok) {
-          throw new Error(`Failed to add shifts: ${response.statusText}`)
+          throw new Error(`Failed to update schedule: ${response.statusText}`)
         }
 
         const updatedSchedule = await response.json()
@@ -1405,11 +1412,11 @@ function AdminEmployeeEditSchedulePage() {
           // For past days, show actual attendance if available
           const lowerStatus = attendanceData[dateStr].toLowerCase()
           if (lowerStatus === "present") {
-            newDayStatus[dateStr] = "attended"
+            newStatus[dateStr] = "attended"
           } else if (lowerStatus === "absent") {
-            newDayStatus[dateStr] = "absent"
+            newStatus[dateStr] = "absent"
           } else if (lowerStatus === "late") {
-            newDayStatus[dateStr] = "late"
+            newStatus[dateStr] = "late"
           }
         } else if (schedule.days?.includes(dayOfWeek) && isInPayrollPeriod) {
           // If it's a scheduled day and in the payroll period
@@ -1926,7 +1933,7 @@ function AdminEmployeeEditSchedulePage() {
 
       // If we have a schedule ID, use PATCH with add_shift_ids
       if (schedule.id) {
-        console.log(`Updating existing schedule ${schedule.id} with add_shift_ids:`, newShiftIds)
+        console.log(`Updating existing schedule ${schedule.id} with new shifts:`, newShiftIds)
 
         // Preserve existing days when updating
         const existingDays = schedule.days || []
@@ -1941,10 +1948,10 @@ function AdminEmployeeEditSchedulePage() {
 
         console.log(`Updating schedule with days: ${updatedDays.join(", ")}`)
 
-        // Prepare the update data with add_shift_ids
+        // Prepare the update data
         const updateData = {
-          add_shift_ids: newShiftIds,
           days: updatedDays,
+          add_shift_ids: newShiftIds, // Correct way to add shifts
           payroll_period_start: payrollPeriodStart,
           payroll_period_end: payrollPeriodEnd,
           bi_weekly_start: payrollPeriodStart,
@@ -1961,7 +1968,7 @@ function AdminEmployeeEditSchedulePage() {
         // Log the data being sent to the server
         console.log("Sending update data to server:", JSON.stringify(updateData, null, 2))
 
-        // Update the schedule using PATCH to add new shifts
+        // Update the schedule using PATCH
         const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
           method: "PATCH",
           headers: {
