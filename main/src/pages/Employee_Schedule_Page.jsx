@@ -4,271 +4,466 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import NavBar from "../components/Nav_Bar"
 import { API_BASE_URL } from "../config/api"
-import axios from "axios"
+import { ArrowLeft, ArrowRight, User2, Calendar, Clock } from "lucide-react"
 import dayjs from "dayjs"
-import { ChevronLeft, ChevronRight, User, Calendar, Clock, AlertCircle } from "lucide-react"
+import axios from "axios"
 
-function EmployeeSchedulePage() {
+function Employee_Schedule_Page() {
   const navigate = useNavigate()
-  const [currentMonth, setCurrentMonth] = useState(dayjs())
-  const [selectedDate, setSelectedDate] = useState(dayjs())
-  const [schedule, setSchedule] = useState([])
-  const [employeeInfo, setEmployeeInfo] = useState(null)
-  const [attendanceData, setAttendanceData] = useState([])
-  const [biometricData, setBiometricData] = useState([])
+
+  // State for employee data
+  const [employee, setEmployee] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
+  // State for calendar and schedule
+  const [currentDate, setCurrentDate] = useState(dayjs())
+  const [selectedDate, setSelectedDate] = useState(dayjs())
+  const [schedule, setSchedule] = useState({
+    id: null,
+    user_id: null,
+    shift_ids: [],
+    days: [],
+    sickleave: null,
+    regularholiday: [],
+    specialholiday: [],
+    nightdiff: [],
+    oncall: [],
+    vacationleave: [],
+    payroll_period: "",
+    hours: 8,
+    bi_weekly_start: "",
+    payroll_period_start: null,
+    payroll_period_end: null,
+  })
+
+  // State for calendar data
+  const [calendarDays, setCalendarDays] = useState([])
+  const [dayStatus, setDayStatus] = useState({})
   const [shifts, setShifts] = useState([])
+  const [attendanceData, setAttendanceData] = useState({})
+  const [holidays, setHolidays] = useState([])
+  const [hasSchedule, setHasSchedule] = useState(false)
+
+  // Fetch holidays
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      try {
+        const accessToken = localStorage.getItem("access_token")
+        const response = await fetch(`${API_BASE_URL}/master-calendar/holidays/`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setHolidays(data)
+        }
+      } catch (error) {
+        console.error("Error fetching holidays:", error)
+      }
+    }
+
+    fetchHolidays()
+  }, [])
 
   // Fetch employee data
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchEmployeeData = async () => {
+      setLoading(true)
       try {
-        setLoading(true)
         const userId = localStorage.getItem("user_id")
-        const token = localStorage.getItem("access_token")
+        const accessToken = localStorage.getItem("access_token")
 
-        if (!userId || !token) {
+        if (!userId || !accessToken) {
           navigate("/", { replace: true })
           return
         }
 
-        // Fetch employee info
-        const employeeResponse = await axios.get(`${API_BASE_URL}/users/${userId}/`, {
+        // Fetch employee info using employment-info endpoint
+        const response = await fetch(`${API_BASE_URL}/employment-info/?user=${userId}`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
           },
         })
 
-        setEmployeeInfo(employeeResponse.data)
-
-        // Fetch employee schedule
-        const scheduleResponse = await axios.get(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        if (scheduleResponse.data && scheduleResponse.data.length > 0) {
-          // Get the most recent schedule
-          const userSchedules = scheduleResponse.data
-            .filter((schedule) => schedule.user_id === Number.parseInt(userId))
-            .sort((a, b) => b.id - a.id)
-
-          if (userSchedules.length > 0) {
-            setSchedule(userSchedules[0])
-            console.log("Found schedule:", userSchedules[0])
-          }
+        if (!response.ok) {
+          throw new Error("Failed to fetch employee data")
         }
 
-        // Fetch attendance data
-        const startDate = currentMonth.startOf("month").format("YYYY-MM-DD")
-        const endDate = currentMonth.endOf("month").format("YYYY-MM-DD")
-
-        const attendanceResponse = await axios.get(
-          `${API_BASE_URL}/attendance/?user=${userId}&date_after=${startDate}&date_before=${endDate}`,
-          {
+        const data = await response.json()
+        if (data && data.length > 0) {
+          setEmployee(data[0])
+          console.log("Fetched employee data:", data[0])
+        } else {
+          // Fallback to users endpoint if employment-info doesn't return data
+          const userResponse = await fetch(`${API_BASE_URL}/users/${userId}/`, {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
             },
-          },
-        )
+          })
 
-        setAttendanceData(attendanceResponse.data)
-
-        // Fetch biometric data
-        const biometricResponse = await axios.get(
-          `${API_BASE_URL}/biometricdata/?user=${userId}&date_after=${startDate}&date_before=${endDate}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        )
-
-        setBiometricData(biometricResponse.data)
-
-        // Fetch shifts
-        const shiftsResponse = await axios.get(`${API_BASE_URL}/shift/`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-
-        setShifts(shiftsResponse.data)
-        setError(null)
-      } catch (err) {
-        console.error("Error fetching data:", err)
-        setError("Failed to load schedule data. Please try again later.")
+          if (userResponse.ok) {
+            const userData = await userResponse.json()
+            setEmployee({
+              user: userData,
+              first_name: userData.first_name,
+              last_name: userData.last_name,
+              employee_id: userData.id,
+            })
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching employee:", error)
+        setError(error.message)
       } finally {
         setLoading(false)
       }
     }
 
-    fetchData()
-  }, [navigate, currentMonth])
+    fetchEmployeeData()
+  }, [navigate])
 
-  // Navigate to previous month
-  const prevMonth = () => {
-    setCurrentMonth(currentMonth.subtract(1, "month"))
-  }
+  // Fetch attendance data
+  useEffect(() => {
+    const fetchAttendanceData = async () => {
+      try {
+        const userId = localStorage.getItem("user_id")
+        if (!userId) return
 
-  // Navigate to next month
-  const nextMonth = () => {
-    setCurrentMonth(currentMonth.add(1, "month"))
-  }
+        const accessToken = localStorage.getItem("access_token")
 
-  // Get days in current month view
-  const getDaysInMonth = () => {
-    const monthStart = currentMonth.startOf("month")
-    const monthEnd = currentMonth.endOf("month")
-    const startDay = monthStart.day() // 0 for Sunday, 1 for Monday, etc.
+        // Get the first and last day of the current month
+        const year = currentDate.year()
+        const month = currentDate.month()
+        const firstDay = dayjs(new Date(year, month, 1)).format("YYYY-MM-DD")
+        const lastDay = dayjs(new Date(year, month + 1, 0)).format("YYYY-MM-DD")
 
-    const days = []
+        // Clear existing attendance data
+        setAttendanceData({})
+
+        // Fetch actual attendance data
+        const response = await fetch(
+          `${API_BASE_URL}/attendance/?user=${userId}&date_after=${firstDay}&date_before=${lastDay}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          },
+        )
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`Received ${data.length} attendance records`)
+
+          // Convert to a map of date -> status
+          const attendanceMap = {}
+          data.forEach((record) => {
+            attendanceMap[record.date] = record.status.toLowerCase()
+          })
+
+          setAttendanceData(attendanceMap)
+        }
+      } catch (error) {
+        console.error("Error fetching attendance data:", error)
+      }
+    }
+
+    fetchAttendanceData()
+  }, [currentDate])
+
+  // Fetch schedule data
+  useEffect(() => {
+    const fetchScheduleData = async () => {
+      try {
+        console.log("Starting fetchScheduleData...")
+        setLoading(true)
+
+        // Reset schedule state first
+        setSchedule({
+          id: null,
+          user_id: null,
+          shift_ids: [],
+          days: [],
+          sickleave: null,
+          regularholiday: [],
+          specialholiday: [],
+          nightdiff: [],
+          oncall: [],
+          vacationleave: [],
+          payroll_period: "",
+          hours: 8,
+          bi_weekly_start: "",
+          payroll_period_start: null,
+          payroll_period_end: null,
+        })
+
+        // Reset day status
+        setDayStatus({})
+        setHasSchedule(false)
+
+        const accessToken = localStorage.getItem("access_token")
+        if (!accessToken) {
+          console.error("No access token found")
+          setLoading(false)
+          return
+        }
+
+        // Use the user ID from localStorage
+        const userId = localStorage.getItem("user_id")
+        if (!userId) {
+          console.warn("No user ID found")
+          setLoading(false)
+          return
+        }
+
+        console.log(`Fetching schedule for user ID: ${userId}`)
+
+        // Use axios for better error handling
+        try {
+          const response = await axios.get(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          })
+
+          console.log(`Fetched schedule data:`, response.data)
+
+          if (response.data && response.data.length > 0) {
+            // Filter to ensure we only get schedules for this specific user
+            // and sort by ID to get the most recent schedule first
+            const userSchedules = response.data
+              .filter((schedule) => schedule.user_id === Number.parseInt(userId))
+              .sort((a, b) => b.id - a.id)
+
+            if (userSchedules.length > 0) {
+              // Always use the most recent schedule (highest ID)
+              const scheduleData = userSchedules[0]
+              console.log("Found most recent schedule for this user:", scheduleData)
+
+              // Set the schedule
+              setSchedule(scheduleData)
+              setHasSchedule(true)
+
+              // Fetch shift details
+              if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
+                const shiftPromises = scheduleData.shift_ids.map((shiftId) =>
+                  fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
+                    headers: {
+                      Authorization: `Bearer ${accessToken}`,
+                      "Content-Type": "application/json",
+                    },
+                  }).then((res) => (res.ok ? res.json() : null)),
+                )
+
+                const shiftsData = await Promise.all(shiftPromises)
+                const validShifts = shiftsData.filter((shift) => shift !== null)
+                setShifts(validShifts)
+              }
+            } else {
+              console.log(`No schedule found for user ID ${userId}`)
+            }
+          } else {
+            console.log(`No schedules found at all`)
+          }
+        } catch (error) {
+          console.error("Error fetching schedule:", error)
+        }
+
+        setLoading(false)
+      } catch (error) {
+        console.error("Error fetching schedule:", error)
+        setLoading(false)
+      }
+    }
+
+    fetchScheduleData()
+  }, [])
+
+  // Generate calendar days for the current month
+  useEffect(() => {
+    const year = currentDate.year()
+    const month = currentDate.month()
+
+    const firstDayOfMonth = dayjs(new Date(year, month, 1))
+    const daysInMonth = currentDate.daysInMonth()
+
+    const dayObjects = []
 
     // Add days from previous month to fill the first week
-    for (let i = 0; i < startDay; i++) {
-      days.push({
-        date: monthStart.subtract(startDay - i, "day"),
+    const firstDayWeekday = firstDayOfMonth.day()
+    for (let i = 0; i < firstDayWeekday; i++) {
+      const prevMonthDay = firstDayOfMonth.subtract(firstDayWeekday - i, "day")
+      dayObjects.push({
+        date: prevMonthDay,
+        dayOfMonth: prevMonthDay.date(),
         isCurrentMonth: false,
       })
     }
 
-    // Add all days of current month
-    for (let i = 1; i <= monthEnd.date(); i++) {
-      days.push({
-        date: dayjs(new Date(currentMonth.year(), currentMonth.month(), i)),
+    // Add days of current month
+    for (let i = 1; i <= daysInMonth; i++) {
+      const date = dayjs(new Date(year, month, i))
+      dayObjects.push({
+        date,
+        dayOfMonth: i,
         isCurrentMonth: true,
       })
     }
 
-    // Add days from next month to fill the last week
-    const endDay = monthEnd.day() // 0-6
-    for (let i = 1; i < 7 - endDay; i++) {
-      days.push({
-        date: monthEnd.add(i, "day"),
-        isCurrentMonth: false,
+    // Add days from next month to complete the last week
+    const lastDayOfMonth = dayjs(new Date(year, month, daysInMonth))
+    const lastDayWeekday = lastDayOfMonth.day()
+
+    if (lastDayWeekday < 6) {
+      for (let i = 1; i <= 6 - lastDayWeekday; i++) {
+        const nextMonthDay = lastDayOfMonth.add(i, "day")
+        dayObjects.push({
+          date: nextMonthDay,
+          dayOfMonth: nextMonthDay.date(),
+          isCurrentMonth: false,
+        })
+      }
+    }
+
+    setCalendarDays(dayObjects)
+
+    // Initialize day status
+    const newDayStatus = {}
+    const today = dayjs()
+
+    // First, apply holiday information
+    holidays.forEach((holiday) => {
+      const dateStr = holiday.date
+      if (dayjs(dateStr).month() === month && dayjs(dateStr).year() === year) {
+        newDayStatus[dateStr] = holiday.holiday_type === "regular" ? "regularholiday" : "specialholiday"
+      }
+    })
+
+    // If we have a schedule, update the day status
+    if (hasSchedule && schedule.days && schedule.days.length > 0) {
+      dayObjects.forEach((day) => {
+        if (day.isCurrentMonth) {
+          const dateStr = day.date.format("YYYY-MM-DD")
+          const dayOfWeek = day.date.format("dddd")
+          const isPastDay = day.date.isBefore(today, "day")
+
+          // Skip if already marked as a holiday
+          if (newDayStatus[dateStr] === "regularholiday" || newDayStatus[dateStr] === "specialholiday") {
+            return
+          }
+
+          // Check if the day is in any of the special categories
+          if (schedule.sickleave === dateStr) {
+            newDayStatus[dateStr] = "sickleave"
+          } else if (schedule.regularholiday?.includes(dateStr)) {
+            newDayStatus[dateStr] = "regularholiday"
+          } else if (schedule.specialholiday?.includes(dateStr)) {
+            newDayStatus[dateStr] = "specialholiday"
+          } else if (schedule.nightdiff?.includes(dateStr)) {
+            newDayStatus[dateStr] = "nightdiff"
+          } else if (schedule.oncall?.includes(dateStr)) {
+            newDayStatus[dateStr] = "oncall"
+          } else if (schedule.vacationleave?.includes(dateStr)) {
+            newDayStatus[dateStr] = "vacationleave"
+          } else if (isPastDay && attendanceData[dateStr]) {
+            // For past days, show actual attendance if available
+            const lowerStatus = attendanceData[dateStr].toLowerCase()
+            if (lowerStatus === "present") {
+              newDayStatus[dateStr] = "attended"
+            } else if (lowerStatus === "absent") {
+              newDayStatus[dateStr] = "absent"
+            } else if (lowerStatus === "late") {
+              newDayStatus[dateStr] = "late"
+            }
+          } else if (schedule.days?.includes(dayOfWeek)) {
+            // If it's a scheduled day
+            if (isPastDay && !attendanceData[dateStr]) {
+              // Past scheduled days without attendance records should be marked as absent
+              newDayStatus[dateStr] = "absent"
+            } else {
+              // Future scheduled days
+              newDayStatus[dateStr] = "scheduled"
+            }
+          } else if (isPastDay) {
+            // Any past day without attendance or schedule should be marked as absent
+            newDayStatus[dateStr] = "absent"
+          } else {
+            // Default status for future days
+            newDayStatus[dateStr] = "unscheduled"
+          }
+        }
       })
     }
 
-    return days
+    setDayStatus(newDayStatus)
+  }, [currentDate, schedule, holidays, attendanceData, hasSchedule])
+
+  // Handle day click in calendar
+  const handleDayClick = (day) => {
+    if (day.isCurrentMonth) {
+      setSelectedDate(day.date)
+    }
   }
 
-  // Get day status (scheduled, attended, absent, etc.)
-  const getDayStatus = (date) => {
-    const dateStr = date.format("YYYY-MM-DD")
-
-    // Check attendance data
-    const attendance = attendanceData.find((item) => item.date === dateStr)
-    if (attendance) {
-      return attendance.status.toLowerCase() // 'present' or 'absent'
-    }
-
-    // Check if day is in schedule
-    if (schedule && schedule.days) {
-      const dayOfWeek = date.format("dddd").toLowerCase()
-      if (schedule.days.includes(dayOfWeek)) {
-        return "scheduled"
-      }
-    }
-
-    // Check for special events
-    if (schedule) {
-      if (schedule.regularholiday && schedule.regularholiday.includes(dateStr)) {
-        return "regularholiday"
-      }
-      if (schedule.specialholiday && schedule.specialholiday.includes(dateStr)) {
-        return "specialholiday"
-      }
-      if (schedule.sickleave && schedule.sickleave.includes(dateStr)) {
-        return "sickleave"
-      }
-      if (schedule.vacationleave && schedule.vacationleave.includes(dateStr)) {
-        return "vacationleave"
-      }
-      if (schedule.nightdiff && schedule.nightdiff.includes(dateStr)) {
-        return "nightdiff"
-      }
-      if (schedule.oncall && schedule.oncall.includes(dateStr)) {
-        return "oncall"
-      }
-      if (schedule.restday && schedule.restday.includes(dateStr)) {
-        return "restday"
-      }
-    }
-
-    return null
+  // Handle month change
+  const handleMonthChange = (direction) => {
+    const newDate = direction === "next" ? currentDate.add(1, "month") : currentDate.subtract(1, "month")
+    setCurrentDate(newDate)
+    setSelectedDate(dayjs(new Date(newDate.year(), newDate.month(), 1)))
   }
 
-  // Get status color class
-  const getStatusColorClass = (day) => {
+  // Function to determine the background color of a calendar day based on its status
+  const getDayStatusColor = (day) => {
     if (!day.isCurrentMonth) {
-      return "bg-gray-200 text-gray-400" // Different month
+      return "bg-gray-400 text-white opacity-50" // Light gray for days outside the current month
     }
 
-    if (day.date.format("YYYY-MM-DD") === dayjs().format("YYYY-MM-DD")) {
-      return "border-2 border-blue-500" // Today
-    }
-
-    if (day.date.format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")) {
-      return "border-2 border-blue-500" // Selected date
-    }
-
-    const status = getDayStatus(day.date)
+    const dateStr = day.date.format("YYYY-MM-DD")
+    const status = dayStatus[dateStr]
 
     switch (status) {
-      case "present":
-        return "bg-green-500 text-white" // Green for attended
+      case "attended":
+        return "bg-green-500 text-white" // Green for attended days
       case "absent":
-        return "bg-red-500 text-white" // Red for absent
+        return "bg-red-500 text-white" // Red for absent days
       case "scheduled":
-        return "bg-blue-100 text-blue-800" // Light blue for scheduled
+        return "bg-blue-200 text-gray-800" // Blue for scheduled days
+      case "sickleave":
+        return "bg-yellow-400 text-white" // Yellow for sick leave
       case "regularholiday":
       case "specialholiday":
-        return "bg-orange-100 text-orange-800" // Orange for holiday
-      case "sickleave":
-        return "bg-yellow-100 text-yellow-800" // Yellow for sick leave
+        return "bg-orange-400 text-white" // Orange for holidays
       case "vacationleave":
-        return "bg-purple-100 text-purple-800" // Purple for vacation
+        return "bg-purple-400 text-white" // Purple for vacation
       case "nightdiff":
-        return "bg-indigo-100 text-indigo-800" // Indigo for night diff
+        return "bg-blue-500 text-white" // Dark blue for night differential
       case "oncall":
-        return "bg-teal-100 text-teal-800" // Teal for on call
-      case "restday":
-        return "bg-gray-100 text-gray-800" // Gray for rest day
+        return "bg-purple-500 text-white" // Purple for on-call
       default:
-        return "bg-white" // Default
+        return "bg-white text-gray-700" // White for unscheduled days
     }
   }
 
   // Get shift for selected date
   const getShiftForDate = (date) => {
-    if (!schedule || !schedule.shift_ids) return null
+    if (!shifts || !shifts.length) return null
 
     const dateStr = date.format("YYYY-MM-DD")
-    const dayOfWeek = date.format("dddd").toLowerCase()
-
-    // Check if this day is in the employee's schedule
-    if (schedule.days && schedule.days.includes(dayOfWeek)) {
-      // Find the shift for this day
-      const shiftId = schedule.shift_ids.find((id) => {
-        const shift = shifts.find((s) => s.id === id)
-        return shift && shift.days && shift.days.includes(dayOfWeek)
-      })
-
-      if (shiftId) {
-        return shifts.find((s) => s.id === shiftId)
-      }
-    }
-
-    return null
+    return shifts.find((shift) => shift.date === dateStr)
   }
 
-  // Format time (HH:MM:SS to HH:MM AM/PM)
-  const formatTime = (timeString) => {
-    if (!timeString) return ""
+  // Format time from "HH:MM:SS" to "HH:MM AM/PM"
+  const formatTime = (timeStr) => {
+    if (!timeStr) return ""
 
-    const [hours, minutes] = timeString.split(":")
+    const [hours, minutes] = timeStr.split(":")
     const hour = Number.parseInt(hours, 10)
     const ampm = hour >= 12 ? "PM" : "AM"
     const hour12 = hour % 12 || 12
@@ -276,315 +471,390 @@ function EmployeeSchedulePage() {
     return `${hour12}:${minutes} ${ampm}`
   }
 
-  // Handle day selection
-  const handleDayClick = (day) => {
-    setSelectedDate(day.date)
-  }
+  // Get event status for a specific event type
+  const getEventStatus = (eventType) => {
+    if (!selectedDate) return false
 
-  // Get event type for selected date
-  const getEventType = (date) => {
-    const dateStr = date.format("YYYY-MM-DD")
-    const status = getDayStatus(date)
+    const dateStr = selectedDate.format("YYYY-MM-DD")
 
-    switch (status) {
-      case "present":
-        return "Attended"
-      case "absent":
-        return "Absent"
-      case "scheduled":
-        return "Scheduled"
-      case "regularholiday":
-        return "Regular Holiday"
-      case "specialholiday":
-        return "Special Holiday"
+    switch (eventType) {
       case "sickleave":
-        return "Sick Leave"
-      case "vacationleave":
-        return "Vacation Leave"
+        return schedule.sickleave === dateStr
+      case "regularholiday":
+        return schedule.regularholiday?.includes(dateStr) || false
+      case "specialholiday":
+        return schedule.specialholiday?.includes(dateStr) || false
       case "nightdiff":
-        return "Night Differential"
+        return schedule.nightdiff?.includes(dateStr) || false
       case "oncall":
-        return "On Call"
-      case "restday":
-        return "Rest Day"
+        return schedule.oncall?.includes(dateStr) || false
+      case "vacationleave":
+        return schedule.vacationleave?.includes(dateStr) || false
       default:
-        return "No Event"
+        return false
     }
   }
 
-  // Get biometric data for selected date
-  const getBiometricForDate = (date) => {
-    const dateStr = date.format("YYYY-MM-DD")
-    return biometricData.filter((item) => item.date === dateStr)
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <NavBar />
-        <div className="flex justify-center items-center h-[80vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-700"></div>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <NavBar />
-        <div className="flex justify-center items-center h-[80vh]">
-          <div className="text-red-500 p-4 border border-red-200 rounded-md bg-red-50">{error}</div>
-        </div>
-      </div>
-    )
-  }
-
-  const selectedShift = getShiftForDate(selectedDate)
-  const eventType = getEventType(selectedDate)
-  const biometricRecords = getBiometricForDate(selectedDate)
+  if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>
+  if (error) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">{error}</div>
 
   return (
     <div className="min-h-screen bg-gray-50">
       <NavBar />
 
-      <div className="flex flex-col md:flex-row p-4 gap-4">
-        {/* Calendar Panel */}
-        <div className="bg-[#5C7346] rounded-lg p-4 md:w-2/3">
-          {/* Back button */}
-          <div className="mb-4">
-            <button
-              onClick={() => navigate(-1)}
-              className="bg-[#3A4D2B] text-white px-4 py-2 rounded-md flex items-center"
-            >
-              <ChevronLeft size={20} />
-              <span>Back</span>
-            </button>
-          </div>
-
-          {/* Month navigation */}
-          <div className="flex justify-between items-center mb-6">
-            <button onClick={prevMonth} className="bg-[#3A4D2B] text-white p-2 rounded-md">
-              <ChevronLeft size={24} />
-            </button>
-
-            <h2 className="text-white text-3xl font-bold">{currentMonth.format("MMMM YYYY")}</h2>
-
-            <button onClick={nextMonth} className="bg-[#3A4D2B] text-white p-2 rounded-md">
-              <ChevronRight size={24} />
-            </button>
-          </div>
-
-          {/* Weekday headers */}
-          <div className="grid grid-cols-7 mb-2">
-            {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day) => (
-              <div key={day} className="text-white font-medium text-center py-2">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-2">
-            {getDaysInMonth().map((day, index) => (
-              <div
-                key={index}
-                className={`${getStatusColorClass(day)} rounded-lg h-20 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90`}
-                onClick={() => handleDayClick(day)}
-              >
-                <span className="text-lg font-bold">{day.date.format("D")}</span>
-                {getDayStatus(day.date) && <div className="text-xs mt-1">{getShiftForDate(day.date)?.name || ""}</div>}
-              </div>
-            ))}
-          </div>
-
-          {/* Legend */}
-          <div className="flex flex-wrap justify-center gap-4 mt-6">
-            <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-              <span className="text-white text-sm">Attended</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
-              <span className="text-white text-sm">Absent</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-blue-100 mr-2"></div>
-              <span className="text-white text-sm">Scheduled</span>
-            </div>
-            <div className="flex items-center">
-              <div className="w-3 h-3 rounded-full bg-orange-300 mr-2"></div>
-              <span className="text-white text-sm">Events</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Employee Info Panel */}
-        <div className="bg-[#5C7346] rounded-lg p-4 md:w-1/3">
-          {/* Employee info */}
-          {employeeInfo && (
-            <div className="bg-[#5C7346] rounded-lg p-4 mb-4">
-              <div className="flex items-center mb-4">
-                <div className="bg-white rounded-full p-2 mr-4">
-                  <User size={32} className="text-[#5C7346]" />
+      <div className="py-4 max-w-7xl mx-auto">
+        <div className="container mx-auto px-4 pt-4 pb-8 flex flex-col gap-6">
+          {/* Main content container with two panels side by side */}
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Calendar Panel - Fixed size with max-height */}
+            <div className="bg-[#5C7346] rounded-lg p-6 lg:w-2/3 h-auto max-h-[800px] overflow-auto">
+              {/* Header with back button, month navigation, and month title */}
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  className="flex items-center gap-2 bg-[#3A4D2B] text-white px-4 py-2 rounded-md hover:bg-[#2a3b1d] transition-colors"
+                  onClick={() => navigate(-1)}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </button>
+                <div className="flex items-center">
+                  <button
+                    className="bg-[#3A4D2B] text-white px-3 py-1 rounded-md hover:bg-[#2a3b1d] mr-2"
+                    onClick={() => handleMonthChange("prev")}
+                  >
+                    <ArrowLeft className="w-5 h-7"></ArrowLeft>
+                  </button>
+                  <h2 className="text-white text-4xl font-bold p-2">{currentDate.format("MMMM YYYY")}</h2>
+                  <button
+                    className="bg-[#3A4D2B] text-white px-3 py-1 rounded-md hover:bg-[#2a3b1d] ml-2"
+                    onClick={() => handleMonthChange("next")}
+                  >
+                    <ArrowRight className="w-5 h-7"></ArrowRight>
+                  </button>
                 </div>
-                <div>
-                  <h3 className="text-white text-xl font-bold">
-                    {employeeInfo.first_name} {employeeInfo.last_name}
-                  </h3>
-                  <p className="text-white text-sm">{employeeInfo.employee_number || employeeInfo.id}</p>
-                </div>
+                <div className="w-20"></div> {/* Spacer for alignment */}
               </div>
-            </div>
-          )}
 
-          {/* Schedule section */}
-          <div className="mb-4">
-            <div className="flex items-center mb-2">
-              <Calendar className="text-white mr-2" />
-              <h3 className="text-white text-lg font-bold">Schedule</h3>
-            </div>
+              {/* Day headers */}
+              <div className="grid grid-cols-7 gap-2 mb-2">
+                {["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map((day, i) => (
+                  <div key={day} className="text-white font-medium text-center py-1 text-sm md:text-lg">
+                    <span className="hidden md:inline">{day}</span>
+                    <span className="md:hidden">{day.substring(0, 3)}</span>
+                  </div>
+                ))}
+              </div>
 
-            <div className="bg-[#5C7346] bg-opacity-50 p-2 rounded-lg">
-              <div className="grid grid-cols-7 gap-1">
-                {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => {
-                  const isScheduled =
-                    schedule &&
-                    schedule.days &&
-                    schedule.days.includes(
-                      ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"][index],
-                    )
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                {calendarDays.map((day, index) => {
+                  const dateStr = day.date.format("YYYY-MM-DD")
+                  const status = day.isCurrentMonth ? dayStatus[dateStr] : null
+
                   return (
                     <div
                       key={index}
-                      className={`${isScheduled ? "bg-blue-100 text-blue-800" : "bg-[#5C7346]"} text-white text-center py-1 rounded`}
+                      className={`${getDayStatusColor(
+                        day,
+                      )} rounded-lg h-20 flex flex-col items-center justify-center cursor-pointer transition-colors hover:opacity-90 relative p-2 sm:p-3 md:p-4
+                      ${
+                        day.date.format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")
+                          ? "ring-4 ring-blue-500 font-bold shadow-lg"
+                          : ""
+                      }`}
+                      onClick={() => handleDayClick(day)}
                     >
-                      {day}
+                      <span className="text-md sm:text-lg md:text-xl font-bold">{day.dayOfMonth}</span>
+
+                      {/* Event indicators */}
+                      {day.isCurrentMonth && status && status !== "attended" && status !== "absent" && (
+                        <div className="absolute bottom-[-2px] left-0 right-0 text-center">
+                          <span className="text-xs md:text-sm px-2 whitespace-nowrap overflow-hidden text-ellipsis inline-block max-w-full">
+                            {status === "sickleave" && "Sick Leave"}
+                            {status === "specialholiday" && "Special Holiday"}
+                            {status === "regularholiday" && "Regular Holiday"}
+                            {status === "vacationleave" && "Vacation Leave"}
+                            {status === "nightdiff" && "Night Differential"}
+                            {status === "oncall" && "On Call"}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
               </div>
-            </div>
-          </div>
 
-          {/* Shifts section */}
-          <div className="mb-4">
-            <div className="flex items-center mb-2">
-              <Clock className="text-white mr-2" />
-              <h3 className="text-white text-lg font-bold">Shifts</h3>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mb-2">
-              {shifts.slice(0, 3).map((shift, index) => (
-                <div key={index} className="bg-[#5C7346] bg-opacity-50 p-2 rounded-lg">
-                  <h4 className="text-white text-center font-medium">{shift.name}</h4>
-                  <p className="text-white text-xs text-center">
-                    {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-[#5C7346] bg-opacity-50 p-2 rounded-lg">
-              <h4 className="text-white text-center font-medium">Custom</h4>
-            </div>
-          </div>
-
-          {/* Events section */}
-          <div className="mb-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center">
-                <Calendar className="text-white mr-2" />
-                <h3 className="text-white text-lg font-bold">Events</h3>
-              </div>
-              <div className="text-white">{selectedDate.format("MMMM D")}</div>
-            </div>
-
-            <div className="bg-[#5C7346] bg-opacity-30 p-4 rounded-lg">
-              <h4 className="text-white text-lg font-medium mb-4">{eventType}</h4>
-
-              <div className="grid grid-cols-2 gap-2">
+              {/* Legend */}
+              <div className="flex justify-end flex-wrap mt-8 gap-4">
                 <div className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={eventType === "Regular Holiday"} readOnly />
-                  <span className="text-white">Regular Holiday</span>
+                  <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
+                  <span className="text-white text-md">Attended</span>
                 </div>
                 <div className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={eventType === "Sick Leave"} readOnly />
-                  <span className="text-white">Sick Leave</span>
+                  <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                  <span className="text-white text-md">Absent</span>
                 </div>
                 <div className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={eventType === "Special Holiday"} readOnly />
-                  <span className="text-white">Special Holiday</span>
+                  <div className="w-3 h-3 rounded-full bg-blue-200 mr-2"></div>
+                  <span className="text-white text-md">Scheduled</span>
                 </div>
                 <div className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={eventType === "On Call"} readOnly />
-                  <span className="text-white">Oncall</span>
-                </div>
-                <div className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={eventType === "Rest Day"} readOnly />
-                  <span className="text-white">Rest Day</span>
-                </div>
-                <div className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={eventType === "Night Differential"} readOnly />
-                  <span className="text-white">Nightdiff</span>
-                </div>
-                <div className="flex items-center">
-                  <input type="checkbox" className="mr-2" checked={eventType === "Vacation Leave"} readOnly />
-                  <span className="text-white">Vacation Leave</span>
+                  <div className="w-3 h-3 rounded-full bg-orange-400 mr-2"></div>
+                  <span className="text-white text-md">Events</span>
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Biometric Data */}
-          {biometricRecords.length > 0 && (
-            <div className="mb-4">
-              <div className="flex items-center mb-2">
-                <AlertCircle className="text-white mr-2" />
-                <h3 className="text-white text-lg font-bold">Biometric Data</h3>
+            {/* Employee Schedule Panel - Fixed size with max-height */}
+            <div className="bg-[#3A4D2B] rounded-lg p-4 lg:w-1/3 h-auto max-h-[800px] overflow-y-auto scrollbar-hide flex flex-col">
+              {/* Employee Info - Horizontal layout */}
+              <div className="flex items-center mb-6 bg-[#5C7346] p-3 rounded-lg">
+                <div className="h-14 w-14 bg-white rounded-full flex items-center justify-center mr-3">
+                  {employee?.profile_picture ? (
+                    <img
+                      src={employee.profile_picture || "/placeholder.svg"}
+                      alt={`${employee.first_name} ${employee.last_name}`}
+                      className="h-full w-full object-cover rounded-full"
+                    />
+                  ) : (
+                    <User2 className="h-6 w-6" style={{ color: "#42573C" }} />
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    {employee && employee.first_name && employee.last_name
+                      ? `${employee.first_name} ${employee.last_name}`
+                      : employee && employee.user && employee.user.first_name && employee.user.last_name
+                        ? `${employee.user.first_name} ${employee.user.last_name}`
+                        : "Employee"}
+                  </h3>
+                  <p className="text-md text-white">{employee?.employee_id || employee?.user?.id || ""}</p>
+                </div>
               </div>
 
-              <div className="bg-[#5C7346] bg-opacity-30 p-4 rounded-lg">
-                {biometricRecords.map((record, index) => (
-                  <div key={index} className="mb-2 last:mb-0">
-                    <div className="flex justify-between">
-                      <span className="text-white">Time In:</span>
-                      <span className="text-white font-medium">{formatTime(record.time_in)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-white">Time Out:</span>
-                      <span className="text-white font-medium">{formatTime(record.time_out)}</span>
+              {/* Schedule Section */}
+              <div className="mb-4">
+                <div className="flex items-center mb-2">
+                  <Calendar className="h-5 w-5 text-white mr-2" />
+                  <p className="text-md font-bold text-white">Schedule</p>
+                </div>
+                <div className="bg-[#A3BC84] rounded-md p-3">
+                  {/* Days of week selector - improved design */}
+                  <div className="grid grid-cols-7 gap-1 mb-1">
+                    {["S", "M", "T", "W", "T", "F", "S"].map((day, index) => {
+                      const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+                      const isScheduled = hasSchedule && schedule.days && schedule.days.includes(dayNames[index])
+
+                      return (
+                        <div
+                          key={day}
+                          className={`h-8 rounded-lg flex items-center justify-center text-md font-medium transition-all ${
+                            isScheduled ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"
+                          }`}
+                        >
+                          {day}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Shift Section */}
+              <div className="mb-4">
+                <div className="flex items-center mb-2">
+                  <Clock className="h-5 w-5 text-white mr-2" />
+                  <p className="text-md font-bold text-white">Shifts</p>
+                </div>
+                <div className="bg-[#A3BC84] rounded-md p-3">
+                  {/* Main shift buttons */}
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {["morning", "midday", "night"].map((shift) => (
+                      <div
+                        key={shift}
+                        className="py-2 px-3 w-full rounded-md text-sm font-medium bg-[#5C7346] text-white"
+                      >
+                        <span className="text-lg font-bold capitalize">{shift}</span>
+                        <span className="text-md block mt-1 opacity-80">
+                          {shift === "morning" ? "10 AM - 7 PM" : shift === "midday" ? "12 PM - 9 PM" : "7 PM - 11 PM"}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Custom Shift */}
+                  <div>
+                    <div className="py-2 px-3 w-full rounded-md text-sm font-medium bg-[#5C7346] text-white">
+                      <span className="text-lg font-bold">Custom</span>
                     </div>
                   </div>
-                ))}
+                </div>
               </div>
+
+              {/* Events Section */}
+              <div className="mb-4">
+                <div className="flex items-center mb-2">
+                  <Calendar className="h-5 w-5 text-white mr-2" />
+                  <p className="text-md font-bold text-white">Events</p>
+                </div>
+                <div className="bg-[#A3BC84] rounded-md p-3">
+                  {/* Selected date display with fixed layout */}
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-xl font-bold text-white">
+                      {/* Event type goes here */}
+                      {(() => {
+                        const dateStr = selectedDate.format("YYYY-MM-DD")
+                        const status = dayStatus[dateStr]
+
+                        if (
+                          !status ||
+                          status === "unscheduled" ||
+                          status === "scheduled" ||
+                          status === "attended" ||
+                          status === "absent"
+                        ) {
+                          return "No Event"
+                        }
+
+                        switch (status) {
+                          case "sickleave":
+                            return "Sick Leave"
+                          case "regularholiday":
+                            return "Regular Holiday"
+                          case "specialholiday":
+                            return "Special Holiday"
+                          case "vacationleave":
+                            return "Vacation Leave"
+                          case "nightdiff":
+                            return "Night Differential"
+                          case "oncall":
+                            return "On Call"
+                          default:
+                            return "No Event"
+                        }
+                      })()}
+                    </div>
+                    <div className="text-xl font-bold text-white">
+                      {/* Date is fixed on the right */}
+                      {selectedDate.format("MMMM D")}
+                    </div>
+                  </div>
+
+                  {/* Event options in a grid */}
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    {[
+                      {
+                        id: "regularHoliday",
+                        label: "Regular Holiday",
+                        type: "regularholiday",
+                      },
+                      {
+                        id: "sickLeave",
+                        label: "Sick Leave",
+                        type: "sickleave",
+                      },
+                      {
+                        id: "specialHoliday",
+                        label: "Special Holiday",
+                        type: "specialholiday",
+                      },
+                      { id: "onCall", label: "Oncall", type: "oncall" },
+                      { id: "restDay", label: "Rest Day", type: "restday" },
+                      {
+                        id: "nightDiff",
+                        label: "Nightdiff",
+                        type: "nightdiff",
+                      },
+                      {
+                        id: "vacationLeave",
+                        label: "Vacation Leave",
+                        type: "vacationleave",
+                      },
+                    ].map((event) => (
+                      <label
+                        key={event.id}
+                        htmlFor={event.id}
+                        className={`flex items-center p-2 rounded-md cursor-pointer transition-all ${
+                          getEventStatus(event.type) ? "bg-white text-[#5C7346]" : "bg-[#5C7346] text-white"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          id={event.id}
+                          checked={getEventStatus(event.type)}
+                          readOnly
+                          className="mr-4 h-4 w-4 accent-[#5C7346] cursor-pointer"
+                        />
+                        <span className="text-md font-medium">{event.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Shift details for selected date */}
+              {hasSchedule && selectedDate && (
+                <div className="mb-4">
+                  <div className="flex items-center mb-2">
+                    <Clock className="h-5 w-5 text-white mr-2" />
+                    <p className="text-md font-bold text-white">Shift Details</p>
+                  </div>
+                  <div className="bg-[#A3BC84] rounded-md p-3">
+                    {getShiftForDate(selectedDate) ? (
+                      <div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-white font-medium">Date:</span>
+                          <span className="text-white">{selectedDate.format("MMMM D, YYYY")}</span>
+                        </div>
+                        <div className="flex justify-between mb-2">
+                          <span className="text-white font-medium">Shift Start:</span>
+                          <span className="text-white">{formatTime(getShiftForDate(selectedDate)?.shift_start)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white font-medium">Shift End:</span>
+                          <span className="text-white">{formatTime(getShiftForDate(selectedDate)?.shift_end)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center text-white py-2">
+                        {hasSchedule ? "No shift scheduled for this date" : "No schedule has been set yet"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-2 justify-end mt-auto">
+                <button
+                  className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
+                  onClick={() => navigate("/payslip")}
+                >
+                  Payslip
+                </button>
+              </div>
+
+              {!hasSchedule && (
+                <div className="mt-4 bg-blue-100 text-blue-800 p-3 rounded-md">
+                  <p className="text-center">Your schedule has not been set yet. Please contact your administrator.</p>
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Action buttons */}
-          <div className="flex justify-between mt-6">
-            <button className="bg-red-500 text-white px-4 py-2 rounded-md flex items-center opacity-50" disabled>
-              Delete
-            </button>
-
-            <button className="bg-blue-800 text-white px-4 py-2 rounded-md" onClick={() => navigate("/payslip")}>
-              Payslip
-            </button>
-
-            <button className="bg-green-600 text-white px-4 py-2 rounded-md opacity-50" disabled>
-              Save Events Only
-            </button>
-          </div>
-
-          <div className="flex justify-end mt-4">
-            <button className="bg-gray-800 text-white px-6 py-2 rounded-md opacity-50" disabled>
-              Confirm
-            </button>
           </div>
         </div>
       </div>
+      <style jsx global>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        
+        .scrollbar-hide {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+      `}</style>
     </div>
   )
 }
 
-export default EmployeeSchedulePage
+export default Employee_Schedule_Page
