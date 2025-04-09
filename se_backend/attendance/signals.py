@@ -66,6 +66,13 @@ def get_shift_details(user, date):
 
     return shift
 
+# add holidays sync. if shift is a special or regular holiday, the dates will be computed and placed in regular and special holidays
+# based on the schedule of the employee, check if they have an attendance during the doy of a holiday, if they did, the hours they commited there
+# would be placed in the respective fields in attendance summary but its computation won't be included in the other fields like:
+# actual_hours = models.IntegerField()
+# overtime_hours = models.IntegerField()
+# late_minutes = models.IntegerField()
+# undertime = models.IntegerField()
 
 @receiver(post_save, sender=Attendance)
 def generate_attendance_summary(sender, instance, **kwargs):

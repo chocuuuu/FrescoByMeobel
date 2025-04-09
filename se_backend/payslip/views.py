@@ -53,3 +53,9 @@ class PayslipViewSet(GenericViewset):
         instance = self.get_object()
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+# backup implementation:
+# add a payslip download that converts all payslips within a payroll period range
+# it should put the serialized info instead of the model info itself since the model info will only show the foreign keys
+# so most likely the conversion will be done view level (to make sure it accesses the serialized info)
+# make sure it's only one row per payslip so the nests will be normalized to 1 row
