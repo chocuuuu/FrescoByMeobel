@@ -262,6 +262,7 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/employee/schedule" element={<EmployeeSchedulePage />} />
         <Route
           path="/payslip"
           element={
