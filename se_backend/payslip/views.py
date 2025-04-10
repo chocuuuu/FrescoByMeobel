@@ -1,6 +1,7 @@
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.decorators import action
 from shared.generic_viewset import GenericViewset
 from shared.utils import role_required
 from .models import Payslip
@@ -54,8 +55,10 @@ class PayslipViewSet(GenericViewset):
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-# backup implementation:
-# add a payslip download that converts all payslips within a payroll period range
-# it should put the serialized info instead of the model info itself since the model info will only show the foreign keys
-# so most likely the conversion will be done view level (to make sure it accesses the serialized info)
-# make sure it's only one row per payslip so the nests will be normalized to 1 row
+    @action(detail=False, methods=['get'], url_path='user-all/(?P<user_id>[^/.]+)')
+    @role_required(["owner", "admin"])
+    def user_all(self, request, user_id=None):
+        """Get all Payslips for a specific user."""
+        payslips = Payslip.objects.filter(user_id=user_id)
+        serializer = self.get_serializer(payslips, many=True)
+        return Response(serializer.data)
