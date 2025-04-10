@@ -199,12 +199,13 @@ function EmployeeSchedulePage() {
 
         if (response.ok) {
           const data = await response.json()
-          console.log(`Received ${data.length} attendance records`)
+          console.log(`Received ${data.length} attendance records:`, data)
 
-          // Convert to a map of date -> status
+          // Convert to a map of date -> attendance record
           const attendanceMap = {}
           data.forEach((record) => {
             attendanceMap[record.date] = record
+            console.log(`Processed attendance for ${record.date}: ${record.status}`)
           })
 
           setAttendanceData(attendanceMap)
@@ -419,28 +420,28 @@ function EmployeeSchedulePage() {
             newDayStatus[dateStr] = "vacationleave"
           } else if (schedule.restday?.includes(dateStr)) {
             newDayStatus[dateStr] = "restday"
+          } else if (attendanceData[dateStr]) {
+            // If we have attendance data for this date, use it regardless of whether it's a scheduled day
+            const status = attendanceData[dateStr].status.toLowerCase()
+            if (status === "present") {
+              newDayStatus[dateStr] = "attended"
+            } else if (status === "absent") {
+              newDayStatus[dateStr] = "absent"
+            } else if (status === "late") {
+              newDayStatus[dateStr] = "late"
+            }
           } else if (schedule.days?.includes(dayOfWeek) && isInPayrollPeriod) {
-            // If it's a scheduled day and in the payroll period
-            if (isPastDay && attendanceData[dateStr]) {
-              // For past days, show actual attendance if available
-              const status = attendanceData[dateStr].status.toLowerCase()
-              if (status === "present") {
-                newDayStatus[dateStr] = "attended"
-              } else if (status === "absent") {
-                newDayStatus[dateStr] = "absent"
-              } else if (status === "late") {
-                newDayStatus[dateStr] = "late"
-              }
-            } else if (isPastDay) {
+            // If it's a scheduled day and in the payroll period (and no attendance data)
+            if (isPastDay) {
               // Past scheduled days without attendance records should be marked as absent
               newDayStatus[dateStr] = "absent"
             } else {
               // Future scheduled days
               newDayStatus[dateStr] = "scheduled"
             }
-          } else if (isPastDay) {
-            // Any past day without attendance or schedule should be marked as absent
-            // Only if it's in the payroll period
+          } else if (isPastDay && schedule.days?.includes(dayOfWeek)) {
+            // Only mark as absent if it's a scheduled working day (Monday or Wednesday)
+            // and it's in the payroll period
             if (isInPayrollPeriod) {
               newDayStatus[dateStr] = "absent"
             }
@@ -508,7 +509,7 @@ function EmployeeSchedulePage() {
       case "absent":
         return "bg-red-500 text-white" // Red for absent days
       case "scheduled":
-        return "bg-blue-200 text-grey-800" // Blue for scheduled days
+        return "bg-blue-200 text-gray-800" // Blue for scheduled days
       case "sickleave":
         return "bg-yellow-400 text-white" // Yellow for sick leave
       case "regularholiday":
@@ -545,6 +546,14 @@ function EmployeeSchedulePage() {
 
     const dateStr = date.format("YYYY-MM-DD")
     const status = dayStatus[dateStr]
+
+    // If we have attendance data for this date, prioritize it
+    if (attendanceData[dateStr]) {
+      const attendanceStatus = attendanceData[dateStr].status.toLowerCase()
+      if (attendanceStatus === "present") return "Attended"
+      if (attendanceStatus === "absent") return "Absent"
+      if (attendanceStatus === "late") return "Late"
+    }
 
     switch (status) {
       case "sickleave":
@@ -677,7 +686,7 @@ function EmployeeSchedulePage() {
                   <span className="text-white text-md">Absent</span>
                 </div>
                 <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
+                  <div className="w-3 h-3 rounded-full bg-blue-200 mr-2"></div>
                   <span className="text-white text-md">Scheduled</span>
                 </div>
                 <div className="flex items-center">
@@ -841,14 +850,6 @@ function EmployeeSchedulePage() {
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-auto">
-                <button
-                  className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors w-full"
-                  onClick={() => navigate("/payslip")}
-                >
-                  View Payslip
-                </button>
-              </div>
             </div>
           </div>
         </div>
