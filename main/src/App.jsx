@@ -14,6 +14,7 @@ import AdminEmployeeEditSchedulePage from "./pages/Admin_Employee_Edit_Schedule_
 import AdminEmployeeAttendancePage from "./pages/Admin_Employee_Attendance_Page"
 import AdminMasterCalendarPage from "./pages/Admin_Master_Calendar_Page"
 import EmployeeSchedulePage from "./pages/Employee_Schedule_Page"
+import ActivityLogPage from "./pages/Admin_Activity_Logs_Page.jsx";
 
 // Session checker component
 function SessionChecker() {
@@ -157,6 +158,14 @@ function App() {
           element={
             <ProtectedRoute allowedRoles={["admin", "owner", "employee"]}>
               <PayslipPage />
+            </ProtectedRoute>
+          }
+        />
+           <Route
+          path="/activity-logs"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <ActivityLogPage />
             </ProtectedRoute>
           }
         />
