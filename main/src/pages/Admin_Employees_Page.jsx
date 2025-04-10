@@ -290,9 +290,9 @@ function AdminEmployeePage() {
           {/* Employee Table - Responsive with horizontal scroll on small screens */}
           <div className="overflow-x-auto -mx-4 md:mx-0">
             <div className="min-w-[800px] md:min-w-0 px-4 md:px-0">
-              <table className="w-full table-fixed">
+              <table className="w-full">
                 <thead>
-                  <tr className="text-left text-white border-b border-white/20">
+                  <tr className="text-left text-white border-b border-white/20 whitespace-nowrap">
                     <th className="py-3 px-4 w-[10%]">ID</th>
                     <th className="py-3 px-4 w-[20%]">NAME</th>
                     <th className="py-3 px-4 w-[10%]">POSITION</th>

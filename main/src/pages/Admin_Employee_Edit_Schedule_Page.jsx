@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react"
 import { useParams, useNavigate } from "react-router-dom"
 import NavBar from "../components/Nav_Bar"
-import { ArrowLeft, ArrowRight, User2, Calendar, Clock, CheckSquare, Trash2 } from "lucide-react"
+import { ArrowLeft, ArrowRight, User2, Calendar, Clock, CheckSquare, Trash2, CalendarDays } from "lucide-react"
 import dayjs from "dayjs"
 import { API_BASE_URL } from "../config/api"
+import axios from "axios"
 
 function AdminEmployeeEditSchedulePage() {
   const { employeeId } = useParams()
@@ -44,6 +45,14 @@ function AdminEmployeeEditSchedulePage() {
     payroll_period_end: null,
   })
 
+  // State for payroll periods
+  const [payrollPeriods, setPayrollPeriods] = useState([])
+  const [selectedPayrollPeriodId, setSelectedPayrollPeriodId] = useState(null)
+  const [payrollPeriodStart, setPayrollPeriodStart] = useState(null)
+  const [payrollPeriodEnd, setPayrollPeriodEnd] = useState(null)
+  const [isEditingPayrollPeriod, setIsEditingPayrollPeriod] = useState(false)
+  const [hasScheduleBeenSaved, setHasScheduleBeenSaved] = useState(false)
+
   // State for selected days and shifts - start with none selected
   const [selectedDays, setSelectedDays] = useState({
     S: false,
@@ -63,6 +72,7 @@ function AdminEmployeeEditSchedulePage() {
   const [dayStatus, setDayStatus] = useState({})
   const [shifts, setShifts] = useState([])
   const [attendanceData, setAttendanceData] = useState({})
+  const [holidays, setHolidays] = useState([])
 
   // State to track if we're currently processing shifts to prevent duplicates
   const [isProcessingShifts, setIsProcessingShifts] = useState(false)
@@ -77,6 +87,17 @@ function AdminEmployeeEditSchedulePage() {
     Friday: { type: "", start: "", end: "" },
     Saturday: { type: "", start: "", end: "" },
   })
+
+  // Helper function to check if a date is within the current payroll period
+  const isDateInPayrollPeriod = (date) => {
+    if (!payrollPeriodStart || !payrollPeriodEnd) return true // If no period set, allow all dates
+
+    const dateObj = dayjs(date)
+    const startDate = dayjs(payrollPeriodStart)
+    const endDate = dayjs(payrollPeriodEnd)
+
+    return dateObj.isAfter(startDate.subtract(1, "day")) && dateObj.isBefore(endDate.add(1, "day"))
+  }
 
   // Helper function to convert time string (e.g., "8:00 AM") to time format (e.g., "08:00:00")
   const convertTimeStringToTimeFormat = (timeString) => {
@@ -109,7 +130,153 @@ function AdminEmployeeEditSchedulePage() {
     return `${hour}:${minutes} ${modifier}`
   }
 
-  // Generate shifts for all instances of a specific day in the current month
+  // Fetch holidays
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      try {
+        const accessToken = localStorage.getItem("access_token")
+        const response = await fetch(`${API_BASE_URL}/master-calendar/holiday/`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setHolidays(data)
+          console.log("Fetched holidays:", data)
+        }
+      } catch (error) {
+        console.error("Error fetching holidays:", error)
+      }
+    }
+
+    fetchHolidays()
+  }, [])
+
+  // Fetch payroll periods
+  useEffect(() => {
+    const fetchPayrollPeriods = async () => {
+      try {
+        setLoading(true)
+        const accessToken = localStorage.getItem("access_token")
+
+        // Use the correct endpoint for master calendar payroll periods
+        const response = await fetch(`${API_BASE_URL}/master-calendar/payrollperiod/`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch payroll periods: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        console.log("Fetched payroll periods:", data)
+
+        // Sort payroll periods by start date (newest first)
+        const sortedPeriods = data.sort((a, b) => new Date(a.payroll_period_start) - new Date(b.payroll_period_start))
+
+        setPayrollPeriods(sortedPeriods)
+
+        // If we have payroll periods, find the one that includes today's date
+        if (sortedPeriods.length > 0) {
+          const today = dayjs()
+          // Find a period that includes today
+          const currentPeriod =
+            sortedPeriods.find((period) => {
+              const start = dayjs(period.payroll_period_start)
+              const end = dayjs(period.payroll_period_end)
+              return today.isAfter(start.subtract(1, "day")) && today.isBefore(end.add(1, "day"))
+            }) || sortedPeriods[0] // Default to first period if none includes today
+
+          setSelectedPayrollPeriodId(currentPeriod.id)
+          setPayrollPeriodStart(currentPeriod.payroll_period_start)
+          setPayrollPeriodEnd(currentPeriod.payroll_period_end)
+        }
+      } catch (error) {
+        console.error("Error fetching payroll periods:", error)
+        setError(`Failed to fetch payroll periods: ${error.message}`)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPayrollPeriods()
+  }, [])
+
+  // Handle payroll period selection
+  const handlePayrollPeriodChange = (e) => {
+    const periodId = Number(e.target.value)
+    setSelectedPayrollPeriodId(periodId)
+
+    const selectedPeriod = payrollPeriods.find((period) => period.id === periodId)
+    if (selectedPeriod) {
+      setPayrollPeriodStart(selectedPeriod.payroll_period_start)
+      setPayrollPeriodEnd(selectedPeriod.payroll_period_end)
+
+      // Navigate to the month of the selected period
+      const periodStart = dayjs(selectedPeriod.payroll_period_start)
+      if (periodStart.month() !== currentDate.month() || periodStart.year() !== currentDate.year()) {
+        setCurrentDate(periodStart)
+        setSelectedDate(periodStart)
+      }
+
+      // Update the schedule with the new payroll period if a schedule exists and has been saved
+      if (schedule.id && hasScheduleBeenSaved) {
+        updateSchedulePayrollPeriod(schedule.id, selectedPeriod.payroll_period_start, selectedPeriod.payroll_period_end)
+      }
+
+      // Update the calendar to reflect the new payroll period
+      setTimeout(() => {
+        if (schedule && schedule.days && schedule.days.length > 0) {
+          updateCalendarWithSchedule(schedule, schedule.days)
+        }
+      }, 100)
+    }
+  }
+
+  // Update schedule with new payroll period
+  const updateSchedulePayrollPeriod = async (scheduleId, startDate, endDate) => {
+    try {
+      setIsSaving(true)
+      const accessToken = localStorage.getItem("access_token")
+
+      const response = await fetch(`${API_BASE_URL}/schedule/${scheduleId}/`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          payroll_period_start: startDate,
+          payroll_period_end: endDate,
+          bi_weekly_start: startDate,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Failed to update schedule payroll period: ${response.statusText}`)
+      }
+
+      const updatedSchedule = await response.json()
+      console.log("Updated schedule with new payroll period:", updatedSchedule)
+      setSchedule(updatedSchedule)
+      setSaveSuccess(true)
+      setSaveMessage("Payroll period updated successfully")
+    } catch (error) {
+      console.error("Error updating schedule payroll period:", error)
+      setSaveSuccess(false)
+      setSaveMessage(`Error: ${error.message}`)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Generate shifts for all instances of a specific day in the current payroll period
   const generateShiftsForDay = async (dayName) => {
     try {
       const accessToken = localStorage.getItem("access_token")
@@ -118,19 +285,23 @@ function AdminEmployeeEditSchedulePage() {
       const daysInMonth = currentDate.daysInMonth()
 
       // Use day-specific shift if available, otherwise use the selected shift
-      const shiftType = dayShifts[dayName].type || selectedShift
+      const shiftType = dayShifts[dayName].type || selectedShift || "morning" // Default to morning if no shift selected
       console.log(`Generating shifts for ${dayName} with shift type: ${shiftType}`)
 
-      // Find all dates in the current month that match the day name
+      // Find all dates in the current month that match the day name AND are within the payroll period
       const matchingDates = []
       for (let i = 1; i <= daysInMonth; i++) {
         const date = dayjs(new Date(year, month, i))
         if (date.format("dddd") === dayName) {
-          matchingDates.push(date.format("YYYY-MM-DD"))
+          const dateStr = date.format("YYYY-MM-DD")
+          // Only include dates within the payroll period
+          if (isDateInPayrollPeriod(dateStr)) {
+            matchingDates.push(dateStr)
+          }
         }
       }
 
-      console.log(`Found ${matchingDates.length} matching dates for ${dayName}:`, matchingDates)
+      console.log(`Found ${matchingDates.length} matching dates for ${dayName} within payroll period:`, matchingDates)
 
       // Get shift times based on selected shift type
       let shiftStart, shiftEnd
@@ -166,7 +337,7 @@ function AdminEmployeeEditSchedulePage() {
         }
       } else {
         // Use global shift type if no day-specific type is set
-        switch (selectedShift) {
+        switch (shiftType) {
           case "morning":
             shiftStart = "10:00:00"
             shiftEnd = "19:00:00"
@@ -333,138 +504,6 @@ function AdminEmployeeEditSchedulePage() {
     }
   }
 
-  // Remove shifts for a specific day
-  const removeShiftsForDay = async (dayName) => {
-    try {
-      const accessToken = localStorage.getItem("access_token")
-      const year = currentDate.year()
-      const month = currentDate.month()
-      const daysInMonth = currentDate.daysInMonth()
-
-      console.log(`Removing shifts for ${dayName}`)
-
-      // Find all dates in the current month that match the day name
-      const matchingDates = []
-      for (let i = 1; i <= daysInMonth; i++) {
-        const date = dayjs(new Date(year, month, i))
-        if (date.format("dddd") === dayName) {
-          matchingDates.push(date.format("YYYY-MM-DD"))
-        }
-      }
-
-      console.log(`Found ${matchingDates.length} dates to remove shifts for`)
-
-      // Collect shift IDs that need to be removed
-      const shiftsToRemove = []
-      const shiftsToKeep = []
-
-      if (schedule.shift_ids && schedule.shift_ids.length > 0) {
-        const shiftRequests = schedule.shift_ids.map((shiftId) =>
-          fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-          }).then((response) => (response.ok ? response.json() : null)),
-        )
-
-        const shiftDataArray = await Promise.all(shiftRequests)
-
-        shiftDataArray.forEach((shiftData, index) => {
-          if (shiftData && matchingDates.includes(shiftData.date)) {
-            shiftsToRemove.push(schedule.shift_ids[index])
-            console.log(`Found shift ${schedule.shift_ids[index]} to remove for date ${shiftData.date}`)
-          } else {
-            shiftsToKeep.push(schedule.shift_ids[index])
-          }
-        })
-      }
-
-      console.log(`Removing ${shiftsToRemove.length} shifts, keeping ${shiftsToKeep.length} shifts`)
-
-      // Update the day status for the removed days
-      const newDayStatus = { ...dayStatus }
-      const today = dayjs()
-
-      matchingDates.forEach((dateStr) => {
-        const date = dayjs(dateStr)
-        const isPastDay = date.isBefore(today, "day")
-
-        // For past days, mark as absent
-        if (isPastDay) {
-          newDayStatus[dateStr] = "absent"
-        } else {
-          // For future days, mark as unselected
-          newDayStatus[dateStr] = "unselected"
-        }
-      })
-
-      setDayStatus(newDayStatus)
-
-      // **Optimistically update UI BEFORE waiting for the API response**
-      setSchedule((prev) => ({
-        ...prev,
-        days: prev.days.filter((d) => d !== dayName),
-        shift_ids: shiftsToKeep,
-      }))
-
-      // Reset the day-specific shift
-      setDayShifts((prev) => ({
-        ...prev,
-        [dayName]: { type: "", start: "", end: "" },
-      }))
-
-      // If we have shifts to remove and a schedule ID, update the schedule
-      if (shiftsToRemove.length > 0 && schedule.id) {
-        // Update the schedule to remove the day from the days array
-        const updatedDays = schedule.days.filter((d) => d !== dayName)
-
-        const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            remove_shift_ids: shiftsToRemove,
-            days: updatedDays,
-          }),
-        })
-
-        if (response.ok) {
-          const updatedSchedule = await response.json()
-          console.log("Successfully updated schedule after removing shifts:", updatedSchedule)
-        } else {
-          console.error("Failed to update schedule after removing shifts")
-        }
-      }
-
-      // **Batch delete shifts in chunks (e.g., 10 at a time)**
-      const chunkSize = 10
-      for (let i = 0; i < shiftsToRemove.length; i += chunkSize) {
-        const chunk = shiftsToRemove.slice(i, i + chunkSize)
-        console.log(`Sending batch delete for ${chunk.length} shifts`)
-
-        fetch(`${API_BASE_URL}/shifts/batch-delete/`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ shift_ids: chunk }),
-        })
-          .then((res) => {
-            if (!res.ok) {
-              throw new Error(`Batch deletion failed for ${chunk.length} shifts`)
-            }
-            console.log(`Successfully deleted ${chunk.length} shifts`)
-          })
-          .catch((err) => console.error(err))
-      }
-    } catch (error) {
-      console.error(`Error removing shifts for ${dayName}:`, error)
-    }
-  }
 
   // Add shifts for a specific day without affecting other days
   const addShiftsForDay = async (dayName) => {
@@ -491,24 +530,31 @@ function AdminEmployeeEditSchedulePage() {
         return
       }
 
-      // If we have a schedule ID, use the add-shifts endpoint
-      if (schedule.id) {
+      // If we have a schedule ID and it has been saved, update it with the new shifts
+      if (schedule.id && hasScheduleBeenSaved) {
         const accessToken = localStorage.getItem("access_token")
 
-        // Call the add-shifts endpoint
-        const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/add-shifts/`, {
-          method: "POST",
+        // Update the schedule with the new shifts using PATCH
+        // Note: We're using the correct endpoint now (no /add-shifts/)
+        const updatedDays = [...(schedule.days || [])]
+        if (!updatedDays.includes(dayName)) {
+          updatedDays.push(dayName)
+        }
+
+        const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
+          method: "PATCH",
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            shift_ids: newShiftIds,
+            days: updatedDays,
+            add_shift_ids: newShiftIds, // This is the correct way to add shifts
           }),
         })
 
         if (!response.ok) {
-          throw new Error(`Failed to add shifts: ${response.statusText}`)
+          throw new Error(`Failed to update schedule: ${response.statusText}`)
         }
 
         const updatedSchedule = await response.json()
@@ -538,8 +584,30 @@ function AdminEmployeeEditSchedulePage() {
         setSaveSuccess(true)
         setSaveMessage(`Successfully added ${dayName} to the schedule.`)
       } else {
-        // If no schedule exists, create one
-        await handleSaveSchedule()
+        // If no schedule exists or it hasn't been saved, just update the UI
+        // We'll create the schedule when the user explicitly saves it
+        console.log("Schedule not saved yet, just updating UI")
+
+        // Update the selected days
+        const daysMap = {
+          Sunday: "S",
+          Monday: "M",
+          Tuesday: "T",
+          Wednesday: "W",
+          Thursday: "T2",
+          Friday: "F",
+          Saturday: "S2",
+        }
+
+        if (daysMap[dayName]) {
+          setSelectedDays((prev) => ({
+            ...prev,
+            [daysMap[dayName]]: true,
+          }))
+        }
+
+        // Update calendar colors for the selected day
+        updateCalendarForSelectedDay(dayName, true)
       }
     } catch (error) {
       console.error(`Error adding shifts for ${dayName}:`, error)
@@ -622,6 +690,17 @@ function AdminEmployeeEditSchedulePage() {
         Saturday: { type: "", start: "", end: "" },
       })
 
+      // Preserve holiday information
+      const newDayStatus = {}
+      holidays.forEach((holiday) => {
+        const dateStr = holiday.date
+        if (dayjs(dateStr).month() === currentDate.month() && dayjs(dateStr).year() === currentDate.year()) {
+          newDayStatus[dateStr] = holiday.holiday_type === "regular" ? "regularholiday" : "specialholiday"
+        }
+      })
+      setDayStatus(newDayStatus)
+
+      setHasScheduleBeenSaved(false)
       setSaveSuccess(true)
       setSaveMessage("Schedule deleted successfully")
       setShowDeleteConfirm(false)
@@ -771,7 +850,7 @@ function AdminEmployeeEditSchedulePage() {
     const fetchShifts = async () => {
       try {
         const accessToken = localStorage.getItem("access_token")
-        const response = await fetch(`${API_BASE_URL}/shifts/`, {
+        const response = await fetch(`${API_BASE_URL}/shift/`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
@@ -851,7 +930,7 @@ function AdminEmployeeEditSchedulePage() {
           return
         }
 
-        // Use the user ID from the employee data if available, otherwise use employeeId
+        // Use the user ID from the employee data if available
         const userId = employee?.user?.id
         if (!userId) {
           console.warn("No user ID found in employee data, using employeeId as fallback")
@@ -862,173 +941,189 @@ function AdminEmployeeEditSchedulePage() {
         console.log(`Fetching schedule for user ID: ${userId}`)
 
         // CRITICAL FIX: Use the exact user_id parameter to ensure we get only this employee's schedule
-        const response = await fetch(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-        })
-
-        const responseText = await response.text()
-        console.log("Raw schedule API response:", responseText)
-
-        let data
+        // Use axios instead of fetch for better error handling
         try {
-          data = JSON.parse(responseText)
-        } catch (e) {
-          console.error("Failed to parse schedule response:", e)
-          setLoading(false)
-          return
-        }
+          const response = await axios.get(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          })
 
-        console.log(`Fetched schedule data:`, data)
+          console.log(`Fetched schedule data:`, response.data)
 
-        if (data && data.length > 0) {
-          // CRITICAL FIX: Filter to ensure we only get schedules for this specific user
-          const userSchedules = data.filter((schedule) => schedule.user_id === userId)
+          if (response.data && response.data.length > 0) {
+            // CRITICAL FIX: Filter to ensure we only get schedules for this specific user
+            // and sort by ID to get the most recent schedule first
+            const userSchedules = response.data
+              .filter((schedule) => schedule.user_id === userId)
+              .sort((a, b) => b.id - a.id) // Sort by ID in descending order
 
-          if (userSchedules.length > 0) {
-            const scheduleData = userSchedules[0]
-            console.log("Found schedule for this user:", scheduleData)
+            if (userSchedules.length > 0) {
+              // Always use the most recent schedule (highest ID)
+              const scheduleData = userSchedules[0]
+              console.log("Found most recent schedule for this user:", scheduleData)
 
-            // Set the schedule
-            setSchedule(scheduleData)
+              // Set the schedule
+              setSchedule(scheduleData)
+              setHasScheduleBeenSaved(true)
 
-            // Set selected days based on schedule
-            const daysMap = {
-              Monday: "M",
-              Tuesday: "T",
-              Wednesday: "W",
-              Thursday: "T2",
-              Friday: "F",
-              Saturday: "S2",
-              Sunday: "S",
-            }
+              // Set payroll period dates
+              if (scheduleData.payroll_period_start) {
+                setPayrollPeriodStart(scheduleData.payroll_period_start)
 
-            const newSelectedDays = {
-              S: false,
-              M: false,
-              T: false,
-              W: false,
-              T2: false,
-              F: false,
-              S2: false,
-            }
-
-            if (scheduleData.days && Array.isArray(scheduleData.days)) {
-              scheduleData.days.forEach((day) => {
-                if (daysMap[day]) {
-                  newSelectedDays[daysMap[day]] = true
-                }
-              })
-
-              console.log("Setting selected days based on schedule:", newSelectedDays)
-              setSelectedDays(newSelectedDays)
-            } else {
-              console.warn("Schedule days is not an array or is undefined:", scheduleData.days)
-            }
-
-            // Determine shift type based on shift_ids
-            if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
-              // Fetch all shifts to determine day-specific shifts
-              try {
-                const shiftPromises = scheduleData.shift_ids.map((shiftId) =>
-                  fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
-                    headers: {
-                      Authorization: `Bearer ${accessToken}`,
-                      "Content-Type": "application/json",
-                    },
-                  }).then((res) => (res.ok ? res.json() : null)),
-                )
-
-                const shiftsData = await Promise.all(shiftPromises)
-                const validShifts = shiftsData.filter((shift) => shift !== null)
-
-                // Group shifts by day of week
-                const shiftsByDay = {}
-                validShifts.forEach((shift) => {
-                  const date = dayjs(shift.date)
-                  const dayOfWeek = date.format("dddd")
-
-                  if (!shiftsByDay[dayOfWeek]) {
-                    shiftsByDay[dayOfWeek] = []
-                  }
-
-                  shiftsByDay[dayOfWeek].push(shift)
-                })
-
-                // Determine shift type for each day
-                const newDayShifts = { ...dayShifts }
-                let startTime, endTime
-
-                Object.entries(shiftsByDay).forEach(([day, dayShifts]) => {
-                  if (dayShifts.length > 0) {
-                    // Use the first shift for this day to determine type
-                    const shift = dayShifts[0]
-                    startTime = shift.shift_start
-                    endTime = shift.shift_end
-
-                    let shiftType = ""
-                    if (startTime === "10:00:00" && endTime === "19:00:00") {
-                      shiftType = "morning"
-                    } else if (startTime === "12:00:00" && endTime === "21:00:00") {
-                      shiftType = "midday"
-                    } else if (startTime === "19:00:00" && endTime === "23:00:00") {
-                      shiftType = "night"
-                    } else {
-                      shiftType = "custom"
-                    }
-                    newDayShifts[day] = {
-                      type: shiftType,
-                      start: startTime,
-                      end: endTime,
-                    }
-                  }
-                })
-
-                setDayShifts(newDayShifts)
-
-                // Set the global shift type based on the most common shift
-                const shiftCounts = { morning: 0, midday: 0, night: 0, custom: 0 }
-                Object.values(newDayShifts).forEach(({ type }) => {
-                  if (type) {
-                    shiftCounts[type]++
-                  }
-                })
-
-                // Find the most common shift type
-                let mostCommonShift = ""
-                let maxCount = 0
-                Object.entries(shiftCounts).forEach(([type, count]) => {
-                  if (count > maxCount) {
-                    mostCommonShift = type
-                    maxCount = count
-                  }
-                })
-
-                if (mostCommonShift) {
-                  setSelectedShift(mostCommonShift)
-
-                  // If custom is the most common, set the custom times
-                  if (mostCommonShift === "custom") {
-                    // Find a day with custom shift
-                    const customShiftDay = Object.entries(newDayShifts).find(([_, data]) => data.type === "custom")
-                    if (customShiftDay) {
-                      const [_, data] = customShiftDay
-                      setCustomShiftStart(convertTimeFormatToTimeString(data.start))
-                      setCustomShiftEnd(convertTimeFormatToTimeString(data.end))
-                    }
+                // If we have payroll periods loaded, select the matching one
+                if (payrollPeriods.length > 0) {
+                  const matchingPeriod = payrollPeriods.find(
+                    (period) => period.payroll_period_start === scheduleData.payroll_period_start,
+                  )
+                  if (matchingPeriod) {
+                    setSelectedPayrollPeriodId(matchingPeriod.id)
                   }
                 }
-              } catch (error) {
-                console.error("Error fetching shift details:", error)
               }
+              if (scheduleData.payroll_period_end) {
+                setPayrollPeriodEnd(scheduleData.payroll_period_end)
+              }
+
+              // Set selected days based on schedule
+              const daysMap = {
+                Monday: "M",
+                Tuesday: "T",
+                Wednesday: "W",
+                Thursday: "T2",
+                Friday: "F",
+                Saturday: "S2",
+                Sunday: "S",
+              }
+
+              const newSelectedDays = {
+                S: false,
+                M: false,
+                T: false,
+                W: false,
+                T2: false,
+                F: false,
+                S2: false,
+              }
+
+              if (scheduleData.days && Array.isArray(scheduleData.days)) {
+                scheduleData.days.forEach((day) => {
+                  if (daysMap[day]) {
+                    newSelectedDays[daysMap[day]] = true
+                  }
+                })
+
+                console.log("Setting selected days based on schedule:", newSelectedDays)
+                setSelectedDays(newSelectedDays)
+              } else {
+                console.warn("Schedule days is not an array or is undefined:", scheduleData.days)
+              }
+
+              // Determine shift type based on shift_ids
+              if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
+                // Fetch all shifts to determine day-specific shifts
+                try {
+                  const shiftPromises = scheduleData.shift_ids.map((shiftId) =>
+                    fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
+                      headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        "Content-Type": "application/json",
+                      },
+                    }).then((res) => (res.ok ? res.json() : null)),
+                  )
+
+                  const shiftsData = await Promise.all(shiftPromises)
+                  const validShifts = shiftsData.filter((shift) => shift !== null)
+
+                  // Group shifts by day of week
+                  const shiftsByDay = {}
+                  validShifts.forEach((shift) => {
+                    const date = dayjs(shift.date)
+                    const dayOfWeek = date.format("dddd")
+
+                    if (!shiftsByDay[dayOfWeek]) {
+                      shiftsByDay[dayOfWeek] = []
+                    }
+
+                    shiftsByDay[dayOfWeek].push(shift)
+                  })
+
+                  // Determine shift type for each day
+                  const newDayShifts = { ...dayShifts }
+                  let startTime, endTime
+
+                  Object.entries(shiftsByDay).forEach(([day, dayShifts]) => {
+                    if (dayShifts.length > 0) {
+                      // Use the first shift for this day to determine type
+                      const shift = dayShifts[0]
+                      startTime = shift.shift_start
+                      endTime = shift.shift_end
+
+                      let shiftType = ""
+                      if (startTime === "10:00:00" && endTime === "19:00:00") {
+                        shiftType = "morning"
+                      } else if (startTime === "12:00:00" && endTime === "21:00:00") {
+                        shiftType = "midday"
+                      } else if (startTime === "19:00:00" && endTime === "23:00:00") {
+                        shiftType = "night"
+                      } else {
+                        shiftType = "custom"
+                      }
+                      newDayShifts[day] = {
+                        type: shiftType,
+                        start: startTime,
+                        end: endTime,
+                      }
+                    }
+                  })
+
+                  setDayShifts(newDayShifts)
+
+                  // Set the global shift type based on the most common shift
+                  const shiftCounts = { morning: 0, midday: 0, night: 0, custom: 0 }
+                  Object.values(newDayShifts).forEach(({ type }) => {
+                    if (type) {
+                      shiftCounts[type]++
+                    }
+                  })
+
+                  // Find the most common shift type
+                  let mostCommonShift = ""
+                  let maxCount = 0
+                  Object.entries(shiftCounts).forEach(([type, count]) => {
+                    if (count > maxCount) {
+                      mostCommonShift = type
+                      maxCount = count
+                    }
+                  })
+
+                  if (mostCommonShift) {
+                    setSelectedShift(mostCommonShift)
+
+                    // If custom is the most common, set the custom times
+                    if (mostCommonShift === "custom") {
+                      // Find a day with custom shift
+                      const customShiftDay = Object.entries(newDayShifts).find(([_, data]) => data.type === "custom")
+                      if (customShiftDay) {
+                        const [_, data] = customShiftDay
+                        setCustomShiftStart(convertTimeFormatToTimeString(data.start))
+                        setCustomShiftEnd(convertTimeFormatToTimeString(data.end))
+                      }
+                    }
+                  }
+                } catch (error) {
+                  console.error("Error fetching shift details:", error)
+                }
+              }
+            } else {
+              console.log(`No schedule found for employee ${employeeId} with user ID ${userId}`)
             }
           } else {
-            console.log(`No schedule found for employee ${employeeId} with user ID ${userId}`)
+            console.log(`No schedules found at all`)
           }
-        } else {
-          console.log(`No schedules found at all`)
+        } catch (error) {
+          console.error("Error fetching schedule:", error)
         }
 
         setLoading(false)
@@ -1042,6 +1137,29 @@ function AdminEmployeeEditSchedulePage() {
       fetchScheduleData()
     }
   }, [employeeId, employee])
+
+  // Function to reset all selections after saving
+  const resetSelections = () => {
+    setSelectedDays({
+      S: false,
+      M: false,
+      T: false,
+      W: false,
+      T2: false,
+      F: false,
+      S2: false,
+    })
+    setSelectedShift("")
+    setDayShifts({
+      Sunday: { type: "", start: "", end: "" },
+      Monday: { type: "", start: "", end: "" },
+      Tuesday: { type: "", start: "", end: "" },
+      Wednesday: { type: "", start: "", end: "" },
+      Thursday: { type: "", start: "", end: "" },
+      Friday: { type: "", start: "", end: "" },
+      Saturday: { type: "", start: "", end: "" },
+    })
+  }
 
   // This useEffect ensures the calendar is updated whenever the schedule data changes
   useEffect(() => {
@@ -1110,11 +1228,25 @@ function AdminEmployeeEditSchedulePage() {
     const newDayStatus = {}
     const today = dayjs()
 
+    // First, apply holiday information
+    holidays.forEach((holiday) => {
+      const dateStr = holiday.date
+      if (dayjs(dateStr).month() === month && dayjs(dateStr).year() === year) {
+        newDayStatus[dateStr] = holiday.holiday_type === "regular" ? "regularholiday" : "specialholiday"
+      }
+    })
+
     dayObjects.forEach((day) => {
       if (day.isCurrentMonth) {
         const dateStr = day.date.format("YYYY-MM-DD")
         const dayOfWeek = day.date.format("dddd")
         const isPastDay = day.date.isBefore(today, "day")
+        const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
+
+        // Skip if already marked as a holiday
+        if (newDayStatus[dateStr] === "regularholiday" || newDayStatus[dateStr] === "specialholiday") {
+          return
+        }
 
         // Priority order for status:
         // 1. Special events (sickleave, holidays, etc.)
@@ -1139,14 +1271,14 @@ function AdminEmployeeEditSchedulePage() {
           // For past days, show actual attendance if available
           const lowerStatus = attendanceData[dateStr].toLowerCase()
           if (lowerStatus === "present") {
-            newDayStatus[dateStr] = "attended"
+            newStatus[dateStr] = "attended"
           } else if (lowerStatus === "absent") {
-            newDayStatus[dateStr] = "absent"
+            newStatus[dateStr] = "absent"
           } else if (lowerStatus === "late") {
-            newDayStatus[dateStr] = "late"
+            newStatus[dateStr] = "late"
           }
-        } else if (schedule.days?.includes(dayOfWeek)) {
-          // If it's a scheduled day
+        } else if (schedule.days?.includes(dayOfWeek) && isInPayrollPeriod) {
+          // If it's a scheduled day and in the payroll period
           if (isPastDay && !attendanceData[dateStr]) {
             // Past scheduled days without attendance records should be marked as absent
             newDayStatus[dateStr] = "absent"
@@ -1159,7 +1291,7 @@ function AdminEmployeeEditSchedulePage() {
           newDayStatus[dateStr] = "absent"
         } else {
           // Default status for future days
-          newDayStatus[dateStr] = "unselected"
+          newDayStatus[dateStr] = isInPayrollPeriod ? "unselected" : "outside-period"
         }
       }
     })
@@ -1170,9 +1302,10 @@ function AdminEmployeeEditSchedulePage() {
       for (let i = 1; i <= daysInMonth; i++) {
         const date = dayjs(new Date(year, month, i))
         const dayOfWeek = date.format("dddd")
+        const dateStr = date.format("YYYY-MM-DD")
+        const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
-        if (schedule.days.includes(dayOfWeek)) {
-          const dateStr = date.format("YYYY-MM-DD")
+        if (schedule.days.includes(dayOfWeek) && isInPayrollPeriod) {
           scheduledDates.push(dateStr)
 
           // Mark this date as scheduled if it's not already marked as something else
@@ -1189,11 +1322,43 @@ function AdminEmployeeEditSchedulePage() {
       console.log(`Initialized ${scheduledDates.length} scheduled dates for ${currentDate.format("MMMM")}`)
     }
 
+    // CRITICAL FIX: Process holidays from the schedule
+    if (schedule && (schedule.regularholiday?.length > 0 || schedule.specialholiday?.length > 0)) {
+      console.log("Processing holidays from schedule:", {
+        regularHolidays: schedule.regularholiday,
+        specialHolidays: schedule.specialholiday,
+      })
+
+      // Process regular holidays
+      if (schedule.regularholiday && Array.isArray(schedule.regularholiday)) {
+        schedule.regularholiday.forEach((dateStr) => {
+          // Only update if it's in the current month
+          const holidayDate = dayjs(dateStr)
+          if (holidayDate.month() === month && holidayDate.year() === year) {
+            console.log(`Marking regular holiday: ${dateStr}`)
+            newDayStatus[dateStr] = "regularholiday"
+          }
+        })
+      }
+
+      // Process special holidays
+      if (schedule.specialholiday && Array.isArray(schedule.specialholiday)) {
+        schedule.specialholiday.forEach((dateStr) => {
+          // Only update if it's in the current month
+          const holidayDate = dayjs(dateStr)
+          if (holidayDate.month() === month && holidayDate.year() === year) {
+            console.log(`Marking special holiday: ${dateStr}`)
+            newDayStatus[dateStr] = "specialholiday"
+          }
+        })
+      }
+    }
+
     setDayStatus(newDayStatus)
     console.log("Calendar days generated:", calendarDays.length)
-    console.log("Day status after generation:", dayStatus)
+    console.log("Day status after generation:", newDayStatus)
     console.log("Schedule days being used:", schedule.days)
-  }, [currentDate, schedule, employeeId, attendanceData])
+  }, [currentDate, schedule, employeeId, attendanceData, payrollPeriodStart, payrollPeriodEnd, holidays])
 
   // Handle day click in calendar
   const handleDayClick = (day) => {
@@ -1210,24 +1375,36 @@ function AdminEmployeeEditSchedulePage() {
     setIsProcessingShifts(true)
 
     try {
+      // Get the day name from the key
+      const daysMap = {
+        S: "Sunday",
+        M: "Monday",
+        T: "Tuesday",
+        W: "Wednesday",
+        T2: "Thursday",
+        F: "Friday",
+        S2: "Saturday",
+      }
+      const dayName = daysMap[day]
+
+      // Check if the day is currently selected
+      const isCurrentlySelected = selectedDays[day]
+
       // Update the UI state first for immediate feedback
       setSelectedDays((prev) => ({
         ...prev,
         [day]: !prev[day],
       }))
 
-      // If the day is being selected (not deselected)
-      if (!selectedDays[day]) {
-        // Get the day name from the key
-        const dayName = {
-          S: "Sunday",
-          M: "Monday",
-          T: "Tuesday",
-          W: "Wednesday",
-          T2: "Thursday",
-          F: "Friday",
-          S2: "Saturday",
-        }[day]
+      // If the day is being deselected
+      if (isCurrentlySelected) {
+        console.log(`Deselecting day: ${dayName}`)
+
+        // Just update the local UI without modifying the schedule
+        updateCalendarForSelectedDay(dayName, false)
+      } else {
+        // If the day is being selected
+        console.log(`Selecting day: ${dayName}`)
 
         // Set the day-specific shift type if not already set
         if (!dayShifts[dayName].type) {
@@ -1267,116 +1444,56 @@ function AdminEmployeeEditSchedulePage() {
           }))
         }
 
-        // Generate shifts for this day
-        const newShiftIds = await generateShiftsForDay(dayName)
-
-        // If we have an existing schedule, update it with the new shifts
-        if (schedule.id) {
-          const accessToken = localStorage.getItem("access_token")
-
-          // CRITICAL FIX: Create an updated days array with the new day added
-          // Make sure to preserve existing days
-          const updatedDays = [...(schedule.days || [])]
-          if (!updatedDays.includes(dayName)) {
-            updatedDays.push(dayName)
-          }
-
-          console.log(`Updating schedule with days: ${updatedDays.join(", ")}`)
-
-          // Update the schedule with add_shift_ids and the updated days array
-          const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
-            method: "PATCH",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              add_shift_ids: newShiftIds,
-              days: updatedDays,
-            }),
-          })
-
-          if (response.ok) {
-            const updatedSchedule = await response.json()
-            setSchedule(updatedSchedule)
-
-            // Update the calendar with the new schedule
-            updateCalendarWithSchedule(updatedSchedule, updatedSchedule.days)
-          } else {
-            console.error("Failed to update schedule with new shifts")
-          }
-        }
-      } else {
-        // If the day is being deselected, remove it
-        await removeShiftsForDay(dayName)
+        // Just update the local UI without creating a schedule
+        updateCalendarForSelectedDay(dayName, true)
       }
-
-      // Update calendar colors for all instances of this day
-      const newDayStatus = { ...dayStatus }
-      const today = dayjs()
-
-      calendarDays.forEach((calDay) => {
-        if (calDay.isCurrentMonth) {
-          const dateStr = calDay.date.format("YYYY-MM-DD")
-          const dayOfWeek = calDay.date.format("dddd")
-          const dayKey = {
-            Sunday: "S",
-            Monday: "M",
-            Tuesday: "T",
-            Wednesday: "W",
-            Thursday: "T2",
-            Friday: "F",
-            Saturday: "S2",
-          }[dayOfWeek]
-
-          const isPastDay = calDay.date.isBefore(today, "day")
-          const hasAttendanceRecord = attendanceData[dateStr] === "present" || attendanceData[dateStr] === "absent"
-
-          // If this day's checkbox was toggled, update its status
-          if (dayKey === day) {
-            // Check if this day has any special status
-            const hasSpecialStatus =
-              schedule.sickleave === dateStr ||
-              (schedule.regularholiday && schedule.regularholiday.includes(dateStr)) ||
-              (schedule.specialholiday && schedule.specialholiday.includes(dateStr)) ||
-              (schedule.nightdiff && schedule.nightdiff.includes(dateStr)) ||
-              (schedule.oncall && schedule.oncall.includes(dateStr)) ||
-              (schedule.vacationleave && schedule.vacationleave.includes(dateStr))
-
-            // Only update if it doesn't have a special status
-            if (!hasSpecialStatus) {
-              if (selectedDays[day]) {
-                // Day is being selected - mark as "selected" unless it has attendance data
-                if (isPastDay && hasAttendanceRecord) {
-                  // Keep the attendance status for past days with records
-                  // This preserves the green/red coloring for past days
-                } else {
-                  // For future days or days without attendance records, mark as selected (blue)
-                  newDayStatus[dateStr] = "selected"
-                }
-              } else {
-                // Day is being deselected
-                if (isPastDay && hasAttendanceRecord) {
-                  // Keep the attendance status for past days with records
-                } else if (isPastDay) {
-                  // Keep past days as "absent"
-                  newDayStatus[dateStr] = "absent"
-                } else {
-                  // Reset to unselected for future days without attendance
-                  newDayStatus[dateStr] = "unselected"
-                }
-              }
-            }
-          }
-        }
-      })
-
-      setDayStatus(newDayStatus)
     } catch (error) {
       console.error("Error handling day selection:", error)
     } finally {
       setIsProcessingShifts(false)
     }
+  }
+
+  // Helper function to update calendar for a selected day without creating a schedule
+  const updateCalendarForSelectedDay = (dayName, isSelected) => {
+    const newDayStatus = { ...dayStatus }
+    const today = dayjs()
+
+    calendarDays.forEach((day) => {
+      if (day.isCurrentMonth) {
+        const dateStr = day.date.format("YYYY-MM-DD")
+        const dayOfWeek = day.date.format("dddd")
+        const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
+
+        // Skip if it's a holiday
+        if (newDayStatus[dateStr] === "regularholiday" || newDayStatus[dateStr] === "specialholiday") {
+          return
+        }
+
+        if (dayOfWeek === dayName && isInPayrollPeriod) {
+          const isPastDay = day.date.isBefore(today, "day")
+          const hasAttendanceRecord = attendanceData[dateStr] === "present" || attendanceData[dateStr] === "absent"
+
+          if (isSelected) {
+            if (isPastDay && hasAttendanceRecord) {
+              // Keep attendance status
+            } else {
+              newDayStatus[dateStr] = "selected"
+            }
+          } else {
+            if (isPastDay && hasAttendanceRecord) {
+              // Keep attendance status
+            } else if (isPastDay) {
+              newDayStatus[dateStr] = "absent"
+            } else {
+              newDayStatus[dateStr] = "unselected"
+            }
+          }
+        }
+      }
+    })
+
+    setDayStatus(newDayStatus)
   }
 
   // Handle shift selection for a specific day
@@ -1469,8 +1586,9 @@ function AdminEmployeeEditSchedulePage() {
       const dayOfWeek = selectedDate.format("dddd")
       const isWorkingDay = newSchedule.days?.includes(dayOfWeek)
       const isPastDay = selectedDate.isBefore(dayjs(), "day")
+      const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
-      if (isWorkingDay) {
+      if (isWorkingDay && isInPayrollPeriod) {
         if (isPastDay && !attendanceData[dateStr]) {
           // Past working day with no attendance
           setDayStatus((prev) => ({
@@ -1490,6 +1608,11 @@ function AdminEmployeeEditSchedulePage() {
             [dateStr]: "selected",
           }))
         }
+      } else if (!isInPayrollPeriod) {
+        setDayStatus((prev) => ({
+          ...prev,
+          [dateStr]: "outside-period",
+        }))
       } else {
         setDayStatus((prev) => ({
           ...prev,
@@ -1517,7 +1640,7 @@ function AdminEmployeeEditSchedulePage() {
         // For "absent", we just remove the date from all arrays
         // and make sure it's not in the working days
         const dayOfWeek = selectedDate.format("dddd")
-        if (newSchedule.days.includes(dayOfWeek)) {
+        if (newSchedule.days && newSchedule.days.includes(dayOfWeek)) {
           // This is a simplification - in a real app, you'd need to handle this differently
           // as you can't modify the days array for just one date
           console.log(`Note: ${dateStr} is marked as absent but is part of the regular working days (${dayOfWeek})`)
@@ -1581,6 +1704,8 @@ function AdminEmployeeEditSchedulePage() {
       })
 
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error("Server response:", errorText)
         throw new Error(`Failed to save events: ${response.statusText}`)
       }
 
@@ -1588,6 +1713,9 @@ function AdminEmployeeEditSchedulePage() {
       setSchedule(updatedSchedule)
       setSaveSuccess(true)
       setSaveMessage("Events saved successfully!")
+
+      // Reset selections after successful save
+      resetSelections()
     } catch (error) {
       console.error("Error saving events:", error)
       setSaveSuccess(false)
@@ -1602,7 +1730,7 @@ function AdminEmployeeEditSchedulePage() {
       setIsSaving(true)
       setSaveSuccess(false)
       setSaveMessage("")
-
+      
       // Convert selected days to array of day names
       const daysMap = {
         S: "Sunday",
@@ -1628,11 +1756,19 @@ function AdminEmployeeEditSchedulePage() {
         return
       }
 
+      // Check if we have payroll period dates
+      if (!payrollPeriodStart || !payrollPeriodEnd) {
+        setSaveSuccess(false)
+        setSaveMessage("Please select a payroll period.")
+        setIsSaving(false)
+        return
+      }
+
       // Get the correct user ID from the employee data
       const userId = employee?.user?.id || Number.parseInt(employeeId)
       const accessToken = localStorage.getItem("access_token")
 
-      // CRITICAL FIX: For each selected day, create shifts with the correct shift type
+      // For each selected day, create shifts with the correct shift type
       console.log("Creating shifts for selected days...")
       setIsProcessingShifts(true)
 
@@ -1642,10 +1778,6 @@ function AdminEmployeeEditSchedulePage() {
         for (const dayName of selectedDaysArray) {
           // Only create shifts for days that aren't already in the schedule
           if (!schedule.days || !schedule.days.includes(dayName)) {
-            // CRITICAL FIX: Use the correct shift type for each day
-            // Set the day-specific shift type if not already set
-            const shiftTypeToUse = selectedShift
-
             const shiftIds = await generateShiftsForDay(dayName)
             newShiftIds.push(...shiftIds)
           }
@@ -1660,10 +1792,9 @@ function AdminEmployeeEditSchedulePage() {
 
       // If we have a schedule ID, use PATCH with add_shift_ids
       if (schedule.id) {
-        console.log(`Updating existing schedule ${schedule.id} with add_shift_ids:`, newShiftIds)
+        console.log(`Updating existing schedule ${schedule.id} with new shifts:`, newShiftIds)
 
-        // CRITICAL FIX: Preserve existing days when updating
-        // Get the current days from the schedule
+        // Preserve existing days when updating
         const existingDays = schedule.days || []
 
         // Add any new selected days that aren't already in the schedule
@@ -1676,21 +1807,27 @@ function AdminEmployeeEditSchedulePage() {
 
         console.log(`Updating schedule with days: ${updatedDays.join(", ")}`)
 
-        // Prepare the update data with add_shift_ids
+        // Prepare the update data
         const updateData = {
-          add_shift_ids: newShiftIds,
-          // IMPORTANT: Always include the complete days array
           days: updatedDays,
-          // Include other fields that might have changed
+          add_shift_ids: newShiftIds, // Correct way to add shifts
+          payroll_period_start: payrollPeriodStart,
+          payroll_period_end: payrollPeriodEnd,
+          bi_weekly_start: payrollPeriodStart,
           sickleave: schedule.sickleave,
           regularholiday: schedule.regularholiday || [],
           specialholiday: schedule.specialholiday || [],
           nightdiff: schedule.nightdiff || [],
           oncall: schedule.oncall || [],
           vacationleave: schedule.vacationleave || [],
+          hours: 8,
+          user_id: userId,
         }
 
-        // Update the schedule using PATCH to add new shifts
+        // Log the data being sent to the server
+        console.log("Sending update data to server:", JSON.stringify(updateData, null, 2))
+
+        // Update the schedule using PATCH
         const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
           method: "PATCH",
           headers: {
@@ -1701,19 +1838,24 @@ function AdminEmployeeEditSchedulePage() {
         })
 
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(`Failed to update schedule: ${JSON.stringify(errorData)}`)
+          const errorText = await response.text()
+          console.error("Server response:", errorText)
+          throw new Error(`Failed to update schedule: ${response.statusText}`)
         }
 
         const updatedSchedule = await response.json()
         console.log("Schedule updated successfully:", updatedSchedule)
         setSchedule(updatedSchedule)
+        setHasScheduleBeenSaved(true)
 
         // Update the calendar with the new schedule
         updateCalendarWithSchedule(updatedSchedule, updatedSchedule.days)
 
         setSaveSuccess(true)
         setSaveMessage("Schedule updated successfully!")
+
+        // Only reset selections after successful save
+        resetSelections()
       } else {
         // If no schedule exists, create a new one
         console.log("Creating new schedule with shifts:", newShiftIds)
@@ -1723,17 +1865,20 @@ function AdminEmployeeEditSchedulePage() {
           user_id: userId,
           shift_ids: newShiftIds,
           days: selectedDaysArray,
+          payroll_period_start: payrollPeriodStart,
+          payroll_period_end: payrollPeriodEnd,
+          bi_weekly_start: payrollPeriodStart,
           sickleave: schedule.sickleave,
           regularholiday: schedule.regularholiday || [],
           specialholiday: schedule.specialholiday || [],
           nightdiff: schedule.nightdiff || [],
           oncall: schedule.oncall || [],
           vacationleave: schedule.vacationleave || [],
-          payroll_period_start: schedule.payroll_period_start || null,
-          payroll_period_end: schedule.payroll_period_end || null,
           hours: 8,
-          bi_weekly_start: schedule.bi_weekly_start || dayjs().format("YYYY-MM-DD"),
         }
+
+        // Log the data being sent to the server
+        console.log("Creating new schedule with data:", JSON.stringify(scheduleData, null, 2))
 
         // Create a new schedule
         const response = await fetch(`${API_BASE_URL}/schedule/`, {
@@ -1746,19 +1891,24 @@ function AdminEmployeeEditSchedulePage() {
         })
 
         if (!response.ok) {
-          const errorData = await response.json()
-          throw new Error(`Failed to create schedule: ${JSON.stringify(errorData)}`)
+          const errorText = await response.text()
+          console.error("Server response:", errorText)
+          throw new Error(`Failed to create schedule: ${response.statusText}`)
         }
 
         const newSchedule = await response.json()
         console.log("Schedule created successfully:", newSchedule)
         setSchedule(newSchedule)
+        setHasScheduleBeenSaved(true)
 
         // Update the calendar with the new schedule
         updateCalendarWithSchedule(newSchedule, newSchedule.days)
 
         setSaveSuccess(true)
         setSaveMessage("Schedule created successfully!")
+
+        // Only reset selections after successful save
+        resetSelections()
       }
 
       // Force a re-render of the calendar
@@ -1792,9 +1942,10 @@ function AdminEmployeeEditSchedulePage() {
       // Create date with the correct month (month-1 because Date constructor uses 0-indexed months)
       const date = dayjs(new Date(year, currentDate.month(), i))
       const dayOfWeek = date.format("dddd")
+      const dateStr = date.format("YYYY-MM-DD")
+      const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
-      if (scheduledDays.includes(dayOfWeek)) {
-        const dateStr = date.format("YYYY-MM-DD")
+      if (scheduledDays.includes(dayOfWeek) && isInPayrollPeriod) {
         scheduledDates.push(dateStr)
         console.log(`Found scheduled date: ${dateStr} (${dayOfWeek})`)
       }
@@ -1820,7 +1971,8 @@ function AdminEmployeeEditSchedulePage() {
         const dateMonth = dateStr.split("-")[1] // Get month part (MM) from YYYY-MM-DD
         if (dateMonth === String(month).padStart(2, "0")) {
           if (newStatus[dateStr] === "selected" && !scheduledDates.includes(dateStr)) {
-            newStatus[dateStr] = "unselected"
+            const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
+            newStatus[dateStr] = isInPayrollPeriod ? "unselected" : "outside-period"
           }
         }
       })
@@ -1852,6 +2004,36 @@ function AdminEmployeeEditSchedulePage() {
         }
       })
 
+      // CRITICAL FIX: Process holidays from the schedule
+      if (savedSchedule.regularholiday && Array.isArray(savedSchedule.regularholiday)) {
+        savedSchedule.regularholiday.forEach((dateStr) => {
+          // Only update if it's in the current month
+          const holidayDate = dayjs(dateStr)
+          if (holidayDate.month() === currentDate.month() && holidayDate.year() === currentDate.year()) {
+            console.log(`Marking regular holiday: ${dateStr}`)
+            newStatus[dateStr] = "regularholiday"
+          }
+        })
+      }
+
+      if (savedSchedule.specialholiday && Array.isArray(savedSchedule.specialholiday)) {
+        savedSchedule.specialholiday.forEach((dateStr) => {
+          // Only update if it's in the current month
+          const holidayDate = dayjs(dateStr)
+          if (holidayDate.month() === currentDate.month() && holidayDate.year() === currentDate.year()) {
+            console.log(`Marking special holiday: ${dateStr}`)
+            newStatus[dateStr] = "specialholiday"
+          }
+        })
+      }
+
+      // Mark days outside the payroll period
+      Object.keys(newStatus).forEach((dateStr) => {
+        if (!isDateInPayrollPeriod(dateStr) && newStatus[dateStr] !== "outside-period") {
+          newStatus[dateStr] = "outside-period"
+        }
+      })
+
       console.log("Updated day status:", newStatus)
       return newStatus
     })
@@ -1872,8 +2054,9 @@ function AdminEmployeeEditSchedulePage() {
       const date = dayjs(new Date(year, month, i))
       const dayOfWeek = date.format("dddd")
       const dateStr = date.format("YYYY-MM-DD")
+      const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
-      if (schedule.days && schedule.days.includes(dayOfWeek)) {
+      if (schedule.days && schedule.days.includes(dayOfWeek) && isInPayrollPeriod) {
         scheduledDates.push({
           date: dateStr,
           dayOfWeek,
@@ -1896,10 +2079,21 @@ function AdminEmployeeEditSchedulePage() {
   const handleMonthChange = (direction) => {
     const newDate = direction === "next" ? currentDate.add(1, "month") : currentDate.subtract(1, "month")
 
+    // Reset the day status for the new month to avoid showing selected days from previous month
+    setDayStatus({})
+
+    // Update the current date
     setCurrentDate(newDate)
 
     // Also update the selected date to the first day of the new month
     setSelectedDate(dayjs(new Date(newDate.year(), newDate.month(), 1)))
+
+    // Force refresh the calendar with the current schedule
+    setTimeout(() => {
+      if (schedule && schedule.days && schedule.days.length > 0) {
+        updateCalendarWithSchedule(schedule, schedule.days)
+      }
+    }, 100)
   }
 
   // Add this function after the handleMonthChange function:
@@ -1938,7 +2132,7 @@ function AdminEmployeeEditSchedulePage() {
   // Function to determine the background color of a calendar day based on its status
   const getDayStatusColor = (day) => {
     if (!day.isCurrentMonth) {
-      return "bg-gray-200 text-gray-400" // Light gray for days outside the current month
+      return "bg-gray-400 text-white" // Light gray for days outside the current month
     }
 
     const dateStr = day.date.format("YYYY-MM-DD")
@@ -1955,9 +2149,13 @@ function AdminEmployeeEditSchedulePage() {
       case "specialholiday":
       case "regularholiday":
       case "vacationleave":
-      case "nightdiff":
-      case "oncall":
         return "bg-orange-400 text-white" // Orange for events
+      case "nightdiff":
+        return "bg-blue-500 text-white" // Dark blue for night differential
+      case "oncall":
+        return "bg-purple-500 text-white" // Purple for on-call
+      case "outside-period":
+        return "bg-gray-200 text-gray-400" // Gray for days outside payroll period
       default:
         return "bg-white text-gray-700" // White for unselected days
     }
@@ -2049,6 +2247,7 @@ function AdminEmployeeEditSchedulePage() {
                 {calendarDays.map((day, index) => {
                   const dateStr = day.date.format("YYYY-MM-DD")
                   const status = day.isCurrentMonth ? dayStatus[dateStr] : null
+                  const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
                   return (
                     <div
@@ -2060,7 +2259,7 @@ function AdminEmployeeEditSchedulePage() {
                         day.date.format("YYYY-MM-DD") === selectedDate.format("YYYY-MM-DD")
                           ? "ring-4 ring-blue-500 font-bold shadow-lg"
                           : ""
-                      }`}
+                      } ${!isInPayrollPeriod && day.isCurrentMonth ? "opacity-50" : ""}`}
                       onClick={() => handleDayClick(day)}
                     >
                       <span className="text-md sm:text-lg md:text-xl font-bold">{day.dayOfMonth}</span>
@@ -2101,6 +2300,10 @@ function AdminEmployeeEditSchedulePage() {
                   <div className="w-3 h-3 rounded-full bg-orange-400 mr-2"></div>
                   <span className="text-white text-md">Events</span>
                 </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-gray-200 mr-2"></div>
+                  <span className="text-white text-md">Outside Period</span>
+                </div>
               </div>
             </div>
 
@@ -2130,6 +2333,31 @@ function AdminEmployeeEditSchedulePage() {
                   <p className="text-md text-white">
                     {employee?.employee_id || employee?.user?.id || employeeId || ""}
                   </p>
+                </div>
+              </div>
+
+              {/* Payroll Period Display in Employee Panel */}
+              <div className="mb-4 bg-[#5C7346] p-3 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <CalendarDays className="h-5 w-5 text-white mr-2" />
+                    <span className="text-white font-bold">Payroll Period:</span>
+                  </div>
+                </div>
+                <div className="w-full">
+                  <select
+                    value={selectedPayrollPeriodId || ""}
+                    onChange={handlePayrollPeriodChange}
+                    className="w-full px-2 py-2 rounded border border-gray-300 bg-white text-[#3A4D2B]"
+                  >
+                    <option value="">Select a payroll period</option>
+                    {payrollPeriods.map((period) => (
+                      <option key={period.id} value={period.id}>
+                        {dayjs(period.payroll_period_start).format("MMM DD")} -{" "}
+                        {dayjs(period.payroll_period_end).format("MMM DD")}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
@@ -2417,4 +2645,3 @@ function AdminEmployeeEditSchedulePage() {
 }
 
 export default AdminEmployeeEditSchedulePage
-

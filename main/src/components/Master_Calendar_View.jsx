@@ -53,6 +53,20 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
     })
   }
 
+  // Function to get the payroll period for a date
+  const getPayrollPeriodForDate = (date) => {
+    return payrollPeriods.find((period) => {
+      const startDate = dayjs(period.payroll_period_start)
+      const endDate = dayjs(period.payroll_period_end)
+      return (
+        startDate.isValid() &&
+        endDate.isValid() &&
+        date.isSameOrAfter(startDate, "day") &&
+        date.isSameOrBefore(endDate, "day")
+      )
+    })
+  }
+
   // Function to check if a date is a weekend
   const isWeekend = (date) => {
     const day = date.day()
@@ -95,7 +109,8 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
   // Function to render a single day cell
   const renderDayCell = (day) => {
     const holiday = getHolidayForDate(day)
-    const isPayrollPeriod = isInPayrollPeriod(day)
+    const payrollPeriod = getPayrollPeriodForDate(day)
+    const isPayrollPeriodDay = !!payrollPeriod
     const isWeekendDay = isWeekend(day)
     const isTodayDate = day.isToday()
 
@@ -105,7 +120,7 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
     if (holiday) {
       cellClasses +=
         holiday.holiday_type === "regular" ? " bg-red-100 hover:bg-red-200" : " bg-blue-100 hover:bg-blue-200"
-    } else if (isPayrollPeriod) {
+    } else if (isPayrollPeriodDay) {
       cellClasses += " bg-green-50 hover:bg-green-100"
     } else if (isWeekendDay) {
       cellClasses += " bg-gray-100 hover:bg-gray-200"
@@ -131,6 +146,13 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
                 title={holiday.name}
               >
                 {holiday.name}
+              </span>
+            </div>
+          )}
+          {isPayrollPeriodDay && !holiday && (
+            <div className="mt-auto">
+              <span className="text-xs truncate block text-green-700" title="Payroll Period">
+                Payroll
               </span>
             </div>
           )}
@@ -264,4 +286,3 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
 }
 
 export default MasterCalendarView
-

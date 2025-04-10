@@ -17,16 +17,18 @@ export default function Calendar({
   const currentYear = dayjs().year()
 
   const handleDateChange = (newDate) => {
-    if (newDate) {
+    if (newDate && onChange) {
       onChange(newDate.format("YYYY-MM-DD"))
-    } else {
+    } else if (onChange) {
       onChange("")
     }
   }
 
   const setToToday = () => {
-    const today = dayjs()
-    onChange(today.format("YYYY-MM-DD"))
+    if (onChange) {
+      const today = dayjs()
+      onChange(today.format("YYYY-MM-DD"))
+    }
   }
 
   return (
@@ -141,4 +143,3 @@ export default function Calendar({
     </LocalizationProvider>
   )
 }
-
