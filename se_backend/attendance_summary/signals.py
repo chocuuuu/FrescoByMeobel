@@ -29,7 +29,12 @@ def update_overtime_hours(attendance_summary):
                 f"Biweek Start: {biweek_start} | Overtime Hours: {overtime_hours} | Late: {late} | Undertime: {undertime}")
 
     # Fetch Schedule for the same user
-    schedule = Schedule.objects.filter(user_id=user).first()
+    schedule = Schedule.objects.filter(
+        user_id=user,
+        payroll_period_start__lte=biweek_start,
+        payroll_period_end__gte=biweek_start
+    ).order_by('-payroll_period_start').first()
+
     if schedule:
         logger.info(f"Schedule found for User {user.id}: Schedule ID {schedule.id}")
     else:
