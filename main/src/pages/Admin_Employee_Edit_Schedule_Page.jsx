@@ -1557,7 +1557,7 @@ function AdminEmployeeEditSchedulePage() {
         // Set the day-specific shift type if not already set
         if (!dayShifts[dayName].type) {
           // Use the currently selected shift type
-          const shiftType = selectedShift || "morning";
+          const shiftType = selectedShift;
           let shiftStart, shiftEnd;
 
           switch (shiftType) {
@@ -2910,20 +2910,13 @@ function AdminEmployeeEditSchedulePage() {
                   Delete
                 </button>
 
-                <button
-                  className="bg-[#373A45] text-white px-4 py-2 rounded-md hover:bg-gray-700 transition-colors"
-                  onClick={() => navigate(`/payslip?employeeId=${employeeId}`)}
-                >
-                  Payslip
-                </button>
-
                 {/* New button to save only events */}
                 <button
                   className="bg-[#5C7346] text-white px-4 py-2 rounded-md hover:bg-[#4a5c38] transition-colors"
                   onClick={handleSaveEvents}
                   disabled={isSaving}
                 >
-                  {isSaving ? "Saving..." : "Save Events Only"}
+                  {isSaving ? "Saving..." : "Save Events"}
                 </button>
 
                 <button
