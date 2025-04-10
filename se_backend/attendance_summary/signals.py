@@ -20,7 +20,10 @@ def update_overtime_hours(attendance_summary):
     overtime_hours = attendance_summary.overtime_hours
     late = attendance_summary.late_minutes
     undertime = attendance_summary.undertime
+    regularholiday_hours = attendance_summary.regularholiday
+    specialholiday_hours = attendance_summary.specialholiday
     biweek_start = attendance_summary.date
+    actual_hours = attendance_summary.actual_hours
 
     logger.info(f"Processing OvertimeHours for User {user.id} | AttendanceSummary ID {attendance_summary.id} | "
                 f"Biweek Start: {biweek_start} | Overtime Hours: {overtime_hours} | Late: {late} | Undertime: {undertime}")
@@ -33,14 +36,13 @@ def update_overtime_hours(attendance_summary):
         logger.warning(f"No Schedule found for User {user.id}. Skipping holiday calculations.")
 
 
-    # Calculate holiday and night differential hours
-    regularholiday_hours = len(schedule.regularholiday) * 8 if schedule and schedule.regularholiday else 0
-    specialholiday_hours = len(schedule.specialholiday) * 8 if schedule and schedule.specialholiday else 0
+    # night differential hours
     nightdiff_hours = len(schedule.nightdiff) * 8 if schedule and schedule.nightdiff else 0
-    restday_hours = schedule.restday if schedule and schedule.restday else 0  # Ensure restday exists
+    restday_hours = schedule.restday if schedule and schedule.restday else 0
 
 
-    logger.info(f"Computed Overtime Details for User {user.id}: "
+    logger.info(f"Computed Overtime Details for User {user.id}:"
+                f"Actual Hours: {actual_hours},"
                 f"Regular Holiday Hours: {regularholiday_hours}, "
                 f"Special Holiday Hours: {specialholiday_hours}, "
                 f"Night Differential Hours: {nightdiff_hours}, "
@@ -52,6 +54,7 @@ def update_overtime_hours(attendance_summary):
         user=user,
         biweek_start=biweek_start,
         defaults={
+            "actualhours": actual_hours,
             "regularot": overtime_hours,
             "regularholiday": regularholiday_hours,
             "specialholiday": specialholiday_hours,
@@ -66,6 +69,7 @@ def update_overtime_hours(attendance_summary):
         logger.info(f"Created new OvertimeHours ID {overtime.id} for AttendanceSummary ID {attendance_summary.id} | Biweek Start: {biweek_start}")
     else:
         # If the record already exists, update it
+        overtime.actualhours = actual_hours
         overtime.regularot = overtime_hours
         overtime.regularholiday = regularholiday_hours
         overtime.specialholiday = specialholiday_hours
