@@ -135,7 +135,7 @@ function AdminEmployeeEditSchedulePage() {
     const fetchHolidays = async () => {
       try {
         const accessToken = localStorage.getItem("access_token")
-        const response = await fetch(`${API_BASE_URL}/master-calendar/holidays/`, {
+        const response = await fetch(`${API_BASE_URL}/master-calendar/holiday/`, {
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
@@ -504,147 +504,6 @@ function AdminEmployeeEditSchedulePage() {
     }
   }
 
-  // Remove shifts for a specific day
-  const removeShiftsForDay = async (dayName) => {
-    try {
-      const accessToken = localStorage.getItem("access_token")
-      const year = currentDate.year()
-      const month = currentDate.month()
-      const daysInMonth = currentDate.daysInMonth()
-
-      console.log(`Removing shifts for ${dayName}`)
-
-      // Find all dates in the current month that match the day name AND are within the payroll period
-      const matchingDates = []
-      for (let i = 1; i <= daysInMonth; i++) {
-        const date = dayjs(new Date(year, month, i))
-        if (date.format("dddd") === dayName) {
-          const dateStr = date.format("YYYY-MM-DD")
-          // Only include dates within the payroll period
-          if (isDateInPayrollPeriod(dateStr)) {
-            matchingDates.push(dateStr)
-          }
-        }
-      }
-
-      console.log(`Found ${matchingDates.length} dates to remove shifts for`)
-
-      // Collect shift IDs that need to be removed
-      const shiftsToRemove = []
-      const shiftsToKeep = []
-
-      if (schedule.shift_ids && schedule.shift_ids.length > 0) {
-        const shiftRequests = schedule.shift_ids.map((shiftId) =>
-          fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-          }).then((response) => (response.ok ? response.json() : null)),
-        )
-
-        const shiftDataArray = await Promise.all(shiftRequests)
-
-        shiftDataArray.forEach((shiftData, index) => {
-          if (shiftData && matchingDates.includes(shiftData.date)) {
-            shiftsToRemove.push(schedule.shift_ids[index])
-            console.log(`Found shift ${schedule.shift_ids[index]} to remove for date ${shiftData.date}`)
-          } else if (shiftData) {
-            shiftsToKeep.push(schedule.shift_ids[index])
-          }
-        })
-      }
-
-      console.log(`Removing ${shiftsToRemove.length} shifts, keeping ${shiftsToKeep.length} shifts`)
-
-      // Update the day status for the removed days
-      const newDayStatus = { ...dayStatus }
-      const today = dayjs()
-
-      matchingDates.forEach((dateStr) => {
-        const date = dayjs(dateStr)
-        const isPastDay = date.isBefore(today, "day")
-
-        // For past days, mark as absent
-        if (isPastDay) {
-          newDayStatus[dateStr] = "absent"
-        } else {
-          // For future days, mark as unselected
-          newDayStatus[dateStr] = "unselected"
-        }
-      })
-
-      setDayStatus(newDayStatus)
-
-      // **Optimistically update UI BEFORE waiting for the API response**
-      setSchedule((prev) => ({
-        ...prev,
-        days: prev.days.filter((d) => d !== dayName),
-        shift_ids: shiftsToKeep,
-      }))
-
-      // Reset the day-specific shift
-      setDayShifts((prev) => ({
-        ...prev,
-        [dayName]: { type: "", start: "", end: "" },
-      }))
-
-      // If we have shifts to remove and a schedule ID, update the schedule
-      if (shiftsToRemove.length > 0 && schedule.id && hasScheduleBeenSaved) {
-        // Update the schedule to remove the day from the days array
-        const updatedDays = schedule.days.filter((d) => d !== dayName)
-
-        const response = await fetch(`${API_BASE_URL}/schedule/${schedule.id}/`, {
-          method: "PATCH",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            remove_shift_ids: shiftsToRemove,
-            days: updatedDays,
-          }),
-        })
-
-        if (response.ok) {
-          const updatedSchedule = await response.json()
-          console.log("Successfully updated schedule after removing shifts:", updatedSchedule)
-
-          // Update the schedule state with the server response
-          setSchedule(updatedSchedule)
-        } else {
-          console.error("Failed to update schedule after removing shifts")
-        }
-      }
-
-      // **Batch delete shifts in chunks (e.g., 10 at a time)**
-      if (hasScheduleBeenSaved) {
-        const chunkSize = 10
-        for (let i = 0; i < shiftsToRemove.length; i += chunkSize) {
-          const chunk = shiftsToRemove.slice(i, i + chunkSize)
-          console.log(`Sending batch delete for ${chunk.length} shifts`)
-
-          fetch(`${API_BASE_URL}/shifts/batch-delete/`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ shift_ids: chunk }),
-          })
-            .then((res) => {
-              if (!res.ok) {
-                throw new Error(`Batch deletion failed for ${chunk.length} shifts`)
-              }
-              console.log(`Successfully deleted ${chunk.length} shifts`)
-            })
-            .catch((err) => console.error(err))
-        }
-      }
-    } catch (error) {
-      console.error(`Error removing shifts for ${dayName}:`, error)
-    }
-  }
 
   // Add shifts for a specific day without affecting other days
   const addShiftsForDay = async (dayName) => {
@@ -1871,7 +1730,7 @@ function AdminEmployeeEditSchedulePage() {
       setIsSaving(true)
       setSaveSuccess(false)
       setSaveMessage("")
-
+      
       // Convert selected days to array of day names
       const daysMap = {
         S: "Sunday",
