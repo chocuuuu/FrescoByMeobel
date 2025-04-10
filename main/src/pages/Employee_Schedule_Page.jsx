@@ -106,11 +106,6 @@ function EmployeeSchedulePage() {
             }) || sortedPeriods[0] // Default to first period if none includes today
 
           setSelectedPayrollPeriodId(currentPeriod.id)
-
-          // Immediately fetch schedule for this period
-          if (userId) {
-            fetchScheduleForPeriod(userId, currentPeriod)
-          }
         }
       } catch (error) {
         console.error("Error fetching payroll periods:", error)
@@ -120,120 +115,56 @@ function EmployeeSchedulePage() {
     fetchPayrollPeriods()
   }, [])
 
-  // Add this function to fetch schedule for a specific period
-  const fetchScheduleForPeriod = async (userId, selectedPeriod) => {
-    try {
-      const accessToken = localStorage.getItem("access_token")
+  // Fetch biometric data
+  useEffect(() => {
+    const fetchBiometricData = async () => {
+      try {
+        if (!employeeId) return
 
-      // Fetch schedule for the selected payroll period
-      const response = await axios.get(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
+        const accessToken = localStorage.getItem("access_token")
 
-      if (response.data && response.data.length > 0) {
-        // Find a schedule that matches this payroll period
-        const matchingSchedule = response.data.find(
-          (s) =>
-            s.payroll_period_start === selectedPeriod.payroll_period_start &&
-            s.payroll_period_end === selectedPeriod.payroll_period_end,
-        )
+        // Get the first and last day of the current month
+        const year = currentDate.year()
+        const month = currentDate.month()
+        const firstDay = dayjs(new Date(year, month, 1)).format("YYYY-MM-DD")
+        const lastDay = dayjs(new Date(year, month + 1, 0)).format("YYYY-MM-DD")
 
-        if (matchingSchedule) {
-          setSchedule(matchingSchedule)
-          setHasSchedule(true)
+        // Fetch biometric data - make sure to filter by the correct employee ID
+        const response = await fetch(`${API_BASE_URL}/biometricdata/?emp_id=${employeeId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
 
-          // Fetch shift details
-          fetchShiftsForSchedule(matchingSchedule, accessToken)
-        } else {
-          // No matching schedule found
-          setSchedule({
-            ...schedule,
-            payroll_period_start: selectedPeriod.payroll_period_start,
-            payroll_period_end: selectedPeriod.payroll_period_end,
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`Received ${data.length} biometric records for employee ${employeeId}:`, data)
+
+          // Convert to a map of date -> array of biometric records
+          const biometricMap = {}
+          data.forEach((record) => {
+            // Extract date from the timestamp (format: 2025-04-07T10:00:00Z)
+            const date = record.time.split("T")[0]
+
+            if (!biometricMap[date]) {
+              biometricMap[date] = []
+            }
+            biometricMap[date].push(record)
           })
-          setShifts([])
-        }
 
-        // Navigate to the month of the selected period
-        const periodStart = dayjs(selectedPeriod.payroll_period_start)
-        if (periodStart.month() !== currentDate.month() || periodStart.year() !== currentDate.year()) {
-          setCurrentDate(periodStart)
-          setSelectedDate(periodStart)
+          setBiometricData(biometricMap)
+          console.log("Processed biometric data:", biometricMap)
         }
+      } catch (error) {
+        console.error("Error fetching biometric data:", error)
       }
-    } catch (error) {
-      console.error("Error fetching schedule for payroll period:", error)
     }
-  }
 
-  // Add this function to fetch shifts for a schedule
-  const fetchShiftsForSchedule = async (scheduleData, accessToken) => {
-    try {
-      if (scheduleData.shifts && scheduleData.shifts.length > 0) {
-        // Sort shifts by date
-        const sortedShifts = [...scheduleData.shifts].sort((a, b) => {
-          return new Date(a.date) - new Date(b.date)
-        })
-        setShifts(sortedShifts)
-        console.log("Using shifts from schedule data:", sortedShifts)
-      } else if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
-        // Fetch shift details if only IDs are provided
-        console.log("Fetching shifts by IDs:", scheduleData.shift_ids)
-        const shiftPromises = scheduleData.shift_ids.map((shiftId) =>
-          fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-          }).then((res) => (res.ok ? res.json() : null)),
-        )
-
-        const shiftsData = await Promise.all(shiftPromises)
-        const validShifts = shiftsData.filter((shift) => shift !== null)
-
-        // Sort shifts by date
-        const sortedShifts = validShifts.sort((a, b) => {
-          return new Date(a.date) - new Date(b.date)
-        })
-        setShifts(sortedShifts)
-        console.log("Fetched shifts by IDs:", sortedShifts)
-      } else {
-        // Try to fetch shifts directly from the API
-        console.log("No shifts in schedule, trying to fetch from API")
-        const startDate = scheduleData.payroll_period_start
-        const endDate = scheduleData.payroll_period_end
-
-        if (startDate && endDate) {
-          const shiftsResponse = await fetch(
-            `${API_BASE_URL}/shift/?date_after=${startDate}&date_before=${endDate}&user_id=${scheduleData.user_id}`,
-            {
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-              },
-            },
-          )
-
-          if (shiftsResponse.ok) {
-            const shiftsData = await shiftsResponse.json()
-            const sortedShifts = shiftsData.sort((a, b) => {
-              return new Date(a.date) - new Date(b.date)
-            })
-            setShifts(sortedShifts)
-            console.log("Fetched shifts from API:", sortedShifts)
-          } else {
-            setShifts([])
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error fetching shifts:", error)
-      setShifts([])
+    if (employeeId) {
+      fetchBiometricData()
     }
-  }
+  }, [currentDate, employeeId, employee])
 
   // Handle payroll period selection
   const handlePayrollPeriodChange = async (e) => {
@@ -241,8 +172,77 @@ function EmployeeSchedulePage() {
     setSelectedPayrollPeriodId(periodId)
 
     const selectedPeriod = payrollPeriods.find((period) => period.id === periodId)
-    if (selectedPeriod && userId) {
-      fetchScheduleForPeriod(userId, selectedPeriod)
+    if (selectedPeriod) {
+      try {
+        const accessToken = localStorage.getItem("access_token")
+
+        // Fetch schedule for the selected payroll period
+        const response = await axios.get(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.data && response.data.length > 0) {
+          // Find a schedule that matches this payroll period
+          const matchingSchedule = response.data.find(
+            (s) =>
+              s.payroll_period_start === selectedPeriod.payroll_period_start &&
+              s.payroll_period_end === selectedPeriod.payroll_period_end,
+          )
+
+          if (matchingSchedule) {
+            setSchedule(matchingSchedule)
+            setHasSchedule(true)
+
+            // Fetch shift details
+            if (matchingSchedule.shifts && matchingSchedule.shifts.length > 0) {
+              // Sort shifts by date
+              const sortedShifts = [...matchingSchedule.shifts].sort((a, b) => {
+                return new Date(a.date) - new Date(b.date)
+              })
+              setShifts(sortedShifts)
+            } else if (matchingSchedule.shift_ids && matchingSchedule.shift_ids.length > 0) {
+              // Fetch shift details if only IDs are provided
+              const shiftPromises = matchingSchedule.shift_ids.map((shiftId) =>
+                fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
+                  },
+                }).then((res) => (res.ok ? res.json() : null)),
+              )
+
+              const shiftsData = await Promise.all(shiftPromises)
+              const validShifts = shiftsData.filter((shift) => shift !== null)
+
+              // Sort shifts by date
+              const sortedShifts = validShifts.sort((a, b) => {
+                return new Date(a.date) - new Date(b.date)
+              })
+              setShifts(sortedShifts)
+            }
+          } else {
+            // No matching schedule found
+            setSchedule({
+              ...schedule,
+              payroll_period_start: selectedPeriod.payroll_period_start,
+              payroll_period_end: selectedPeriod.payroll_period_end,
+            })
+            setShifts([])
+          }
+
+          // Navigate to the month of the selected period
+          const periodStart = dayjs(selectedPeriod.payroll_period_start)
+          if (periodStart.month() !== currentDate.month() || periodStart.year() !== currentDate.year()) {
+            setCurrentDate(periodStart)
+            setSelectedDate(periodStart)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching schedule for payroll period:", error)
+      }
     }
   }
 
@@ -733,7 +733,7 @@ function EmployeeSchedulePage() {
       // Find attendance for this date
       const attendanceForDate = attendanceData[dateStr]
 
-      // Find biometric data for this date
+      // Find biometric data for this date - ensure it's for the correct employee
       const biometricForDate = biometricData[dateStr] || []
 
       // Find attendance summary for this date
@@ -957,10 +957,8 @@ function EmployeeSchedulePage() {
 
   // Get shifts for the current payroll period
   const getShiftsForCurrentPayrollPeriod = () => {
-    if (!shifts.length || !schedule.payroll_period_start || !schedule.payroll_period_end) {
-      return []
-    }
-
+    
+    
     return shifts
       .filter((shift) => {
         const shiftDate = dayjs(shift.date)
@@ -991,7 +989,8 @@ function EmployeeSchedulePage() {
 
   // Get shifts for the current payroll period
   const currentPayrollPeriodShifts = getShiftsForCurrentPayrollPeriod()
-
+  console.log("Current Payroll:", currentPayrollPeriodShifts)
+  
   return (
     <div className="min-h-screen bg-gray-50">
       <NavBar />
@@ -1182,15 +1181,9 @@ function EmployeeSchedulePage() {
                 </div>
                 <div className="bg-[#A3BC84] rounded-md p-3">
                   {hasSchedule && schedule.days && schedule.days.length > 0 ? (
-                    <div className="text-[#3A4D2B] font-medium">
+                    <div className="font-medium text-white">
                       <p>Working days: {schedule.days.join(", ")}</p>
                       <p>Hours: {schedule.hours || 8} hours per day</p>
-                      {schedule.payroll_period_start && schedule.payroll_period_end && (
-                        <p>
-                          Payroll period: {dayjs(schedule.payroll_period_start).format("MMM DD")} -{" "}
-                          {dayjs(schedule.payroll_period_end).format("MMM DD")}
-                        </p>
-                      )}
                     </div>
                   ) : (
                     <div className="text-center text-[#3A4D2B] font-medium">No schedule has been set yet</div>
@@ -1304,36 +1297,24 @@ function EmployeeSchedulePage() {
                               </span>
                             </div>
                           </div>
-                        ) : selectedDateDetails.attendance ? (
-                          <div>
-                            <div className="flex justify-between mb-2">
-                              <span className="font-medium">Time In:</span>
-                              <span>{formatTime(selectedDateDetails.attendance.check_in_time)}</span>
-                            </div>
-                            <div className="flex justify-between mb-2">
-                              <span className="font-medium">Time Out:</span>
-                              <span>{formatTime(selectedDateDetails.attendance.check_out_time)}</span>
-                            </div>
-                            {selectedDateDetails.overtimeHours > 0 && (
-                              <div className="flex justify-between mb-2">
-                                <span className="font-medium">Overtime:</span>
-                                <span className="text-blue-300">{selectedDateDetails.overtimeHours} hours</span>
-                              </div>
-                            )}
-                            {selectedDateDetails.undertimeHours > 0 && (
-                              <div className="flex justify-between mb-2">
-                                <span className="font-medium">Undertime:</span>
-                                <span className="text-orange-300">{selectedDateDetails.undertimeHours} hours</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between">
-                              <span className="font-medium">Status:</span>
-                              <span>{getEventForDate(selectedDate)}</span>
-                            </div>
-                          </div>
                         ) : selectedDateDetails.isScheduledDay ? (
                           <div>
-                            {selectedDateDetails.biometric && selectedDateDetails.biometric.length > 0 ? (
+                            {selectedDateDetails.attendance ? (
+                              <div>
+                                <div className="flex justify-between mb-2">
+                                  <span className="font-medium">Time In:</span>
+                                  <span>{formatTime(selectedDateDetails.attendance.check_in_time)}</span>
+                                </div>
+                                <div className="flex justify-between mb-2">
+                                  <span className="font-medium">Time Out:</span>
+                                  <span>{formatTime(selectedDateDetails.attendance.check_out_time)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="font-medium">Status:</span>
+                                  <span>Attended</span>
+                                </div>
+                              </div>
+                            ) : selectedDateDetails.biometric && selectedDateDetails.biometric.length > 0 ? (
                               <div>
                                 <div className="flex justify-between mb-2">
                                   <span className="font-medium">Time In:</span>
