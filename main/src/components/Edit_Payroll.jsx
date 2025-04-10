@@ -29,9 +29,9 @@ const handleTokenError = () => {
 function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const [formData, setFormData] = useState({
     // Payroll Dates
-    payrollPeriodStart: "",
-    payrollPeriodEnd: "",
-    payDate: "",
+    payrollPeriodStart: "10/26/24",
+    payrollPeriodEnd: "11/10/24",
+    payDate: "11/15/2024",
 
     // Earnings
     basicRate: 0,
@@ -136,16 +136,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           setDeductionsId(userSalary.deductions_id)
           setTotalOvertimeId(userSalary.overtime_id)
           console.log("Found salary record:", userSalary)
-          
-          // Format and set pay date from salary record
-          if (userSalary.pay_date) {
-            const formattedDate = formatDate(userSalary.pay_date)
-            setFormData(prevData => ({
-              ...prevData,
-              payDate: formattedDate
-            }))
-          }
-          
           return userSalary
         }
       }
@@ -156,16 +146,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.error("Error checking user salary:", error)
       return null
     }
-  }
-
-  // Function to format date from YYYY-MM-DD to MM/DD/YYYY
-  const formatDate = (dateStr) => {
-    if (!dateStr) return ""
-    const date = new Date(dateStr)
-    const month = (date.getMonth() + 1).toString().padStart(2, "0")
-    const day = date.getDate().toString().padStart(2, "0")
-    const year = date.getFullYear().toString()
-    return `${month}/${day}/${year}`
   }
 
   // Function to check if a user has a payroll record
@@ -189,16 +169,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         if (userPayroll) {
           setPayrollId(userPayroll.id)
           console.log("Found payroll record:", userPayroll)
-          
-          // If payroll record contains period information, set it
-          if (userPayroll.payroll_period_start && userPayroll.payroll_period_end) {
-            setFormData(prevData => ({
-              ...prevData,
-              payrollPeriodStart: formatDate(userPayroll.payroll_period_start),
-              payrollPeriodEnd: formatDate(userPayroll.payroll_period_end)
-            }))
-          }
-          
           return userPayroll
         }
       }
@@ -252,19 +222,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
       const totalOvertimeData = await totalOvertimeResponse.json()
 
-      // Fetch payroll periods from API
-      const payrollPeriodsResponse = await fetch(`${API_BASE_URL}/payroll-periods/current/`, { headers })
-      if (payrollPeriodsResponse.ok) {
-        const periodsData = await payrollPeriodsResponse.json()
-        if (periodsData && periodsData.start_date && periodsData.end_date) {
-          setFormData(prevData => ({
-            ...prevData,
-            payrollPeriodStart: formatDate(periodsData.start_date),
-            payrollPeriodEnd: formatDate(periodsData.end_date)
-          }))
-        }
-      }
-
       // Fetch schedule data to get payroll periods
       const scheduleResponse = await fetch(`${API_BASE_URL}/schedule/?user_id=${userId}`, { headers })
       if (scheduleResponse.ok) {
@@ -276,6 +233,16 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
             // Update form data with payroll periods if available
             if (userSchedule.payroll_period_start && userSchedule.payroll_period_end) {
+              // Format dates from YYYY-MM-DD to MM/DD/YY
+              const formatDate = (dateStr) => {
+                if (!dateStr) return ""
+                const date = new Date(dateStr)
+                const month = (date.getMonth() + 1).toString().padStart(2, "0")
+                const day = date.getDate().toString().padStart(2, "0")
+                const year = date.getFullYear().toString().slice(2)
+                return `${month}/${day}/${year}`
+              }
+
               setFormData((prevData) => ({
                 ...prevData,
                 payrollPeriodStart: formatDate(userSchedule.payroll_period_start),
@@ -287,24 +254,13 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     if (userSchedule.payroll_period_end) {
                       const endDate = new Date(userSchedule.payroll_period_end)
                       endDate.setDate(endDate.getDate() + 5) // Pay date is typically 5 days after period end
-                      return formatDate(endDate.toISOString().split('T')[0])
+                      return `${(endDate.getMonth() + 1).toString().padStart(2, "0")}/${endDate.getDate().toString().padStart(2, "0")}/${endDate.getFullYear()}`
                     }
                     return prevData.payDate
                   })(),
               }))
             }
           }
-        }
-      }
-
-      // Also check if there's a payroll record with pay date and period info
-      if (userPayroll) {
-        // If payroll has pay_date, use it
-        if (userPayroll.pay_date) {
-          setFormData((prevData) => ({
-            ...prevData,
-            payDate: formatDate(userPayroll.pay_date),
-          }))
         }
       }
 
@@ -321,11 +277,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       // Fetch SSS, PhilHealth, and Pag-IBIG data
       console.log("Fetching benefit records for user ID:", userId)
       const [sssRecords, philhealthRecords, pagibigRecords] = await Promise.all([
-        fetch(`${API_BASE_URL}/sss/?user=${userId}`, { headers }).then((res) => (res.ok ? res.json() : [])),
-        fetch(`${API_BASE_URL}/philhealth/?user=${userId}`, { headers }).then((res) =>
+        fetch(`${API_BASE_URL}/benefits/sss/?user=${userId}`, { headers }).then((res) => (res.ok ? res.json() : [])),
+        fetch(`${API_BASE_URL}/benefits/philhealth/?user=${userId}`, { headers }).then((res) =>
           res.ok ? res.json() : [],
         ),
-        fetch(`${API_BASE_URL}/pagibig/?user=${userId}`, { headers }).then((res) =>
+        fetch(`${API_BASE_URL}/benefits/pagibig/?user=${userId}`, { headers }).then((res) =>
           res.ok ? res.json() : [],
         ),
       ])
@@ -615,35 +571,25 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         "Content-Type": "application/json",
       }
 
-      // Calculate SSS contribution using the direct API endpoint
-      const sssResponse = await fetch(`${API_BASE_URL}/sss/calculate/?salary=${basicRate}`, { headers })
+      // Calculate SSS contribution
+      const sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/?salary=${basicRate}`, { headers })
       if (!sssResponse.ok) throw new Error("Failed to calculate SSS contribution")
       const sssData = await sssResponse.json()
 
       // Calculate PhilHealth contribution
-      const philhealthResponse = await fetch(`${API_BASE_URL}/philhealth/calculate/?salary=${basicRate}`, {
-        headers,
-      })
+      const philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/?salary=${basicRate}`, { headers })
       if (!philhealthResponse.ok) throw new Error("Failed to calculate PhilHealth contribution")
       const philhealthData = await philhealthResponse.json()
 
       // Calculate Pag-IBIG contribution
-      const pagibigResponse = await fetch(`${API_BASE_URL}/pagibig/calculate/?salary=${basicRate}`, {
-        headers,
-      })
+      const pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/?salary=${basicRate}`, { headers })
       if (!pagibigResponse.ok) throw new Error("Failed to calculate Pag-IBIG contribution")
       const pagibigData = await pagibigResponse.json()
 
-      console.log("Calculated benefits:", {
-        sss: sssData,
-        philhealth: philhealthData,
-        pagibig: pagibigData,
-      })
-
       return {
-        sss: sssData.employee_share || 0,
-        philhealth: philhealthData.total_contribution || 0,
-        pagibig: pagibigData.employee_share || 0,
+        sss: sssData.contribution || 0,
+        philhealth: philhealthData.contribution || 0,
+        pagibig: pagibigData.contribution || 0,
       }
     } catch (error) {
       console.error("Error calculating benefits:", error)
@@ -692,10 +638,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
     // If basic rate is changed, recalculate SSS, PhilHealth, and Pag-IBIG
     if (section === "basicRate") {
-      console.log("Basic rate changed, calculating benefits for:", value)
       const benefits = await calculateBenefits(value)
-      console.log("Calculated benefits:", benefits)
-
       newFormData.sss.amount = benefits.sss.toString()
       newFormData.philhealth.amount = benefits.philhealth.toString()
       newFormData.pagibig.amount = benefits.pagibig.toString()
@@ -736,28 +679,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         "Content-Type": "application/json",
       }
 
-      // Recalculate benefits based on the current basic rate
-      const benefits = await calculateBenefits(formData.basicRate)
-
-      // Update the form data with the calculated benefits
-      const updatedFormData = {
-        ...formData,
-        sss: { amount: benefits.sss.toString() },
-        philhealth: { amount: benefits.philhealth.toString() },
-        pagibig: { amount: benefits.pagibig.toString() },
-      }
-
-      // Calculate totals with the updated benefits
-      const totals = calculateTotals(updatedFormData)
-      const finalFormData = { ...updatedFormData, ...totals }
-
-      // Update the state with the new values
-      setFormData(finalFormData)
+      // Calculate totals to ensure they're up-to-date
+      const totals = calculateTotals(formData)
+      const updatedFormData = { ...formData, ...totals }
 
       // Use the updated totals for all calculations
-      const totalGross = Number.parseFloat(finalFormData.totalGross)
-      const totalDeductions = Number.parseFloat(finalFormData.totalDeductions)
-      const totalSalaryCompensation = Number.parseFloat(finalFormData.totalSalaryCompensation)
+      const totalGross = Number.parseFloat(updatedFormData.totalGross)
+      const totalDeductions = Number.parseFloat(updatedFormData.totalDeductions)
+      const totalSalaryCompensation = Number.parseFloat(updatedFormData.totalSalaryCompensation)
 
       // STEP 1: Update or create the base components only
       // ------------------------------------------------
@@ -766,12 +695,12 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Updating earnings record...")
       const earningsData = {
         user: userId,
-        basic_rate: Number.parseFloat(finalFormData.basicRate).toFixed(2),
-        basic: Number.parseFloat(finalFormData.basic).toFixed(2),
-        allowance: Number.parseFloat(finalFormData.allowance).toFixed(2),
-        ntax: Number.parseFloat(finalFormData.ntax).toFixed(2),
-        vacationleave: Number.parseFloat(finalFormData.vacationleave).toFixed(2),
-        sickleave: Number.parseFloat(finalFormData.sickleave).toFixed(2),
+        basic_rate: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        basic: Number.parseFloat(updatedFormData.basic).toFixed(2),
+        allowance: Number.parseFloat(updatedFormData.allowance).toFixed(2),
+        ntax: Number.parseFloat(updatedFormData.ntax).toFixed(2),
+        vacationleave: Number.parseFloat(updatedFormData.vacationleave).toFixed(2),
+        sickleave: Number.parseFloat(updatedFormData.sickleave).toFixed(2),
       }
 
       let earningsResponse
@@ -805,16 +734,16 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Updating deductions record...")
       const deductionsData = {
         user: userId,
-        sss: Number.parseFloat(finalFormData.sss.amount).toFixed(2),
-        philhealth: Number.parseFloat(finalFormData.philhealth.amount).toFixed(2),
-        pagibig: Number.parseFloat(finalFormData.pagibig.amount).toFixed(2),
-        late: Number.parseFloat(finalFormData.late.amount).toFixed(2),
-        wtax: Number.parseFloat(finalFormData.wtax.amount).toFixed(2),
-        nowork: Number.parseFloat(finalFormData.nowork.amount).toFixed(2),
-        loan: Number.parseFloat(finalFormData.loan.amount).toFixed(2),
-        charges: Number.parseFloat(finalFormData.charges.amount).toFixed(2),
-        undertime: Number.parseFloat(finalFormData.undertime.amount).toFixed(2),
-        msfcloan: Number.parseFloat(finalFormData.msfcloan.amount).toFixed(2),
+        sss: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+        philhealth: Number.parseFloat(updatedFormData.philhealth.amount).toFixed(2),
+        pagibig: Number.parseFloat(updatedFormData.pagibig.amount).toFixed(2),
+        late: Number.parseFloat(updatedFormData.late.amount).toFixed(2),
+        wtax: Number.parseFloat(updatedFormData.wtax.amount).toFixed(2),
+        nowork: Number.parseFloat(updatedFormData.nowork.amount).toFixed(2),
+        loan: Number.parseFloat(updatedFormData.loan.amount).toFixed(2),
+        charges: Number.parseFloat(updatedFormData.charges.amount).toFixed(2),
+        undertime: Number.parseFloat(updatedFormData.undertime.amount).toFixed(2),
+        msfcloan: Number.parseFloat(updatedFormData.msfcloan.amount).toFixed(2),
       }
 
       let deductionsResponse
@@ -848,21 +777,21 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Updating total overtime record...")
       const totalOvertimeData = {
         user: userId,
-        total_regularot: Number.parseFloat(finalFormData.regularOT.rate).toFixed(2),
-        total_regularholiday: Number.parseFloat(finalFormData.regularHoliday.rate).toFixed(2),
-        total_specialholiday: Number.parseFloat(finalFormData.specialHoliday.rate).toFixed(2),
-        total_restday: Number.parseFloat(finalFormData.restDay.rate).toFixed(2),
-        total_nightdiff: Number.parseFloat(finalFormData.nightDiff.rate).toFixed(2),
-        total_backwage: Number.parseFloat(finalFormData.backwage.rate).toFixed(2),
+        total_regularot: Number.parseFloat(updatedFormData.regularOT.rate).toFixed(2),
+        total_regularholiday: Number.parseFloat(updatedFormData.regularHoliday.rate).toFixed(2),
+        total_specialholiday: Number.parseFloat(updatedFormData.specialHoliday.rate).toFixed(2),
+        total_restday: Number.parseFloat(updatedFormData.restDay.rate).toFixed(2),
+        total_nightdiff: Number.parseFloat(updatedFormData.nightDiff.rate).toFixed(2),
+        total_backwage: Number.parseFloat(updatedFormData.backwage.rate).toFixed(2),
         total_overtime: (
-          Number.parseFloat(finalFormData.regularOT.rate) +
-          Number.parseFloat(finalFormData.regularHoliday.rate) +
-          Number.parseFloat(finalFormData.specialHoliday.rate) +
-          Number.parseFloat(finalFormData.restDay.rate) +
-          Number.parseFloat(finalFormData.nightDiff.rate)
+          Number.parseFloat(updatedFormData.regularOT.rate) +
+          Number.parseFloat(updatedFormData.regularHoliday.rate) +
+          Number.parseFloat(updatedFormData.specialHoliday.rate) +
+          Number.parseFloat(updatedFormData.restDay.rate) +
+          Number.parseFloat(updatedFormData.nightDiff.rate)
         ).toFixed(2),
-        total_late: Number.parseFloat(finalFormData.late.amount).toFixed(2),
-        total_undertime: Number.parseFloat(finalFormData.undertime.amount).toFixed(2),
+        total_late: Number.parseFloat(updatedFormData.late.amount).toFixed(2),
+        total_undertime: Number.parseFloat(updatedFormData.undertime.amount).toFixed(2),
         biweek_start: new Date().toISOString().split("T")[0],
       }
 
@@ -898,11 +827,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       // Fetch existing benefit records
       const [sssRecords, philhealthRecords, pagibigRecords] = await Promise.all([
-        fetch(`${API_BASE_URL}/sss/?user=${userId}`, { headers }).then((res) => (res.ok ? res.json() : [])),
-        fetch(`${API_BASE_URL}/philhealth/?user=${userId}`, { headers }).then((res) =>
+        fetch(`${API_BASE_URL}/benefits/sss/?user=${userId}`, { headers }).then((res) => (res.ok ? res.json() : [])),
+        fetch(`${API_BASE_URL}/benefits/philhealth/?user=${userId}`, { headers }).then((res) =>
           res.ok ? res.json() : [],
         ),
-        fetch(`${API_BASE_URL}/pagibig/?user=${userId}`, { headers }).then((res) =>
+        fetch(`${API_BASE_URL}/benefits/pagibig/?user=${userId}`, { headers }).then((res) =>
           res.ok ? res.json() : [],
         ),
       ])
@@ -915,27 +844,27 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       // Update or create SSS record
       const sssData = {
         user: userId,
-        basic_salary: Number.parseFloat(finalFormData.basicRate).toFixed(2),
+        basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
         msc: "5000.00",
-        employee_share: Number.parseFloat(finalFormData.sss.amount).toFixed(2),
+        employee_share: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
         employer_share: "500.00",
         ec_contribution: "10.00",
         employer_mpf_contribution: "0.00",
         employee_mpf_contribution: "0.00",
         total_employer: "510.00",
-        total_employee: Number.parseFloat(finalFormData.sss.amount).toFixed(2),
-        total_contribution: (Number.parseFloat(finalFormData.sss.amount) + 510).toFixed(2),
+        total_employee: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+        total_contribution: (Number.parseFloat(updatedFormData.sss.amount) + 510).toFixed(2),
       }
 
       let sssResponse
       if (sssRecord) {
-        sssResponse = await fetch(`${API_BASE_URL}/sss/${sssRecord.id}/`, {
+        sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/${sssRecord.id}/`, {
           method: "PATCH",
           headers,
           body: JSON.stringify(sssData),
         })
       } else {
-        sssResponse = await fetch(`${API_BASE_URL}/sss/`, {
+        sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/`, {
           method: "POST",
           headers,
           body: JSON.stringify(sssData),
@@ -954,19 +883,19 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       // Update or create PhilHealth record
       const philhealthData = {
         user: userId,
-        basic_salary: Number.parseFloat(finalFormData.basicRate).toFixed(2),
-        total_contribution: Number.parseFloat(finalFormData.philhealth.amount).toFixed(2),
+        basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        total_contribution: Number.parseFloat(updatedFormData.philhealth.amount).toFixed(2),
       }
 
       let philhealthResponse
       if (philhealthRecord) {
-        philhealthResponse = await fetch(`${API_BASE_URL}/philhealth/${philhealthRecord.id}/`, {
+        philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/${philhealthRecord.id}/`, {
           method: "PATCH",
           headers,
           body: JSON.stringify(philhealthData),
         })
       } else {
-        philhealthResponse = await fetch(`${API_BASE_URL}/philhealth/`, {
+        philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/`, {
           method: "POST",
           headers,
           body: JSON.stringify(philhealthData),
@@ -985,21 +914,21 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       // Update or create Pag-IBIG record
       const pagibigData = {
         user: userId,
-        basic_salary: Number.parseFloat(finalFormData.basicRate).toFixed(2),
-        employee_share: Number.parseFloat(finalFormData.pagibig.amount).toFixed(2),
+        basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        employee_share: Number.parseFloat(updatedFormData.pagibig.amount).toFixed(2),
         employer_share: "200.00",
-        total_contribution: (Number.parseFloat(finalFormData.pagibig.amount) + 200).toFixed(2),
+        total_contribution: (Number.parseFloat(updatedFormData.pagibig.amount) + 200).toFixed(2),
       }
 
       let pagibigResponse
       if (pagibigRecord) {
-        pagibigResponse = await fetch(`${API_BASE_URL}/pagibig/${pagibigRecord.id}/`, {
+        pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/${pagibigRecord.id}/`, {
           method: "PATCH",
           headers,
           body: JSON.stringify(pagibigData),
         })
       } else {
-        pagibigResponse = await fetch(`${API_BASE_URL}/pagibig/`, {
+        pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/`, {
           method: "POST",
           headers,
           body: JSON.stringify(pagibigData),
@@ -1026,9 +955,9 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           fetch(`${API_BASE_URL}/earnings/${updatedEarningsId}/`, { headers }).then((res) => res.json()),
           fetch(`${API_BASE_URL}/deductions/${updatedDeductionsId}/`, { headers }).then((res) => res.json()),
           fetch(`${API_BASE_URL}/totalovertime/${updatedOvertimeId}/`, { headers }).then((res) => res.json()),
-          fetch(`${API_BASE_URL}/sss/${updatedSssId}/`, { headers }).then((res) => res.json()),
-          fetch(`${API_BASE_URL}/philhealth/${updatedPhilhealthId}/`, { headers }).then((res) => res.json()),
-          fetch(`${API_BASE_URL}/pagibig/${updatedPagibigId}/`, { headers }).then((res) => res.json()),
+          fetch(`${API_BASE_URL}/benefits/sss/${updatedSssId}/`, { headers }).then((res) => res.json()),
+          fetch(`${API_BASE_URL}/benefits/philhealth/${updatedPhilhealthId}/`, { headers }).then((res) => res.json()),
+          fetch(`${API_BASE_URL}/benefits/pagibig/${updatedPagibigId}/`, { headers }).then((res) => res.json()),
         ])
 
         // Update the salary record with the complete objects
@@ -1041,8 +970,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           sss_id: sssObj,
           philhealth_id: philhealthObj,
           pagibig_id: pagibigObj,
-          rate_per_month: Number.parseFloat(finalFormData.basicRate).toFixed(2),
-          rate_per_hour: (Number.parseFloat(finalFormData.basicRate) / 160).toFixed(2),
+          rate_per_month: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+          rate_per_hour: (Number.parseFloat(updatedFormData.basicRate) / 160).toFixed(2),
           pay_date: new Date().toISOString().split("T")[0],
         }
 
@@ -1061,49 +990,12 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         }
       }
 
-      // Update or create the payroll record
-      console.log("Updating payroll record...")
-      const payrollData = {
-        user_id: userId,
-        gross_pay: totalGross.toFixed(2),
-        total_deductions: totalDeductions.toFixed(2),
-        net_pay: totalSalaryCompensation.toFixed(2),
-        pay_date: new Date().toISOString().split("T")[0],
-        status: "Processing", // Set status to Processing when saving
-      }
-
-      let payrollResponse
-      if (payrollId) {
-        // Update existing record
-        payrollResponse = await fetch(`${API_BASE_URL}/payroll/${payrollId}/`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify(payrollData),
-        })
-      } else {
-        // Create new record
-        payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payrollData),
-        })
-      }
-
-      if (!payrollResponse.ok) {
-        const errorData = await payrollResponse.json()
-        console.error("Payroll update/create error:", errorData)
-        throw new Error(`Failed to update payroll data: ${JSON.stringify(errorData)}`)
-      }
-
-      const payrollResult = await payrollResponse.json()
-      console.log("Payroll update/create result:", payrollResult)
-
       // Set hasPayrollData to true since we've now saved data
       setHasPayrollData(true)
 
       // Call the onUpdate callback with the updated data
       onUpdate({
-        ...finalFormData,
+        ...updatedFormData,
         id: employeeData.id,
         baseSalary: totalGross,
         totalDeductions: totalDeductions,
@@ -1386,7 +1278,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     <input
                       type="text"
                       value={formData.sss.amount}
-                      readOnly
+                      onChange={(e) => handleInputChange(e, "sss", "amount")}
                       className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
@@ -1398,7 +1290,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     <input
                       type="text"
                       value={formData.philhealth.amount}
-                      readOnly
+                      onChange={(e) => handleInputChange(e, "philhealth", "amount")}
                       className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
@@ -1410,7 +1302,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
                     <input
                       type="text"
                       value={formData.pagibig.amount}
-                      readOnly
+                      onChange={(e) => handleInputChange(e, "pagibig", "amount")}
                       className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
                     />
                   </div>
@@ -1578,3 +1470,4 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 }
 
 export default EditPayroll
+
