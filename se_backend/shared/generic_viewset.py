@@ -43,11 +43,19 @@ class GenericViewset(
             return Response(status=405)
 
         queryset = self.filter_queryset(self.get_queryset())
+        queryset = queryset.order_by('id')  # Optional sorting
 
-        queryset = queryset.order_by('id')
-        limit = int(request.query_params.get("limit", 100))
-        paginator = Paginator(queryset, limit)
-        page = paginator.get_page(1)
-        serializer = self.get_serializer(page, many=True)
+        # limit = int(request.query_params.get("limit", 100))
+        # page_number = int(request.query_params.get("page", 1))
+        # paginator = Paginator(queryset, limit)
+        # page = paginator.get_page(page_number)
+
+        serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
 
+        # return Response({
+        #     "count": paginator.count,
+        #     "num_pages": paginator.num_pages,
+        #     "current_page": page_number,
+        #     "results": serializer.data,
+        # })
