@@ -2337,24 +2337,24 @@ function AdminEmployeeEditSchedulePage() {
               </div>
 
               {/* Payroll Period Display in Employee Panel */}
-              <div className="mb-4 bg-[#5C7346] p-3 rounded-lg">
+              <div className="mb-4">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center">
                     <CalendarDays className="h-5 w-5 text-white mr-2" />
-                    <span className="text-white font-bold">Payroll Period:</span>
+                    <span className="text-white font-medium">Payroll Period:</span>
                   </div>
                 </div>
-                <div className="w-full">
+                <div className="w-full bg-[#A3BC84] rounded-md p-3">
                   <select
                     value={selectedPayrollPeriodId || ""}
                     onChange={handlePayrollPeriodChange}
-                    className="w-full px-2 py-2 rounded border border-gray-300 bg-white text-[#3A4D2B]"
+                    className="w-full px-2 py-2 rounded border border-gray-300 bg-white text-[#3A4D2B] font-medium"
                   >
-                    <option value="">Select a payroll period</option>
+                    <option value="" >Select a payroll period</option>
                     {payrollPeriods.map((period) => (
-                      <option key={period.id} value={period.id}>
-                        {dayjs(period.payroll_period_start).format("MMM DD")} -{" "}
-                        {dayjs(period.payroll_period_end).format("MMM DD")}
+                      <option className="font-bold" key={period.id} value={period.id}>
+                        {dayjs(period.payroll_period_start).format("MMMM DD")} -{" "}
+                        {dayjs(period.payroll_period_end).format("MMMM DD")}
                       </option>
                     ))}
                   </select>
