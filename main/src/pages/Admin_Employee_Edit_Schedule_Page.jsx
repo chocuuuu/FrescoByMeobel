@@ -852,7 +852,7 @@ function AdminEmployeeEditSchedulePage() {
         );
 
         const response = await fetch(
-          `${API_BASE_URL}/attendance/?user=${userId}&date_after=${firstDay}&date_before=${lastDay}`,
+          `${API_BASE_URL}/attendance/filter/?user=${userId}&date_after=${firstDay}&date_before=${lastDay}`,
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
