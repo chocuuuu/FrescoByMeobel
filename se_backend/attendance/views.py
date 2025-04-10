@@ -1,4 +1,5 @@
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import action
 from rest_framework import status, viewsets
 from rest_framework.response import Response
 from shared.utils import role_required
@@ -55,3 +56,34 @@ class AttendanceViewSet(GenericViewset, viewsets.ModelViewSet):
         instance = self.get_object()
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['get'], url_path='filter')
+    @role_required(["owner", "admin"])
+    def filter_attendance(self, request, *args, **kwargs):
+        """
+        Filter attendance records by user ID and date range:
+        - Filter by user ID: ?user=${userId}
+        - Filter by date range: ?date_after=${firstDay}&date_before=${lastDay}
+        """
+        queryset = self.queryset
+
+        # Filter by user ID if provided
+        user_id = request.query_params.get('user', None)
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        # Filter by date range if provided
+        date_after = request.query_params.get('date_after', None)
+        if date_after:
+            queryset = queryset.filter(date__gte=date_after)
+
+        date_before = request.query_params.get('date_before', None)
+        if date_before:
+            queryset = queryset.filter(date__lte=date_before)
+
+        # Set the filtered queryset
+        self.queryset = queryset
+
+        # Use the existing pagination and serialization from list method
+        return super().list(request, *args, **kwargs)
+
