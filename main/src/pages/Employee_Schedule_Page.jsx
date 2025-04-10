@@ -51,9 +51,11 @@ function EmployeeSchedulePage() {
   const [hasSchedule, setHasSchedule] = useState(false)
   const [selectedDateDetails, setSelectedDateDetails] = useState(null)
   const [attendanceSummary, setAttendanceSummary] = useState({})
+  const [biometricData, setBiometricData] = useState({})
 
   // Get the current user ID from localStorage
   const userId = localStorage.getItem("user_id")
+  const employeeId = employee?.employee_number || employee?.employee_id || userId
 
   // Helper function to check if a date is within the current payroll period
   const isDateInPayrollPeriod = (date) => {
@@ -112,6 +114,57 @@ function EmployeeSchedulePage() {
 
     fetchPayrollPeriods()
   }, [])
+
+  // Fetch biometric data
+  useEffect(() => {
+    const fetchBiometricData = async () => {
+      try {
+        if (!employeeId) return
+
+        const accessToken = localStorage.getItem("access_token")
+
+        // Get the first and last day of the current month
+        const year = currentDate.year()
+        const month = currentDate.month()
+        const firstDay = dayjs(new Date(year, month, 1)).format("YYYY-MM-DD")
+        const lastDay = dayjs(new Date(year, month + 1, 0)).format("YYYY-MM-DD")
+
+        // Fetch biometric data - make sure to filter by the correct employee ID
+        const response = await fetch(`${API_BASE_URL}/biometricdata/?emp_id=${employeeId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log(`Received ${data.length} biometric records for employee ${employeeId}:`, data)
+
+          // Convert to a map of date -> array of biometric records
+          const biometricMap = {}
+          data.forEach((record) => {
+            // Extract date from the timestamp (format: 2025-04-07T10:00:00Z)
+            const date = record.time.split("T")[0]
+
+            if (!biometricMap[date]) {
+              biometricMap[date] = []
+            }
+            biometricMap[date].push(record)
+          })
+
+          setBiometricData(biometricMap)
+          console.log("Processed biometric data:", biometricMap)
+        }
+      } catch (error) {
+        console.error("Error fetching biometric data:", error)
+      }
+    }
+
+    if (employeeId) {
+      fetchBiometricData()
+    }
+  }, [currentDate, employeeId, employee])
 
   // Handle payroll period selection
   const handlePayrollPeriodChange = async (e) => {
@@ -279,7 +332,7 @@ function EmployeeSchedulePage() {
 
     // Helper function to fetch user data as fallback
     const fetchUserData = async (userId, accessToken) => {
-      const userResponse = await fetch(`${API_BASE_URL}/users/${userId}/`, {
+      const userResponse = await fetch(`${API_BASE_URL}/user/${userId}/`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
@@ -319,15 +372,12 @@ function EmployeeSchedulePage() {
         setAttendanceData({})
 
         // Fetch actual attendance data
-        const response = await fetch(
-          `${API_BASE_URL}/attendance/?user=${userId}&date_after=${firstDay}&date_before=${lastDay}`,
-          {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
+        const response = await fetch(`${API_BASE_URL}/attendance/?user=${userId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
           },
-        )
+        })
 
         if (response.ok) {
           const data = await response.json()
@@ -617,8 +667,10 @@ function EmployeeSchedulePage() {
             // Only mark attendance if it's within the payroll period
             const status = attendanceData[dateStr].status.toLowerCase()
             if (status === "present") {
-              // Check if the employee was late
+              // Check if the employee was late, had overtime, or undertime
               const shiftForDate = shifts.find((shift) => shift.date === dateStr)
+              const summary = attendanceSummary[dateStr]
+
               if (shiftForDate && attendanceData[dateStr].check_in_time) {
                 const shiftStart = shiftForDate.shift_start.split(":")
                 const checkIn = attendanceData[dateStr].check_in_time.split(":")
@@ -628,6 +680,10 @@ function EmployeeSchedulePage() {
 
                 if (checkInMinutes > shiftStartMinutes) {
                   newDayStatus[dateStr] = "late"
+                } else if (summary && summary.overtime_hours > 0) {
+                  newDayStatus[dateStr] = "overtime"
+                } else if (summary && summary.undertime > 0) {
+                  newDayStatus[dateStr] = "undertime"
                 } else {
                   newDayStatus[dateStr] = "attended"
                 }
@@ -661,7 +717,7 @@ function EmployeeSchedulePage() {
     }
 
     setDayStatus(newDayStatus)
-  }, [currentDate, schedule, holidays, attendanceData, hasSchedule, shifts])
+  }, [currentDate, schedule, holidays, attendanceData, hasSchedule, shifts, attendanceSummary])
 
   // Handle day click in calendar
   const handleDayClick = (day) => {
@@ -677,15 +733,23 @@ function EmployeeSchedulePage() {
       // Find attendance for this date
       const attendanceForDate = attendanceData[dateStr]
 
+      // Find biometric data for this date - ensure it's for the correct employee
+      const biometricForDate = biometricData[dateStr] || []
+
+      // Find attendance summary for this date
+      const summaryForDate = attendanceSummary[dateStr]
+
       // Check if this is a scheduled day
       const isScheduledDay = schedule.days && schedule.days.includes(dayOfWeek) && isDateInPayrollPeriod(dateStr)
 
       // Get the status
       const status = dayStatus[dateStr] || "unscheduled"
 
-      // Determine if the employee was late
+      // Determine if the employee was late, had overtime or undertime
       let isLate = false
       let lateMinutes = 0
+      const overtimeHours = summaryForDate ? summaryForDate.overtime_hours : 0
+      const undertimeHours = summaryForDate ? summaryForDate.undertime : 0
 
       if (shiftForDate && attendanceForDate && attendanceForDate.check_in_time) {
         const shiftStart = shiftForDate.shift_start.split(":")
@@ -706,10 +770,14 @@ function EmployeeSchedulePage() {
         status: status,
         shift: shiftForDate,
         attendance: attendanceForDate,
+        biometric: biometricForDate,
+        summary: summaryForDate,
         isScheduledDay: isScheduledDay,
         isInPayrollPeriod: isDateInPayrollPeriod(dateStr),
         isLate: isLate,
         lateMinutes: lateMinutes,
+        overtimeHours: overtimeHours,
+        undertimeHours: undertimeHours,
       })
     }
   }
@@ -735,6 +803,10 @@ function EmployeeSchedulePage() {
         return "bg-green-500 text-white" // Green for attended days
       case "late":
         return "bg-yellow-500 text-white" // Yellow for late days
+      case "overtime":
+        return "bg-blue-600 text-white" // Dark blue for overtime days
+      case "undertime":
+        return "bg-orange-500 text-white" // Orange for undertime days
       case "absent":
         return "bg-red-500 text-white" // Red for absent days
       case "scheduled":
@@ -786,8 +858,9 @@ function EmployeeSchedulePage() {
     // If we have attendance data for this date and it's in the payroll period, prioritize it
     if (attendanceData[dateStr] && isInPayrollPeriod) {
       const attendanceStatus = attendanceData[dateStr].status.toLowerCase()
+      const summary = attendanceSummary[dateStr]
 
-      // Check if the employee was late
+      // Check if the employee was late, had overtime or undertime
       if (attendanceStatus === "present") {
         const shiftForDate = shifts.find((shift) => shift.date === dateStr)
         if (shiftForDate && attendanceData[dateStr].check_in_time) {
@@ -799,6 +872,14 @@ function EmployeeSchedulePage() {
 
           if (checkInMinutes > shiftStartMinutes) {
             return "Attended (Late)"
+          }
+
+          if (summary && summary.overtime_hours > 0) {
+            return "Attended (Overtime)"
+          }
+
+          if (summary && summary.undertime > 0) {
+            return "Attended (Undertime)"
           }
         }
         return "Attended"
@@ -828,6 +909,10 @@ function EmployeeSchedulePage() {
         return "Attended"
       case "late":
         return "Attended (Late)"
+      case "overtime":
+        return "Attended (Overtime)"
+      case "undertime":
+        return "Attended (Undertime)"
       case "absent":
         return "Absent"
       case "scheduled":
@@ -843,22 +928,69 @@ function EmployeeSchedulePage() {
   const getStatusColor = (status) => {
     switch (status) {
       case "Attended":
+        return "text-green-500"
       case "Attended (Late)":
+        return "text-yellow-500"
+      case "Attended (Overtime)":
+        return "text-blue-600"
+      case "Attended (Undertime)":
+        return "text-orange-500"
       case "Late":
+        return "text-yellow-500"
       case "Absent":
+        return "text-red-500"
       case "Scheduled":
+        return "text-blue-500"
       case "Sick Leave":
+        return "text-yellow-400"
       case "Vacation Leave":
+        return "text-purple-400"
       case "Regular Holiday":
       case "Special Holiday":
+        return "text-orange-400"
       case "Outside Payroll Period":
+        return "text-gray-500"
       default:
         return "text-white"
     }
   }
 
+  // Get shifts for the current payroll period
+  const getShiftsForCurrentPayrollPeriod = () => {
+    if (!shifts.length || !schedule.payroll_period_start || !schedule.payroll_period_end) {
+      return []
+    }
+
+    return shifts
+      .filter((shift) => {
+        const shiftDate = dayjs(shift.date)
+        const startDate = dayjs(schedule.payroll_period_start)
+        const endDate = dayjs(schedule.payroll_period_end)
+
+        return shiftDate.isAfter(startDate.subtract(1, "day")) && shiftDate.isBefore(endDate.add(1, "day"))
+      })
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
+  }
+
+  // Format biometric time from ISO format to HH:MM AM/PM
+  const formatBiometricTime = (isoTimeString) => {
+    if (!isoTimeString) return ""
+
+    // Extract time part from ISO string (format: 2025-04-07T10:00:00Z)
+    const timePart = isoTimeString.split("T")[1].split("Z")[0]
+    const [hours, minutes] = timePart.split(":")
+    const hour = Number.parseInt(hours, 10)
+    const ampm = hour >= 12 ? "PM" : "AM"
+    const hour12 = hour % 12 || 12
+
+    return `${hour12}:${minutes} ${ampm}`
+  }
+
   if (loading) return <div className="min-h-screen bg-gray-50 flex items-center justify-center">Loading...</div>
   if (error) return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-red-500">{error}</div>
+
+  // Get shifts for the current payroll period
+  const currentPayrollPeriodShifts = getShiftsForCurrentPayrollPeriod()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -871,14 +1003,7 @@ function EmployeeSchedulePage() {
             {/* Calendar Panel - Fixed size with max-height */}
             <div className="bg-[#5C7346] rounded-lg p-6 lg:w-2/3 h-auto max-h-[800px] overflow-auto">
               {/* Header with back button, month navigation, and month title */}
-              <div className="flex items-center justify-between mb-4">
-                <button
-                  className="flex items-center gap-2 bg-[#3A4D2B] text-white px-4 py-2 rounded-md hover:bg-[#2a3b1d] transition-colors"
-                  onClick={() => navigate(-1)}
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Back
-                </button>
+              <div className="flex items-center justify-center mb-4">
                 <div className="flex items-center">
                   <button
                     className="bg-[#3A4D2B] text-white px-3 py-1 rounded-md hover:bg-[#2a3b1d] mr-2"
@@ -894,7 +1019,6 @@ function EmployeeSchedulePage() {
                     <ArrowRight className="w-5 h-7"></ArrowRight>
                   </button>
                 </div>
-                <div className="w-20"></div> {/* Spacer for alignment */}
               </div>
 
               {/* Day headers */}
@@ -944,6 +1068,8 @@ function EmployeeSchedulePage() {
                               {status === "oncall" && "On Call"}
                               {status === "restday" && "Rest Day"}
                               {status === "late" && "Late"}
+                              {status === "overtime" && "Overtime"}
+                              {status === "undertime" && "Undertime"}
                               {status === "outside-period"}
                             </span>
                           </div>
@@ -962,6 +1088,14 @@ function EmployeeSchedulePage() {
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
                   <span className="text-white text-md">Late</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-blue-600 mr-2"></div>
+                  <span className="text-white text-md">Overtime</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-orange-500 mr-2"></div>
+                  <span className="text-white text-md">Undertime</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
@@ -1007,7 +1141,7 @@ function EmployeeSchedulePage() {
                           : "Employee"}
                     </h3>
                     <p className="text-md text-white">
-                      {employee?.employee_number || employee?.user?.id || userId || ""}
+                      {employee?.employee_number || employee?.employee_id || userId || ""}
                     </p>
                   </div>
                 </div>
@@ -1071,9 +1205,9 @@ function EmployeeSchedulePage() {
                   <p className="text-lg font-bold text-white">My Shifts</p>
                 </div>
                 <div className="bg-[#A3BC84] rounded-md p-3">
-                  {hasSchedule && shifts.length > 0 ? (
+                  {hasSchedule && currentPayrollPeriodShifts.length > 0 ? (
                     <div className="space-y-2">
-                      {shifts.map((shift, index) => (
+                      {currentPayrollPeriodShifts.map((shift, index) => (
                         <div key={index} className="bg-[#5C7346] p-2 rounded-md">
                           <div className="flex justify-between items-center">
                             <span className="text-white font-bold">{dayjs(shift.date).format("ddd, MMM D")}</span>
@@ -1085,7 +1219,9 @@ function EmployeeSchedulePage() {
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center text-[#3A4D2B] font-medium">No shifts assigned yet</div>
+                    <div className="text-center text-[#3A4D2B] font-medium">
+                      No shifts assigned for this payroll period
+                    </div>
                   )}
                 </div>
               </div>
@@ -1137,18 +1273,82 @@ function EmployeeSchedulePage() {
                                   <span className="font-medium">Time Out:</span>
                                   <span>{formatTime(selectedDateDetails.attendance.check_out_time)}</span>
                                 </div>
+                                {selectedDateDetails.overtimeHours > 0 && (
+                                  <div className="flex justify-between mb-2">
+                                    <span className="font-medium">Overtime:</span>
+                                    <span className="text-blue-300">{selectedDateDetails.overtimeHours} hours</span>
+                                  </div>
+                                )}
+                                {selectedDateDetails.undertimeHours > 0 && (
+                                  <div className="flex justify-between mb-2">
+                                    <span className="font-medium">Undertime:</span>
+                                    <span className="text-orange-300">{selectedDateDetails.undertimeHours} hours</span>
+                                  </div>
+                                )}
                               </>
                             )}
                             <div className="flex justify-between">
                               <span className="font-medium">Status:</span>
-                              <span className={selectedDateDetails.isLate ? "text-yellow-300" : ""}>
+                              <span
+                                className={
+                                  selectedDateDetails.isLate
+                                    ? "text-yellow-300"
+                                    : selectedDateDetails.overtimeHours > 0
+                                      ? "text-blue-300"
+                                      : selectedDateDetails.undertimeHours > 0
+                                        ? "text-orange-300"
+                                        : ""
+                                }
+                              >
                                 {getEventForDate(selectedDate)}
                               </span>
                             </div>
                           </div>
                         ) : selectedDateDetails.isScheduledDay ? (
-                          <div className="text-center py-2">
-                            This is a scheduled work day, but no shift details are available.
+                          <div>
+                            {selectedDateDetails.attendance ? (
+                              <div>
+                                <div className="flex justify-between mb-2">
+                                  <span className="font-medium">Time In:</span>
+                                  <span>{formatTime(selectedDateDetails.attendance.check_in_time)}</span>
+                                </div>
+                                <div className="flex justify-between mb-2">
+                                  <span className="font-medium">Time Out:</span>
+                                  <span>{formatTime(selectedDateDetails.attendance.check_out_time)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="font-medium">Status:</span>
+                                  <span>Attended</span>
+                                </div>
+                              </div>
+                            ) : selectedDateDetails.biometric && selectedDateDetails.biometric.length > 0 ? (
+                              <div>
+                                <div className="flex justify-between mb-2">
+                                  <span className="font-medium">Time In:</span>
+                                  <span>
+                                    {formatBiometricTime(
+                                      selectedDateDetails.biometric.find((b) => b.work_state === "Checked In")?.time,
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between mb-2">
+                                  <span className="font-medium">Time Out:</span>
+                                  <span>
+                                    {formatBiometricTime(
+                                      selectedDateDetails.biometric.find((b) => b.work_state === "Checked Out")?.time,
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="font-medium">Status:</span>
+                                  <span>Attended</span>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center py-2">
+                                This is a scheduled work day, but no shift details are available.
+                              </div>
+                            )}
                           </div>
                         ) : !selectedDateDetails.isInPayrollPeriod ? (
                           <div className="text-center py-2">This date is outside the current payroll period</div>
