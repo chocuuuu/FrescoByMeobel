@@ -23,6 +23,65 @@ function ActivityLogPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
+  // Filter options state - separate from current data
+  const [allModules, setAllModules] = useState([])
+  const [allActionTypes, setAllActionTypes] = useState([])
+  const [allDates, setAllDates] = useState([])
+
+  // Fetch all available filter options
+  // Replace the fetchFilterOptions function with this:
+
+const fetchFilterOptions = async () => {
+  try {
+    const accessToken = localStorage.getItem("access_token")
+
+    // Try to fetch all logs with a large page size to get all possible filter values
+    const response = await fetch(`${API_BASE_URL}/activity-log/?page=1&page_size=1000`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      const allLogItems = data.results || data
+
+      // Extract unique values for each filter
+      const uniqueModules = [...new Set(allLogItems.map(log => log.module))].filter(Boolean).sort()
+      setAllModules(uniqueModules)
+
+      const uniqueTypes = [...new Set(allLogItems.map(log => log.type))].filter(Boolean).sort()
+      setAllActionTypes(uniqueTypes)
+
+      const uniqueDates = [...new Set(allLogItems.map(log => {
+        if (!log.datetime) return null
+        const date = new Date(log.datetime)
+        return date.toISOString().split('T')[0]
+      }))].filter(Boolean).sort((a, b) => new Date(b) - new Date(a)) // Sort newest first
+
+      setAllDates(uniqueDates)
+    }
+  } catch (error) {
+    console.error("Error fetching filter options:", error)
+    // If the large request fails, just use the current page data for filters
+    // This is a fallback to ensure something shows in the dropdowns
+    const uniqueModules = [...new Set(logs.map(log => log.module))].filter(Boolean).sort()
+    setAllModules(uniqueModules)
+
+    const uniqueTypes = [...new Set(logs.map(log => log.type))].filter(Boolean).sort()
+    setAllActionTypes(uniqueTypes)
+
+    const uniqueDates = [...new Set(logs.map(log => {
+      if (!log.datetime) return null
+      const date = new Date(log.datetime)
+      return date.toISOString().split('T')[0]
+    }))].filter(Boolean).sort((a, b) => new Date(b) - new Date(a))
+
+    setAllDates(uniqueDates)
+  }
+}
+
   const fetchLogs = async () => {
     setLoading(true)
     setError(null)
@@ -114,6 +173,8 @@ function ActivityLogPage() {
 
       // Refresh logs after deletion
       await fetchLogs()
+      // Also refresh filter options as some may no longer exist
+      await fetchFilterOptions()
     } catch (error) {
       console.error("Error deleting logs:", error)
     } finally {
@@ -125,7 +186,14 @@ function ActivityLogPage() {
   }
 
   useEffect(() => {
+    // Fetch filter options on component mount
+    fetchFilterOptions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
     fetchLogs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, pageSize, moduleFilter, typeFilter, dateFilter])
 
   // Format date for display
@@ -149,16 +217,6 @@ function ActivityLogPage() {
       second: '2-digit'
     })
   }
-
-  // Get unique modules, action types, and dates for filters
-  const modules = [...new Set(logs.map(log => log.module))].sort()
-  const actionTypes = [...new Set(logs.map(log => log.type))].sort()
-
-  // Get unique dates (just the date part of datetime)
-  const dates = [...new Set(logs.map(log => {
-    const date = new Date(log.datetime)
-    return date.toISOString().split('T')[0]
-  }))].sort((a, b) => new Date(b) - new Date(a)) // Sort newest first
 
   // Filter logs based on search term (local filtering for search only)
   const filteredLogs = logs.filter(log => {
@@ -198,6 +256,7 @@ function ActivityLogPage() {
   // Function to handle refresh button click
   const handleRefresh = () => {
     fetchLogs()
+    fetchFilterOptions() // Also refresh filter options
   }
 
   // Function to handle search (debounced)
@@ -272,7 +331,7 @@ function ActivityLogPage() {
               className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
             >
               <option value="all">All Modules</option>
-              {modules.map(module => (
+              {allModules.map(module => (
                 <option key={module} value={module}>{module}</option>
               ))}
             </select>
@@ -286,7 +345,7 @@ function ActivityLogPage() {
               className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
             >
               <option value="all">All Actions</option>
-              {actionTypes.map(type => (
+              {allActionTypes.map(type => (
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
@@ -300,7 +359,7 @@ function ActivityLogPage() {
               className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
             >
               <option value="all">All Dates</option>
-              {dates.map(date => (
+              {allDates.map(date => (
                 <option key={date} value={date}>
                   {formatDate(date)}
                 </option>
