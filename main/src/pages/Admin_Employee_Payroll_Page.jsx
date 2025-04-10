@@ -296,7 +296,7 @@ function AdminEmployeePayrollPage() {
     }
   }
 
-  // Updated delete payroll function to completely delete records
+  // Handle delete payroll
   const handleDeletePayroll = async (employeeId, userId) => {
     if (
       !window.confirm(
@@ -308,119 +308,6 @@ function AdminEmployeePayrollPage() {
 
     try {
       const accessToken = localStorage.getItem("access_token")
-      const headers = {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      }
-
-      // Find employee record to get all associated IDs
-      const employee = payrollData.find((emp) => emp.id === employeeId)
-
-      if (!employee || !employee.user?.id) {
-        alert("Cannot find employee data")
-        return
-      }
-
-      // We'll collect all deletion promises to execute them together
-      const deletionPromises = []
-
-      // Delete payroll record if it exists
-      if (employee.payrollRecord && employee.payrollRecord.id) {
-        deletionPromises.push(
-          fetch(`${API_BASE_URL}/payroll/${employee.payrollRecord.id}/`, {
-            method: "DELETE",
-            headers,
-          }),
-        )
-      }
-
-      // Delete earnings record if it exists
-      if (employee.earnings && employee.earnings.id) {
-        deletionPromises.push(
-          fetch(`${API_BASE_URL}/earnings/${employee.earnings.id}/`, {
-            method: "DELETE",
-            headers,
-          }),
-        )
-      }
-
-      // Delete deductions record if it exists
-      if (employee.deductionsData && employee.deductionsData.id) {
-        deletionPromises.push(
-          fetch(`${API_BASE_URL}/deductions/${employee.deductionsData.id}/`, {
-            method: "DELETE",
-            headers,
-          }),
-        )
-      }
-
-      // Delete overtime record if it exists
-      if (employee.overtimeData && employee.overtimeData.id) {
-        deletionPromises.push(
-          fetch(`${API_BASE_URL}/totalovertime/${employee.overtimeData.id}/`, {
-            method: "DELETE",
-            headers,
-          }),
-        )
-      }
-
-      // Delete salary record if it exists
-      if (employee.salaryRecord && employee.salaryRecord.id) {
-        deletionPromises.push(
-          fetch(`${API_BASE_URL}/salary/${employee.salaryRecord.id}/`, {
-            method: "DELETE",
-            headers,
-          }),
-        )
-      }
-
-      // Execute all deletion requests
-      const results = await Promise.allSettled(deletionPromises)
-
-      // Check if any deletions failed
-      const failedDeletes = results.filter((r) => r.status === "rejected")
-      if (failedDeletes.length > 0) {
-        console.error("Some deletions failed:", failedDeletes)
-        alert("Some payroll data could not be deleted. Please try again.")
-      } else {
-        alert("Payroll information deleted successfully")
-
-        // Update UI by removing deleted data
-        setPayrollData((prevData) =>
-          prevData.map((emp) => {
-            if (emp.id === employeeId) {
-              return {
-                ...emp,
-                base_salary: 0,
-                deductions: 0,
-                net_salary: 0,
-                status: "Pending",
-                payrollRecord: null,
-                salaryRecord: null,
-                earnings: null,
-                deductionsData: null,
-                overtimeData: null,
-              }
-            }
-            return emp
-          }),
-        )
-      }
-
-      // Refresh data after a short delay
-      setTimeout(() => {
-        fetchPayrollData()
-      }, 1000)
-    } catch (error) {
-      console.error("Error deleting payroll:", error)
-      alert(`Failed to delete payroll: ${error.message}`)
-    }
-  }
-
-  // Handle marking payroll as paid
-  const handleMarkAsPaid = async (employeeId, userId) => {
-    try {
-      const accessToken = localStorage.getItem("access_token")
 
       // Find the payroll record for this user
       const employee = payrollData.find((emp) => emp.id === employeeId)
@@ -429,37 +316,44 @@ function AdminEmployeePayrollPage() {
         return
       }
 
-      // Update the payroll status to "Paid"
+      // Delete the payroll record
       const payrollResponse = await fetch(`${API_BASE_URL}/payroll/${employee.payrollRecord.id}/`, {
-        method: "PATCH",
+        method: "DELETE",
         headers: {
           Authorization: `Bearer ${accessToken}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status: "Paid" }),
       })
 
       if (!payrollResponse.ok) {
-        throw new Error(`Failed to update payroll status: ${payrollResponse.status} ${payrollResponse.statusText}`)
+        throw new Error(`Failed to delete payroll: ${payrollResponse.status} ${payrollResponse.statusText}`)
       }
 
-      // Update the UI to reflect the change
+      // Update the UI by removing the payroll data
       setPayrollData((prevData) =>
         prevData.map((emp) => {
           if (emp.id === employeeId) {
             return {
               ...emp,
-              status: "Paid",
+              base_salary: 0,
+              deductions: 0,
+              net_salary: 0,
+              status: "Pending",
             }
           }
           return emp
         }),
       )
 
-      alert("Payment has been marked as sent to the employee")
+      alert("Payroll information deleted successfully")
+
+      // Refresh data after a short delay
+      setTimeout(() => {
+        fetchPayrollData()
+      }, 1000)
     } catch (error) {
-      console.error("Error marking payroll as paid:", error)
-      alert(`Failed to mark payroll as paid: ${error.message}`)
+      console.error("Error deleting payroll:", error)
+      alert(`Failed to delete payroll: ${error.message}`)
     }
   }
 
@@ -654,22 +548,16 @@ function AdminEmployeePayrollPage() {
                             onClick={() => handleEditPayroll(record.id)}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
                           >
-                            Edit
+                            Edit Payroll
                           </button>
-                          {record.status === "Processing" && (
+                          {record.payrollRecord && (
                             <button
-                              onClick={() => handleMarkAsPaid(record.id, record.user?.id)}
-                              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
+                              onClick={() => handleDeletePayroll(record.id, record.user?.id)}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
                             >
-                              Pay
+                              Delete
                             </button>
                           )}
-                          <button
-                            onClick={() => handleDeletePayroll(record.id, record.user?.id)}
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
-                          >
-                            Delete
-                          </button>
                         </div>
                       </td>
                     </tr>
