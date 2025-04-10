@@ -295,7 +295,11 @@ function EmployeeSchedulePage() {
 
               // Fetch shift details
               if (scheduleData.shifts && scheduleData.shifts.length > 0) {
-                setShifts(scheduleData.shifts)
+                // Sort shifts by date
+                const sortedShifts = [...scheduleData.shifts].sort((a, b) => {
+                  return new Date(a.date) - new Date(b.date)
+                })
+                setShifts(sortedShifts)
               } else if (scheduleData.shift_ids && scheduleData.shift_ids.length > 0) {
                 // Fetch shift details if only IDs are provided
                 const shiftPromises = scheduleData.shift_ids.map((shiftId) =>
@@ -309,7 +313,12 @@ function EmployeeSchedulePage() {
 
                 const shiftsData = await Promise.all(shiftPromises)
                 const validShifts = shiftsData.filter((shift) => shift !== null)
-                setShifts(validShifts)
+
+                // Sort shifts by date
+                const sortedShifts = validShifts.sort((a, b) => {
+                  return new Date(a.date) - new Date(b.date)
+                })
+                setShifts(sortedShifts)
               }
             } else {
               console.log(`No schedule found for user ID ${userId}`)
@@ -420,8 +429,8 @@ function EmployeeSchedulePage() {
             newDayStatus[dateStr] = "vacationleave"
           } else if (schedule.restday?.includes(dateStr)) {
             newDayStatus[dateStr] = "restday"
-          } else if (attendanceData[dateStr]) {
-            // If we have attendance data for this date, use it regardless of whether it's a scheduled day
+          } else if (attendanceData[dateStr] && isInPayrollPeriod) {
+            // Only mark attendance if it's within the payroll period
             const status = attendanceData[dateStr].status.toLowerCase()
             if (status === "present") {
               newDayStatus[dateStr] = "attended"
@@ -439,12 +448,10 @@ function EmployeeSchedulePage() {
               // Future scheduled days
               newDayStatus[dateStr] = "scheduled"
             }
-          } else if (isPastDay && schedule.days?.includes(dayOfWeek)) {
+          } else if (isPastDay && schedule.days?.includes(dayOfWeek) && isInPayrollPeriod) {
             // Only mark as absent if it's a scheduled working day (Monday or Wednesday)
             // and it's in the payroll period
-            if (isInPayrollPeriod) {
-              newDayStatus[dateStr] = "absent"
-            }
+            newDayStatus[dateStr] = "absent"
           } else {
             // Default status for future days
             newDayStatus[dateStr] = isInPayrollPeriod ? "unscheduled" : "outside-period"
@@ -483,6 +490,7 @@ function EmployeeSchedulePage() {
         shift: shiftForDate,
         attendance: attendanceForDate,
         isScheduledDay: isScheduledDay,
+        isInPayrollPeriod: isDateInPayrollPeriod(dateStr),
       })
     }
   }
@@ -523,6 +531,8 @@ function EmployeeSchedulePage() {
         return "bg-purple-500 text-white" // Purple for on-call
       case "restday":
         return "bg-gray-300 text-gray-700" // Gray for rest days
+      case "outside-period":
+        return "bg-gray-200 text-gray-500" // Light gray for days outside payroll period
       default:
         return "bg-white text-gray-700" // White for unscheduled days
     }
@@ -545,16 +555,22 @@ function EmployeeSchedulePage() {
     if (!date) return "No Event"
 
     const dateStr = date.format("YYYY-MM-DD")
-    const status = dayStatus[dateStr]
+    const isInPayrollPeriod = isDateInPayrollPeriod(dateStr)
 
-    // If we have attendance data for this date, prioritize it
-    if (attendanceData[dateStr]) {
+    // If not in payroll period, return "Outside Period"
+    if (!isInPayrollPeriod) {
+      return "Outside Payroll Period"
+    }
+
+    // If we have attendance data for this date and it's in the payroll period, prioritize it
+    if (attendanceData[dateStr] && isInPayrollPeriod) {
       const attendanceStatus = attendanceData[dateStr].status.toLowerCase()
       if (attendanceStatus === "present") return "Attended"
       if (attendanceStatus === "absent") return "Absent"
       if (attendanceStatus === "late") return "Late"
     }
 
+    const status = dayStatus[dateStr]
     switch (status) {
       case "sickleave":
         return "Sick Leave"
@@ -576,6 +592,8 @@ function EmployeeSchedulePage() {
         return "Absent"
       case "scheduled":
         return "Scheduled"
+      case "outside-period":
+        return "Outside Payroll Period"
       default:
         return "No Event"
     }
@@ -660,13 +678,14 @@ function EmployeeSchedulePage() {
                         status !== "scheduled" && (
                           <div className="absolute bottom-1 left-0 right-0 text-center">
                             <span className="text-xs px-1 whitespace-nowrap overflow-hidden text-ellipsis inline-block max-w-full">
-                              {status === "sickleave" && "Sick"}
-                              {status === "specialholiday" && "Special"}
-                              {status === "regularholiday" && "Holiday"}
-                              {status === "vacationleave" && "Vacation"}
-                              {status === "nightdiff" && "Night"}
+                              {status === "sickleave" && "Sick Leave"}
+                              {status === "specialholiday" && "Special Holiday"}
+                              {status === "regularholiday" && "Regular Holiday"}
+                              {status === "vacationleave" && "Vacation Leave"}
+                              {status === "nightdiff" && "Night Differential"}
                               {status === "oncall" && "On Call"}
-                              {status === "restday" && "Rest"}
+                              {status === "restday" && "Rest Day"}
+                              {status === "outside-period"}
                             </span>
                           </div>
                         )}
@@ -700,6 +719,10 @@ function EmployeeSchedulePage() {
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-purple-400 mr-2"></div>
                   <span className="text-white text-md">Vacation</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-gray-200 mr-2"></div>
+                  <span className="text-white text-md">Outside Period</span>
                 </div>
               </div>
             </div>
@@ -838,6 +861,8 @@ function EmployeeSchedulePage() {
                           <div className="text-center py-2">
                             This is a scheduled work day, but no shift details are available.
                           </div>
+                        ) : !selectedDateDetails.isInPayrollPeriod ? (
+                          <div className="text-center py-2">This date is outside the current payroll period</div>
                         ) : (
                           <div className="text-center py-2">No shift scheduled for this date</div>
                         )}
