@@ -2073,7 +2073,7 @@ function AdminEmployeeEditSchedulePage() {
 
         // Create a new schedule
         const response = await fetch(`${API_BASE_URL}/schedule/`, {
-          method: "POST",
+          method: "PATCH",
           headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
