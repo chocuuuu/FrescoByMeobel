@@ -15,6 +15,7 @@ function NavBar() {
           <Link to="/employee" className="font-medium hover:text-gray-300">EMPLOYEE</Link>
           <Link to="/attendance" className="font-medium hover:text-gray-300">ATTENDANCE</Link>
           <Link to="/payroll" className="font-medium hover:text-gray-300">PAYROLL</Link>
+          <Link to="/activity-logs" className="font-medium hover:text-gray-300">LOGS</Link>
           <UserCircle className="h-8 w-8 cursor-pointer" />
         </div>
       </div>
