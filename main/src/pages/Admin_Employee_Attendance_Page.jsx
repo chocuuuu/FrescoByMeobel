@@ -13,8 +13,10 @@ function AdminEmployeeAttendancePage() {
   const twoWeeksLater = new Date(today)
   twoWeeksLater.setDate(today.getDate() + 14)
 
+  const [activeTab, setActiveTab] = useState("attendance") // Tab state
   const [attendanceData, setAttendanceData] = useState([])
   const [rawAttendanceData, setRawAttendanceData] = useState([])
+  const [overtimeData, setOvertimeData] = useState([]) // State for overtime data
   const [employees, setEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -22,6 +24,10 @@ function AdminEmployeeAttendancePage() {
   const [currentPage, setCurrentPage] = useState(1)
   const recordsPerPage = 7
   const [deleteLoading, setDeleteLoading] = useState(false)
+
+  // Add filters for attendance data
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [dateFilter, setDateFilter] = useState("all")
 
   // Fetch employees for the dropdown
   useEffect(() => {
@@ -96,6 +102,53 @@ function AdminEmployeeAttendancePage() {
     fetchAttendanceData()
   }, [])
 
+  // Fetch overtime hours data
+  useEffect(() => {
+    const fetchOvertimeData = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const accessToken = localStorage.getItem("access_token")
+        const url = `${API_BASE_URL}/overtimehours/`
+
+        console.log("Fetching overtime data from:", url)
+
+        const response = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch overtime data: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        console.log("Overtime data fetched:", data.length, data)
+
+        // Process the overtime data to include employee info
+        const processedData = await enrichOvertimeData(data)
+
+        // Sort overtime data by biweek_start in descending order (newest first)
+        const sortedData = [...processedData].sort((a, b) => {
+          const dateA = new Date(a.biweek_start).getTime()
+          const dateB = new Date(b.biweek_start).getTime()
+          return dateB - dateA
+        })
+
+        setOvertimeData(sortedData)
+      } catch (error) {
+        console.error("Error fetching overtime data:", error)
+        setError("An error occurred while fetching overtime data. Please try again later.")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchOvertimeData()
+  }, [])
+
   // Process attendance data whenever raw data or employees change
   useEffect(() => {
     const processAttendanceData = async () => {
@@ -118,6 +171,36 @@ function AdminEmployeeAttendancePage() {
 
     processAttendanceData()
   }, [rawAttendanceData, employees])
+
+  // Enrich overtime data with employee names
+  const enrichOvertimeData = async (overtimeRecords) => {
+    // If no overtime records, return empty array
+    if (!overtimeRecords || !Array.isArray(overtimeRecords) || overtimeRecords.length === 0) {
+      console.log("No overtime records to process")
+      return []
+    }
+
+    // Process the records directly using the new structure
+    return overtimeRecords.map((record) => {
+      // Get employee info from the nested employment_info object
+      const employmentInfo = record.employment_info || {}
+
+      // Create employee name from first_name and last_name in employment_info
+      const firstName = employmentInfo.first_name || ""
+      const lastName = employmentInfo.last_name || ""
+      const employeeName = `${firstName} ${lastName}`.trim() || `Unknown (ID: ${record.user})`
+
+      // Get employee number from employment_info
+      const employeeNumber = employmentInfo.employee_number || record.user
+
+      return {
+        ...record,
+        employee_name: employeeName,
+        employee_id: employeeNumber,
+        employment_info_id: employmentInfo.id || null,
+      }
+    })
+  }
 
   // Enrich attendance data with employee names
   const enrichAttendanceData = async (attendanceRecords) => {
@@ -195,9 +278,29 @@ function AdminEmployeeAttendancePage() {
     }
   }
 
+  // Helper function to format date from "YYYY-MM-DD" to a more readable format
+  const formatDate = (dateString) => {
+    if (!dateString) return "-"
+
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString()
+    } catch (error) {
+      console.error("Error formatting date:", error)
+      return dateString // Return original if parsing fails
+    }
+  }
+
+  // Get the month from date string
+  const getMonthFromDate = (dateString) => {
+    if (!dateString) return "-"
+    const date = new Date(dateString)
+    return date.toLocaleDateString('default', { month: 'long' })
+  }
+
   // Handle delete attendance record
   const handleDeleteAttendance = async (attendanceId, userId, date, checkInTime, checkOutTime) => {
-    if (!window.confirm("Are you sure you want to delete this attendance record?")) {
+    if (!window.confirm("Deleting an attendance record will delete its corresponding biometricdata and its summary. Are you sure you want to delete this attendance record?")) {
       return
     }
 
@@ -290,17 +393,54 @@ function AdminEmployeeAttendancePage() {
     }
   }
 
+  // Get unique statuses and months for filters
+  const statuses = [...new Set(attendanceData.map(record => record.status))]
+    .filter(status => status) // Filter out null/undefined
+    .sort()
+
+  const months = [...new Set(attendanceData.map(record => getMonthFromDate(record.date)))]
+    .filter(month => month !== "-")
+    .sort()
+
+  // Handle tab change
+  const handleTabChange = (tab) => {
+    setActiveTab(tab)
+    setCurrentPage(1) // Reset to first page when changing tabs
+    // Reset filters
+    setStatusFilter("all")
+    setDateFilter("all")
+  }
+
+  // Filter attendance data based on search term and filters
   const filteredAttendanceData = attendanceData.filter(
+    (record) => {
+      const nameMatch = record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         record.employee_id?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+
+      const statusMatch = statusFilter === "all" || record.status === statusFilter
+
+      const monthMatch = dateFilter === "all" ||
+                         getMonthFromDate(record.date) === dateFilter
+
+      return nameMatch && statusMatch && monthMatch
+    }
+  )
+
+  // Filter overtime data based on search term
+  const filteredOvertimeData = overtimeData.filter(
     (record) =>
       record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.employee_id?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
   )
 
+  // Get current records based on active tab
+  const currentData = activeTab === "attendance" ? filteredAttendanceData : filteredOvertimeData
+
   // Pagination logic
   const indexOfLastRecord = currentPage * recordsPerPage
   const indexOfFirstRecord = indexOfLastRecord - recordsPerPage
-  const currentRecords = filteredAttendanceData.slice(indexOfFirstRecord, indexOfLastRecord)
-  const totalPages = Math.ceil(filteredAttendanceData.length / recordsPerPage)
+  const currentRecords = currentData.slice(indexOfFirstRecord, indexOfLastRecord)
+  const totalPages = Math.ceil(currentData.length / recordsPerPage)
 
   const nextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
@@ -309,6 +449,11 @@ function AdminEmployeeAttendancePage() {
   const prevPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1))
   }
+
+  // Reset to page 1 when changing tabs
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [activeTab])
 
   // Determine status color based on status string
   const getStatusColor = (status) => {
@@ -333,91 +478,201 @@ function AdminEmployeeAttendancePage() {
 
       <div className="container mx-auto px-4 pt-24">
         <div className="bg-[#A7BC8F] rounded-lg p-6">
-          {/* Header Section */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-            <h2 className="text-2xl font-semibold text-white">Attendance Records</h2>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          {/* Header Section with Tabs inside the box */}
+          <div className="flex flex-col space-y-4 md:space-y-0 md:flex-row md:justify-between md:items-center mb-6">
+            {/* Tab Buttons */}
+            <div className="flex space-x-2">
+              <button
+                className={`px-4 py-2 md:px-6 md:py-2 rounded-md ${
+                  activeTab === "attendance" ? "bg-[#5C7346] text-white font-semibold" : "bg-[#D1DBC4] text-gray-700"
+                }`}
+                onClick={() => handleTabChange("attendance")}
+              >
+                ATTENDANCE
+              </button>
+              <button
+                className={`px-4 py-2 md:px-6 md:py-2 rounded-md ${
+                  activeTab === "summary" ? "bg-[#5C7346] text-white font-semibold" : "bg-[#D1DBC4] text-gray-700"
+                }`}
+                onClick={() => handleTabChange("summary")}
+              >
+                SUMMARY
+              </button>
+            </div>
+
+            {/* Search and Filters - Stack on mobile, side by side on larger screens */}
+            <div className="flex flex-row md:flex-row md:space-y-0 md:space-x-2 md:items-center">
               <input
                 type="search"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full sm:w-auto"
+                className="px-4 py-2 mr-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full md:w-54"
               />
+
+              {/* Only show these filters for attendance tab */}
+              {activeTab === "attendance" && (
+                <div className="flex space-x-2">
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
+                  >
+                    <option value="all">All Statuses</option>
+                    {statuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] bg-white"
+                  >
+                    <option value="all">All Months</option>
+                    {months.map((month) => (
+                      <option key={month} value={month}>
+                        {month}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Attendance Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="text-left text-white border-b border-white/20 whitespace-nowrap">
-                  <th className="py-3 px-4 w-[10%]">DATE</th>
-                  <th className="py-3 px-4 w-[10%]">EMPLOYEE ID</th>
-                  <th className="py-3 px-4 w-[30%]">NAME</th>
-                  <th className="py-3 px-4 w-[12%]">TIME IN</th>
-                  <th className="py-3 px-4 w-[12%]">TIME OUT</th>
-                  <th className="py-3 px-4 w-[12%]">STATUS</th>
-                  <th className="py-3 px-4 w-[15%]">ACTIONS</th>
-                </tr>
-              </thead>
-              <tbody className="text-white">
-                {currentRecords.length > 0 ? (
-                  currentRecords.map((record) => (
-                    <tr key={record.id} className="border-b border-white/10 text-md">
-                      <td className="py-3 px-4">{new Date(record.date).toLocaleDateString()}</td>
-                      <td className="py-3 px-4">{record.employee_id}</td>
-                      <td className="py-3 px-4">{record.employee_name}</td>
-                      <td className="py-3 px-4">{record.time_in}</td>
-                      <td className="py-3 px-4">{record.time_out}</td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`px-4 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(record.status)}`}
-                        >
-                          {record.status || "Unknown"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() =>
-                              handleDeleteAttendance(
-                                record.id,
-                                record.user,
-                                record.date,
-                                record.check_in_time,
-                                record.check_out_time,
-                              )
-                            }
-                            disabled={deleteLoading}
-                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="7" className="py-4 text-center">
-                      No attendance records found
-                    </td>
+          {/* Title */}
+          <h2 className="text-2xl font-semibold text-white mb-4">
+            {activeTab === "attendance" ? "Attendance Records" : "Attendance Summary"}
+          </h2>
+
+          {/* Table Section - Attendance Tab */}
+          {activeTab === "attendance" && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full table-fixed">
+                <thead>
+                  <tr className="text-left text-white border-b border-white/20">
+                    <th className="py-3 px-4 w-[10%]">DATE</th>
+                    <th className="py-3 px-4 w-[10%]">EMPLOYEE ID</th>
+                    <th className="py-3 px-4 w-[30%]">NAME</th>
+                    <th className="py-3 px-4 w-[12%]">TIME IN</th>
+                    <th className="py-3 px-4 w-[12%]">TIME OUT</th>
+                    <th className="py-3 px-4 w-[12%]">STATUS</th>
+                    <th className="py-3 px-4 w-[15%]">ACTIONS</th>
                   </tr>
-                )}
-                {/* Add empty rows to maintain table height */}
-                {currentRecords.length > 0 &&
-                  [...Array(Math.max(0, recordsPerPage - currentRecords.length))].map((_, index) => (
-                    <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
-                      <td colSpan="7"></td>
+                </thead>
+                <tbody className="text-white">
+                  {currentRecords.length > 0 ? (
+                    currentRecords.map((record) => (
+                      <tr key={record.id} className="border-b border-white/10 text-md">
+                        <td className="py-3 px-4">{new Date(record.date).toLocaleDateString()}</td>
+                        <td className="py-3 px-4">{record.employee_id}</td>
+                        <td className="py-3 px-4">{record.employee_name}</td>
+                        <td className="py-3 px-4">{record.time_in}</td>
+                        <td className="py-3 px-4">{record.time_out}</td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`px-4 py-1 rounded-full font-medium whitespace-nowrap ${getStatusColor(record.status)}`}
+                          >
+                            {record.status || "Unknown"}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() =>
+                                handleDeleteAttendance(
+                                  record.id,
+                                  record.user,
+                                  record.date,
+                                  record.check_in_time,
+                                  record.check_out_time,
+                                )
+                              }
+                              disabled={deleteLoading}
+                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="7" className="py-4 text-center">
+                        No attendance records found
+                      </td>
                     </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                  {/* Add empty rows to maintain table height */}
+                  {currentRecords.length > 0 &&
+                    [...Array(Math.max(0, recordsPerPage - currentRecords.length))].map((_, index) => (
+                      <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
+                        <td colSpan="7"></td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Table Section - Summary Tab */}
+          {activeTab === "summary" && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full table-fixed">
+                <thead>
+                  <tr className="text-left text-white border-b border-white/20">
+                    <th className="py-3 px-4 w-[12%]">BIWEEK START</th>
+                    <th className="py-3 px-4 w-[10%]">EMPLOYEE ID</th>
+                    <th className="py-3 px-4 w-[22%]">NAME</th>
+                    <th className="py-3 px-4 w-[8%]">ACTUAL HRS</th>
+                    <th className="py-3 px-4 w-[8%]">REG OT</th>
+                    <th className="py-3 px-4 w-[8%]">REG HOLIDAY</th>
+                    <th className="py-3 px-4 w-[8%]">SPEC HOLIDAY</th>
+                    <th className="py-3 px-4 w-[8%]">REST DAY</th>
+                    <th className="py-3 px-4 w-[8%]">NIGHT DIFF</th>
+                    <th className="py-3 px-4 w-[8%]">LATE</th>
+                  </tr>
+                </thead>
+                <tbody className="text-white">
+                  {currentRecords.length > 0 ? (
+                    currentRecords.map((record) => (
+                      <tr key={record.id} className="border-b border-white/10 text-md">
+                        <td className="py-3 px-4">{formatDate(record.biweek_start)}</td>
+                        <td className="py-3 px-4">{record.employee_id}</td>
+                        <td className="py-3 px-4">{record.employee_name}</td>
+                        <td className="py-3 px-4">{record.actualhours}</td>
+                        <td className="py-3 px-4">{record.regularot}</td>
+                        <td className="py-3 px-4">{record.regularholiday}</td>
+                        <td className="py-3 px-4">{record.specialholiday}</td>
+                        <td className="py-3 px-4">{record.restday}</td>
+                        <td className="py-3 px-4">{record.nightdiff}</td>
+                        <td className="py-3 px-4">{record.late}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="10" className="py-4 text-center">
+                        No overtime records found
+                      </td>
+                    </tr>
+                  )}
+                  {/* Add empty rows to maintain table height */}
+                  {currentRecords.length > 0 &&
+                    [...Array(Math.max(0, recordsPerPage - currentRecords.length))].map((_, index) => (
+                      <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
+                        <td colSpan="10"></td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* Footer Section */}
-          <div className="flex justify-end items-center mt-4">
+          <div className="flex justify-end items-center mt-6">
             <div className="flex space-x-2">
               <button
                 onClick={prevPage}
@@ -428,9 +683,9 @@ function AdminEmployeeAttendancePage() {
               >
                 Previous
               </button>
-              <button className="bg-white text-[#5C7346] px-4 py-2 rounded-md">
+              <div className="bg-white text-[#5C7346] px-4 py-2 rounded-md min-w-[80px] text-center">
                 {currentPage} of {totalPages || 1}
-              </button>
+              </div>
               <button
                 onClick={nextPage}
                 disabled={currentPage === totalPages || totalPages === 0}
@@ -449,4 +704,3 @@ function AdminEmployeeAttendancePage() {
 }
 
 export default AdminEmployeeAttendancePage
-
