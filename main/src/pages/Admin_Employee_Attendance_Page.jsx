@@ -626,14 +626,15 @@ function AdminEmployeeAttendancePage() {
                   <tr className="text-left text-white border-b border-white/20">
                     <th className="py-3 px-4 w-[12%]">BIWEEK START</th>
                     <th className="py-3 px-4 w-[10%]">EMPLOYEE ID</th>
-                    <th className="py-3 px-4 w-[22%]">NAME</th>
-                    <th className="py-3 px-4 w-[8%]">ACTUAL HRS</th>
-                    <th className="py-3 px-4 w-[8%]">REG OT</th>
-                    <th className="py-3 px-4 w-[8%]">REG HOLIDAY</th>
-                    <th className="py-3 px-4 w-[8%]">SPEC HOLIDAY</th>
-                    <th className="py-3 px-4 w-[8%]">REST DAY</th>
-                    <th className="py-3 px-4 w-[8%]">NIGHT DIFF</th>
-                    <th className="py-3 px-4 w-[8%]">LATE</th>
+                    <th className="py-3 px-4 w-[20%]">NAME</th>
+                    <th className="py-3 px-4 w-[7%]">ACTUAL HRS</th>
+                    <th className="py-3 px-4 w-[7%]">REG OT</th>
+                    <th className="py-3 px-4 w-[7%]">REG HOLIDAY</th>
+                    <th className="py-3 px-4 w-[7%]">SPEC HOLIDAY</th>
+                    <th className="py-3 px-4 w-[7%]">REST DAY</th>
+                    <th className="py-3 px-4 w-[7%]">NIGHT DIFF</th>
+                    <th className="py-3 px-4 w-[7%]">UNDERTIME</th>
+                    <th className="py-3 px-4 w-[7%]">LATE</th>
                   </tr>
                 </thead>
                 <tbody className="text-white">
@@ -649,12 +650,13 @@ function AdminEmployeeAttendancePage() {
                         <td className="py-3 px-4">{record.specialholiday}</td>
                         <td className="py-3 px-4">{record.restday}</td>
                         <td className="py-3 px-4">{record.nightdiff}</td>
+                        <td className="py-3 px-4">{record.undertime}</td>
                         <td className="py-3 px-4">{record.late}</td>
                       </tr>
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="10" className="py-4 text-center">
+                      <td colSpan="11" className="py-4 text-center">
                         No overtime records found
                       </td>
                     </tr>
@@ -663,7 +665,7 @@ function AdminEmployeeAttendancePage() {
                   {currentRecords.length > 0 &&
                     [...Array(Math.max(0, recordsPerPage - currentRecords.length))].map((_, index) => (
                       <tr key={`empty-${index}`} className="border-b border-white/10 h-[52px]">
-                        <td colSpan="10"></td>
+                        <td colSpan="11"></td>
                       </tr>
                     ))}
                 </tbody>
