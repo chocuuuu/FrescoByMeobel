@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import NavBar from "../components/Nav_Bar"
 import { API_BASE_URL } from "../config/api"
-import { ArrowLeft, ArrowRight, User2, Calendar, Clock } from "lucide-react"
+import { ArrowLeft, ArrowRight, User2, Calendar, Clock, CalendarDays } from "lucide-react"
 import dayjs from "dayjs"
 import axios from "axios"
 
@@ -38,6 +38,10 @@ function EmployeeSchedulePage() {
     payroll_period_end: null,
   })
 
+  // State for payroll periods
+  const [payrollPeriods, setPayrollPeriods] = useState([])
+  const [selectedPayrollPeriodId, setSelectedPayrollPeriodId] = useState(null)
+
   // State for calendar data
   const [calendarDays, setCalendarDays] = useState([])
   const [dayStatus, setDayStatus] = useState({})
@@ -46,6 +50,7 @@ function EmployeeSchedulePage() {
   const [holidays, setHolidays] = useState([])
   const [hasSchedule, setHasSchedule] = useState(false)
   const [selectedDateDetails, setSelectedDateDetails] = useState(null)
+  const [attendanceSummary, setAttendanceSummary] = useState({})
 
   // Get the current user ID from localStorage
   const userId = localStorage.getItem("user_id")
@@ -59,6 +64,133 @@ function EmployeeSchedulePage() {
     const endDate = dayjs(schedule.payroll_period_end)
 
     return dateObj.isAfter(startDate.subtract(1, "day")) && dateObj.isBefore(endDate.add(1, "day"))
+  }
+
+  // Fetch payroll periods
+  useEffect(() => {
+    const fetchPayrollPeriods = async () => {
+      try {
+        const accessToken = localStorage.getItem("access_token")
+
+        // Use the correct endpoint for master calendar payroll periods
+        const response = await fetch(`${API_BASE_URL}/master-calendar/payrollperiod/`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch payroll periods: ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        console.log("Fetched payroll periods:", data)
+
+        // Sort payroll periods by start date (newest first)
+        const sortedPeriods = data.sort((a, b) => new Date(b.payroll_period_start) - new Date(a.payroll_period_start))
+
+        setPayrollPeriods(sortedPeriods)
+
+        // If we have payroll periods, find the one that includes today's date
+        if (sortedPeriods.length > 0) {
+          const today = dayjs()
+          // Find a period that includes today
+          const currentPeriod =
+            sortedPeriods.find((period) => {
+              const start = dayjs(period.payroll_period_start)
+              const end = dayjs(period.payroll_period_end)
+              return today.isAfter(start.subtract(1, "day")) && today.isBefore(end.add(1, "day"))
+            }) || sortedPeriods[0] // Default to first period if none includes today
+
+          setSelectedPayrollPeriodId(currentPeriod.id)
+        }
+      } catch (error) {
+        console.error("Error fetching payroll periods:", error)
+      }
+    }
+
+    fetchPayrollPeriods()
+  }, [])
+
+  // Handle payroll period selection
+  const handlePayrollPeriodChange = async (e) => {
+    const periodId = Number(e.target.value)
+    setSelectedPayrollPeriodId(periodId)
+
+    const selectedPeriod = payrollPeriods.find((period) => period.id === periodId)
+    if (selectedPeriod) {
+      try {
+        const accessToken = localStorage.getItem("access_token")
+
+        // Fetch schedule for the selected payroll period
+        const response = await axios.get(`${API_BASE_URL}/schedule/?user_id=${userId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.data && response.data.length > 0) {
+          // Find a schedule that matches this payroll period
+          const matchingSchedule = response.data.find(
+            (s) =>
+              s.payroll_period_start === selectedPeriod.payroll_period_start &&
+              s.payroll_period_end === selectedPeriod.payroll_period_end,
+          )
+
+          if (matchingSchedule) {
+            setSchedule(matchingSchedule)
+            setHasSchedule(true)
+
+            // Fetch shift details
+            if (matchingSchedule.shifts && matchingSchedule.shifts.length > 0) {
+              // Sort shifts by date
+              const sortedShifts = [...matchingSchedule.shifts].sort((a, b) => {
+                return new Date(a.date) - new Date(b.date)
+              })
+              setShifts(sortedShifts)
+            } else if (matchingSchedule.shift_ids && matchingSchedule.shift_ids.length > 0) {
+              // Fetch shift details if only IDs are provided
+              const shiftPromises = matchingSchedule.shift_ids.map((shiftId) =>
+                fetch(`${API_BASE_URL}/shift/${shiftId}/`, {
+                  headers: {
+                    Authorization: `Bearer ${accessToken}`,
+                    "Content-Type": "application/json",
+                  },
+                }).then((res) => (res.ok ? res.json() : null)),
+              )
+
+              const shiftsData = await Promise.all(shiftPromises)
+              const validShifts = shiftsData.filter((shift) => shift !== null)
+
+              // Sort shifts by date
+              const sortedShifts = validShifts.sort((a, b) => {
+                return new Date(a.date) - new Date(b.date)
+              })
+              setShifts(sortedShifts)
+            }
+          } else {
+            // No matching schedule found
+            setSchedule({
+              ...schedule,
+              payroll_period_start: selectedPeriod.payroll_period_start,
+              payroll_period_end: selectedPeriod.payroll_period_end,
+            })
+            setShifts([])
+          }
+
+          // Navigate to the month of the selected period
+          const periodStart = dayjs(selectedPeriod.payroll_period_start)
+          if (periodStart.month() !== currentDate.month() || periodStart.year() !== currentDate.year()) {
+            setCurrentDate(periodStart)
+            setSelectedDate(periodStart)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching schedule for payroll period:", error)
+      }
+    }
   }
 
   // Fetch holidays
@@ -218,6 +350,42 @@ function EmployeeSchedulePage() {
     fetchAttendanceData()
   }, [currentDate, userId])
 
+  // Fetch attendance summary data
+  useEffect(() => {
+    const fetchAttendanceSummary = async () => {
+      try {
+        if (!userId) return
+
+        const accessToken = localStorage.getItem("access_token")
+
+        // Fetch attendance summary data
+        const response = await fetch(`${API_BASE_URL}/attendance_summary/?user_id=${userId}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          console.log("Fetched attendance summary:", data)
+
+          // Convert to a map of date -> summary
+          const summaryMap = {}
+          data.forEach((summary) => {
+            summaryMap[summary.date] = summary
+          })
+
+          setAttendanceSummary(summaryMap)
+        }
+      } catch (error) {
+        console.error("Error fetching attendance summary:", error)
+      }
+    }
+
+    fetchAttendanceSummary()
+  }, [userId])
+
   // Fetch schedule data
   useEffect(() => {
     const fetchScheduleData = async () => {
@@ -293,6 +461,22 @@ function EmployeeSchedulePage() {
               setSchedule(scheduleData)
               setHasSchedule(true)
 
+              // If we have a selected payroll period, try to find a schedule that matches it
+              if (selectedPayrollPeriodId) {
+                const selectedPeriod = payrollPeriods.find((period) => period.id === selectedPayrollPeriodId)
+                if (selectedPeriod) {
+                  const matchingSchedule = userSchedules.find(
+                    (s) =>
+                      s.payroll_period_start === selectedPeriod.payroll_period_start &&
+                      s.payroll_period_end === selectedPeriod.payroll_period_end,
+                  )
+
+                  if (matchingSchedule) {
+                    setSchedule(matchingSchedule)
+                  }
+                }
+              }
+
               // Fetch shift details
               if (scheduleData.shifts && scheduleData.shifts.length > 0) {
                 // Sort shifts by date
@@ -338,7 +522,7 @@ function EmployeeSchedulePage() {
     }
 
     fetchScheduleData()
-  }, [userId])
+  }, [userId, selectedPayrollPeriodId, payrollPeriods])
 
   // Generate calendar days for the current month
   useEffect(() => {
@@ -433,7 +617,23 @@ function EmployeeSchedulePage() {
             // Only mark attendance if it's within the payroll period
             const status = attendanceData[dateStr].status.toLowerCase()
             if (status === "present") {
-              newDayStatus[dateStr] = "attended"
+              // Check if the employee was late
+              const shiftForDate = shifts.find((shift) => shift.date === dateStr)
+              if (shiftForDate && attendanceData[dateStr].check_in_time) {
+                const shiftStart = shiftForDate.shift_start.split(":")
+                const checkIn = attendanceData[dateStr].check_in_time.split(":")
+
+                const shiftStartMinutes = Number.parseInt(shiftStart[0]) * 60 + Number.parseInt(shiftStart[1])
+                const checkInMinutes = Number.parseInt(checkIn[0]) * 60 + Number.parseInt(checkIn[1])
+
+                if (checkInMinutes > shiftStartMinutes) {
+                  newDayStatus[dateStr] = "late"
+                } else {
+                  newDayStatus[dateStr] = "attended"
+                }
+              } else {
+                newDayStatus[dateStr] = "attended"
+              }
             } else if (status === "absent") {
               newDayStatus[dateStr] = "absent"
             } else if (status === "late") {
@@ -449,7 +649,7 @@ function EmployeeSchedulePage() {
               newDayStatus[dateStr] = "scheduled"
             }
           } else if (isPastDay && schedule.days?.includes(dayOfWeek) && isInPayrollPeriod) {
-            // Only mark as absent if it's a scheduled working day (Monday or Wednesday)
+            // Only mark as absent if it's a scheduled working day
             // and it's in the payroll period
             newDayStatus[dateStr] = "absent"
           } else {
@@ -461,7 +661,7 @@ function EmployeeSchedulePage() {
     }
 
     setDayStatus(newDayStatus)
-  }, [currentDate, schedule, holidays, attendanceData, hasSchedule])
+  }, [currentDate, schedule, holidays, attendanceData, hasSchedule, shifts])
 
   // Handle day click in calendar
   const handleDayClick = (day) => {
@@ -483,6 +683,23 @@ function EmployeeSchedulePage() {
       // Get the status
       const status = dayStatus[dateStr] || "unscheduled"
 
+      // Determine if the employee was late
+      let isLate = false
+      let lateMinutes = 0
+
+      if (shiftForDate && attendanceForDate && attendanceForDate.check_in_time) {
+        const shiftStart = shiftForDate.shift_start.split(":")
+        const checkIn = attendanceForDate.check_in_time.split(":")
+
+        const shiftStartMinutes = Number.parseInt(shiftStart[0]) * 60 + Number.parseInt(shiftStart[1])
+        const checkInMinutes = Number.parseInt(checkIn[0]) * 60 + Number.parseInt(checkIn[1])
+
+        if (checkInMinutes > shiftStartMinutes) {
+          isLate = true
+          lateMinutes = checkInMinutes - shiftStartMinutes
+        }
+      }
+
       // Set selected date details
       setSelectedDateDetails({
         date: dateStr,
@@ -491,6 +708,8 @@ function EmployeeSchedulePage() {
         attendance: attendanceForDate,
         isScheduledDay: isScheduledDay,
         isInPayrollPeriod: isDateInPayrollPeriod(dateStr),
+        isLate: isLate,
+        lateMinutes: lateMinutes,
       })
     }
   }
@@ -514,6 +733,8 @@ function EmployeeSchedulePage() {
     switch (status) {
       case "attended":
         return "bg-green-500 text-white" // Green for attended days
+      case "late":
+        return "bg-yellow-500 text-white" // Yellow for late days
       case "absent":
         return "bg-red-500 text-white" // Red for absent days
       case "scheduled":
@@ -532,7 +753,7 @@ function EmployeeSchedulePage() {
       case "restday":
         return "bg-gray-300 text-gray-700" // Gray for rest days
       case "outside-period":
-        return "bg-gray-200 text-gray-500" // Light gray for days outside payroll period
+        return "bg-gray-300 text-gray-500" // Light gray for days outside payroll period
       default:
         return "bg-white text-gray-700" // White for unscheduled days
     }
@@ -565,7 +786,24 @@ function EmployeeSchedulePage() {
     // If we have attendance data for this date and it's in the payroll period, prioritize it
     if (attendanceData[dateStr] && isInPayrollPeriod) {
       const attendanceStatus = attendanceData[dateStr].status.toLowerCase()
-      if (attendanceStatus === "present") return "Attended"
+
+      // Check if the employee was late
+      if (attendanceStatus === "present") {
+        const shiftForDate = shifts.find((shift) => shift.date === dateStr)
+        if (shiftForDate && attendanceData[dateStr].check_in_time) {
+          const shiftStart = shiftForDate.shift_start.split(":")
+          const checkIn = attendanceData[dateStr].check_in_time.split(":")
+
+          const shiftStartMinutes = Number.parseInt(shiftStart[0]) * 60 + Number.parseInt(shiftStart[1])
+          const checkInMinutes = Number.parseInt(checkIn[0]) * 60 + Number.parseInt(checkIn[1])
+
+          if (checkInMinutes > shiftStartMinutes) {
+            return "Attended (Late)"
+          }
+        }
+        return "Attended"
+      }
+
       if (attendanceStatus === "absent") return "Absent"
       if (attendanceStatus === "late") return "Late"
     }
@@ -588,6 +826,8 @@ function EmployeeSchedulePage() {
         return "Rest Day"
       case "attended":
         return "Attended"
+      case "late":
+        return "Attended (Late)"
       case "absent":
         return "Absent"
       case "scheduled":
@@ -596,6 +836,24 @@ function EmployeeSchedulePage() {
         return "Outside Payroll Period"
       default:
         return "No Event"
+    }
+  }
+
+  // Get status color for selected date details
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Attended":
+      case "Attended (Late)":
+      case "Late":
+      case "Absent":
+      case "Scheduled":
+      case "Sick Leave":
+      case "Vacation Leave":
+      case "Regular Holiday":
+      case "Special Holiday":
+      case "Outside Payroll Period":
+      default:
+        return "text-white"
     }
   }
 
@@ -685,6 +943,7 @@ function EmployeeSchedulePage() {
                               {status === "nightdiff" && "Night Differential"}
                               {status === "oncall" && "On Call"}
                               {status === "restday" && "Rest Day"}
+                              {status === "late" && "Late"}
                               {status === "outside-period"}
                             </span>
                           </div>
@@ -701,6 +960,10 @@ function EmployeeSchedulePage() {
                   <span className="text-white text-md">Attended</span>
                 </div>
                 <div className="flex items-center">
+                  <div className="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+                  <span className="text-white text-md">Late</span>
+                </div>
+                <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
                   <span className="text-white text-md">Absent</span>
                 </div>
@@ -711,14 +974,6 @@ function EmployeeSchedulePage() {
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-orange-400 mr-2"></div>
                   <span className="text-white text-md">Holiday</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-yellow-400 mr-2"></div>
-                  <span className="text-white text-md">Sick Leave</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 rounded-full bg-purple-400 mr-2"></div>
-                  <span className="text-white text-md">Vacation</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-gray-200 mr-2"></div>
@@ -755,6 +1010,33 @@ function EmployeeSchedulePage() {
                       {employee?.employee_number || employee?.user?.id || userId || ""}
                     </p>
                   </div>
+                </div>
+              </div>
+
+              {/* Payroll Period Dropdown */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <CalendarDays className="h-5 w-5 text-white mr-2" />
+                    <span className="text-white font-medium">Payroll Period:</span>
+                  </div>
+                </div>
+                <div className="w-full bg-[#A3BC84] rounded-md p-3">
+                  <select
+                    value={selectedPayrollPeriodId || ""}
+                    onChange={handlePayrollPeriodChange}
+                    className="w-full px-2 py-2 sm:px-3 sm:py-2 md:px-4 md:py-2 rounded border border-gray-300 bg-white text-[#3A4D2B] font-medium text-sm sm:text-base md:text-lg"
+                  >
+                    <option value="">Select a payroll period</option>
+                    {[...payrollPeriods]
+                      .sort((a, b) => new Date(b.payroll_period_start) - new Date(a.payroll_period_start))
+                      .map((period) => (
+                        <option className="font-medium" key={period.id} value={period.id}>
+                          {dayjs(period.payroll_period_start).format("MMMM DD")} -{" "}
+                          {dayjs(period.payroll_period_end).format("MMMM DD")}
+                        </option>
+                      ))}
+                  </select>
                 </div>
               </div>
 
@@ -817,7 +1099,9 @@ function EmployeeSchedulePage() {
                 <div className="bg-[#A3BC84] rounded-md p-3">
                   {/* Selected date display with fixed layout */}
                   <div className="flex justify-between items-center mb-4">
-                    <div className="text-xl font-bold text-[#3A4D2B]">
+                    <div
+                      className={`text-xl font-bold ${selectedDateDetails ? getStatusColor(getEventForDate(selectedDate)) : "text-[#3A4D2B]"}`}
+                    >
                       {selectedDateDetails ? getEventForDate(selectedDate) : "No Event"}
                     </div>
                     <div className="text-xl font-bold text-[#3A4D2B]">{selectedDate.format("MMMM D")}</div>
@@ -844,7 +1128,10 @@ function EmployeeSchedulePage() {
                               <>
                                 <div className="flex justify-between mb-2">
                                   <span className="font-medium">Time In:</span>
-                                  <span>{formatTime(selectedDateDetails.attendance.check_in_time)}</span>
+                                  <span className={selectedDateDetails.isLate ? "text-yellow-300" : ""}>
+                                    {formatTime(selectedDateDetails.attendance.check_in_time)}
+                                    {selectedDateDetails.isLate && ` (+${selectedDateDetails.lateMinutes} min)`}
+                                  </span>
                                 </div>
                                 <div className="flex justify-between mb-2">
                                   <span className="font-medium">Time Out:</span>
@@ -854,7 +1141,9 @@ function EmployeeSchedulePage() {
                             )}
                             <div className="flex justify-between">
                               <span className="font-medium">Status:</span>
-                              <span>{getEventForDate(selectedDate)}</span>
+                              <span className={selectedDateDetails.isLate ? "text-yellow-300" : ""}>
+                                {getEventForDate(selectedDate)}
+                              </span>
                             </div>
                           </div>
                         ) : selectedDateDetails.isScheduledDay ? (
@@ -873,8 +1162,6 @@ function EmployeeSchedulePage() {
                   </div>
                 </div>
               </div>
-
-              {/* Action Buttons */}
             </div>
           </div>
         </div>
