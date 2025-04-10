@@ -24,45 +24,44 @@ def calculate_minutes(check_in, check_out):
 
 
 def get_biweekly_period(date, user):
-    """Determine the biweekly period using payroll_period_start and payroll_period_end from the schedule."""
-    schedule = Schedule.objects.filter(user_id=user).order_by('-id').first()
+    """
+    Get the payroll_period_start of the schedule that includes the given date.
+    Prioritizes schedules that start before or on the date, and end after or on the date.
+    """
+    schedule = Schedule.objects.filter(
+        user_id=user,
+        payroll_period_start__lte=date,
+        payroll_period_end__gte=date
+    ).order_by('-payroll_period_start').first()
 
-    if not schedule or not schedule.payroll_period_start or not schedule.payroll_period_end:
-        logger.warning(f"[get_biweekly_period] No schedule or payroll period for User: {user}")
+    if not schedule:
+        logger.warning(f"[get_biweekly_period] No matching schedule found for User: {user} on Date: {date}")
         return None
 
-    start_date = schedule.payroll_period_start
-    end_date = schedule.payroll_period_end
+    return schedule.payroll_period_start
 
-    # Check if the provided date falls within this range
-    if start_date <= date <= end_date:
-        return start_date
-
-    # If the date doesn't fall within the range, return the closest start date.
-    return start_date if date < start_date else end_date
 
 
 def get_shift_details(user, date):
-    """Retrieve shift details for the given user and date."""
-    biweekly_start = get_biweekly_period(date, user)
-
-    logger.debug(f"[get_shift_details] Searching for Schedule with User ID: {user}, Biweekly Start: {biweekly_start}")
-
+    """Retrieve shift details for the given user and date based on the correct biweekly schedule."""
     schedule = Schedule.objects.filter(
         user_id=user,
-        bi_weekly_start=biweekly_start
-    ).order_by('-id').first()
+        payroll_period_start__lte=date,
+        payroll_period_end__gte=date
+    ).order_by('-payroll_period_start').first()
 
     if not schedule:
         logger.warning(
-            f"[get_shift_details] No schedule for User: {user}, Date: {date}, Biweekly Start: {biweekly_start}")
+            f"[get_shift_details] No schedule found for User: {user} that includes Date: {date}"
+        )
         return None
 
     shift = Shift.objects.filter(date=date, id__in=schedule.shift_ids.all()).first()
 
     if not shift:
         logger.warning(
-            f"[get_shift_details] No shift found for User: {user}, Date: {date}, Biweekly Start: {biweekly_start}")
+            f"[get_shift_details] No shift found for User: {user}, Date: {date}, in Schedule: {schedule.id}"
+        )
 
     return shift
 
