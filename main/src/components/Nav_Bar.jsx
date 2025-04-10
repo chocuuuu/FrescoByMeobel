@@ -57,6 +57,7 @@ function NavBar() {
         { name: "ATTENDANCE", href: "/attendance" },
         { name: "PAYROLL", href: "/payroll" },
         { name: "MASTER CALENDAR", href: "/master-calendar" },
+        { name: "LOGS", href: "/activity-logs" },
       ]
     } else if (userRole === "employee") {
       // For employees, show only relevant links
