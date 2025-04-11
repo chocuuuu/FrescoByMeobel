@@ -15,21 +15,11 @@ function LoginPage() {
     password: "",
   })
   const [error, setError] = useState("")
-  const [isLoading, setIsLoading] = useState(false)
-
-  // Clear any existing sessions when the login page loads
-  useEffect(() => {
-    // Only clear if we're on the login page directly
-    if (window.location.pathname === "/") {
-      sessionStorage.clear()
-      localStorage.clear() // Also clear localStorage in case tokens are stored there
-    }
-  }, [])
 
   // Check if user is already logged in
   useEffect(() => {
-    const token = sessionStorage.getItem("access_token")
-    const role = sessionStorage.getItem("user_role")
+    const token = localStorage.getItem("access_token")
+    const role = localStorage.getItem("user_role")
 
     if (token) {
       // Redirect based on user role
@@ -59,7 +49,6 @@ function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
-    setIsLoading(true)
 
     try {
       // Sending the POST request to the API
@@ -76,15 +65,15 @@ function LoginPage() {
       if (response.ok) {
         // Check if response contains tokens and user info
         if (data.access && data.refresh) {
-          // Store the tokens and user details in sessionStorage
-          sessionStorage.setItem("access_token", data.access)
-          sessionStorage.setItem("refresh_token", data.refresh)
-          sessionStorage.setItem("user_id", data.user)
-          sessionStorage.setItem("user_email", data.email)
-          sessionStorage.setItem("user_role", data.role)
+          // Store the tokens and user details in localStorage
+          localStorage.setItem("access_token", data.access)
+          localStorage.setItem("refresh_token", data.refresh)
+          localStorage.setItem("user_id", data.user)
+          localStorage.setItem("user_email", data.email)
+          localStorage.setItem("user_role", data.role)
 
           // Set session start time
-          sessionStorage.setItem("session_start", Date.now().toString())
+          localStorage.setItem("session_start", Date.now().toString())
 
           // Redirect based on user role
           if (data.role === "admin" || data.role === "owner") {
@@ -103,10 +92,7 @@ function LoginPage() {
         setError(data.message || "Login failed. Please try again.")
       }
     } catch (error) {
-      console.error("Login error:", error)
       setError("An error occurred. Please try again later.")
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -166,9 +152,8 @@ function LoginPage() {
                   value={formData.id}
                   onChange={handleChange}
                   required
-                  disabled={isLoading}
                   className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400
-                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 disabled:opacity-70"
+                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 />
               </div>
               <div>
@@ -182,18 +167,16 @@ function LoginPage() {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  disabled={isLoading}
                   className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400
-                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 disabled:opacity-70"
+                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
                 />
               </div>
               {error && <div className="text-red-600 text-sm">{error}</div>}
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-70"
+                className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
               >
-                {isLoading ? "Logging in..." : "Log In"}
+                Log In
               </button>
               <div className="text-sm underline text-center">
                 <a href="/forgot-password" className="font-medium text-gray-600 hover:text-gray-900">
