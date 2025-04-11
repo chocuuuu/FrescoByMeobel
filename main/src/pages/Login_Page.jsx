@@ -16,10 +16,16 @@ function LoginPage() {
   })
   const [error, setError] = useState("")
 
+  // Clear any existing sessions when the login page loads
+  useEffect(() => {
+    sessionStorage.clear()
+    localStorage.clear() // Also clear localStorage in case tokens are stored there
+  }, [])
+
   // Check if user is already logged in
   useEffect(() => {
-    const token = localStorage.getItem("access_token")
-    const role = localStorage.getItem("user_role")
+    const token = sessionStorage.getItem("access_token")
+    const role = sessionStorage.getItem("user_role")
 
     if (token) {
       // Redirect based on user role
@@ -65,15 +71,15 @@ function LoginPage() {
       if (response.ok) {
         // Check if response contains tokens and user info
         if (data.access && data.refresh) {
-          // Store the tokens and user details in localStorage
-          localStorage.setItem("access_token", data.access)
-          localStorage.setItem("refresh_token", data.refresh)
-          localStorage.setItem("user_id", data.user)
-          localStorage.setItem("user_email", data.email)
-          localStorage.setItem("user_role", data.role)
+          // Store the tokens and user details in sessionStorage
+          sessionStorage.setItem("access_token", data.access)
+          sessionStorage.setItem("refresh_token", data.refresh)
+          sessionStorage.setItem("user_id", data.user)
+          sessionStorage.setItem("user_email", data.email)
+          sessionStorage.setItem("user_role", data.role)
 
           // Set session start time
-          localStorage.setItem("session_start", Date.now().toString())
+          sessionStorage.setItem("session_start", Date.now().toString())
 
           // Redirect based on user role
           if (data.role === "admin" || data.role === "owner") {

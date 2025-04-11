@@ -14,9 +14,10 @@ import AdminEmployeeEditSchedulePage from "./pages/Admin_Employee_Edit_Schedule_
 import AdminEmployeeAttendancePage from "./pages/Admin_Employee_Attendance_Page"
 import AdminMasterCalendarPage from "./pages/Admin_Master_Calendar_Page"
 import EmployeeSchedulePage from "./pages/Employee_Schedule_Page"
-import ActivityLogPage from "./pages/Admin_Activity_Logs_Page.jsx";
+import ActivityLogPage from "./pages/Admin_Activity_Logs_Page.jsx"
+import ForceLogout from "./ForceLogout"
 
-// Session checker component
+// Session checker component with enhanced URL protection
 function SessionChecker() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -25,20 +26,49 @@ function SessionChecker() {
     // Check if the current route is not a public route
     const isPublicRoute =
       location.pathname === "/" ||
+      location.pathname === "/force-logout" ||
       location.pathname.startsWith("/forgot-password") ||
       location.pathname.startsWith("/reset-password")
 
     if (!isPublicRoute) {
-      const token = localStorage.getItem("access_token")
+      const token = sessionStorage.getItem("access_token")
       if (!token) {
         // Redirect to login if no token
         navigate("/", { replace: true })
       }
     }
 
+    // Prevent URL manipulation
+    const originalPushState = history.pushState
+    const originalReplaceState = history.replaceState
+
+    history.pushState = function () {
+      const token = sessionStorage.getItem("access_token")
+      const result = originalPushState.apply(this, arguments)
+
+      // If trying to navigate to protected route without token
+      if (!token && !isPublicRoute) {
+        navigate("/", { replace: true })
+      }
+
+      return result
+    }
+
+    history.replaceState = function () {
+      const token = sessionStorage.getItem("access_token")
+      const result = originalReplaceState.apply(this, arguments)
+
+      // If trying to navigate to protected route without token
+      if (!token && !isPublicRoute) {
+        navigate("/", { replace: true })
+      }
+
+      return result
+    }
+
     // Prevent back navigation after logout
     const handlePopState = () => {
-      const token = localStorage.getItem("access_token")
+      const token = sessionStorage.getItem("access_token")
       if (!token && !isPublicRoute) {
         navigate("/", { replace: true })
       }
@@ -48,6 +78,9 @@ function SessionChecker() {
 
     return () => {
       window.removeEventListener("popstate", handlePopState)
+      // Restore original history methods
+      history.pushState = originalPushState
+      history.replaceState = originalReplaceState
     }
   }, [navigate, location])
 
@@ -57,8 +90,8 @@ function SessionChecker() {
 // Protected route component
 function ProtectedRoute({ children, allowedRoles, redirectPath = "/" }) {
   const navigate = useNavigate()
-  const role = localStorage.getItem("user_role")
-  const isAuthenticated = !!localStorage.getItem("access_token")
+  const role = sessionStorage.getItem("user_role")
+  const isAuthenticated = !!sessionStorage.getItem("access_token")
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -93,6 +126,7 @@ function App() {
         <Route path="/" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+        <Route path="/force-logout" element={<ForceLogout />} />
 
         {/* Admin/Owner routes */}
         <Route
@@ -161,7 +195,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-           <Route
+        <Route
           path="/activity-logs"
           element={
             <ProtectedRoute allowedRoles={["admin", "owner"]}>
@@ -178,4 +212,3 @@ function App() {
 }
 
 export default App
-  
