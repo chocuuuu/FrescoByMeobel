@@ -56,7 +56,7 @@ class PayslipViewSet(GenericViewset):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=False, methods=['get'], url_path='user-all/(?P<user_id>[^/.]+)')
-    @role_required(["owner", "admin"])
+    @role_required(["owner", "admin", "employee"])
     def user_all(self, request, user_id=None):
         """Get all Payslips for a specific user."""
         payslips = Payslip.objects.filter(user_id=user_id)
