@@ -37,66 +37,47 @@ def calculate_total_deductions(deductions, overtime, sss, philhealth, pagibig):
 
 
 @shared_task
-def generate_payroll_entries():
-    today = now().date()
-    logger.info(f"[{today}] Starting payroll generation task.")
+def generate_payroll_for_salary(salary_id):
+    try:
+        salary = Salary.objects.get(id=salary_id)
+    except Salary.DoesNotExist:
+        logger.error(f"Salary ID {salary_id} not found.")
+        return f"Salary ID {salary_id} not found."
 
-    salaries = Salary.objects.all()
-    logger.info(f"Found {salaries.count()} salary records.")
+    # Now use salary directly (instead of looping)
+    earnings = salary.earnings_id
+    overtime = salary.overtime_id
+    deductions = salary.deductions_id
+    sss = salary.sss_id
+    philhealth = salary.philhealth_id
+    pagibig = salary.pagibig_id
+    user_id = salary.user_id
+    pay_date = salary.pay_date
 
-    for salary in salaries:
-        earnings = salary.earnings_id
-        overtime = salary.overtime_id
-        deductions = salary.deductions_id
-        sss = salary.sss_id
-        philhealth = salary.philhealth_id
-        pagibig = salary.pagibig_id
-        user_id = salary.user_id
+    gross_pay = calculate_gross_pay(earnings, overtime)
+    total_deductions = calculate_total_deductions(deductions, overtime, sss, philhealth, pagibig)
+    net_pay = gross_pay - total_deductions
 
-        gross_pay = calculate_gross_pay(earnings, overtime)
-        total_deductions = calculate_total_deductions(deductions, overtime, sss, philhealth, pagibig)
-        net_pay = gross_pay - total_deductions
-        pay_date = salary.pay_date
+    schedule = Schedule.objects.filter(
+        user_id=user_id,
+        payroll_period_end__lt=pay_date
+    ).order_by('-payroll_period_end').first()
 
-        # Find the latest schedule before pay_date
-        schedule = Schedule.objects.filter(
-            user_id=user_id,
-            payroll_period_end__lt=pay_date
-        ).order_by('-payroll_period_end').first()
+    employment_info = EmploymentInfo.objects.filter(
+        employee_number=user_id.id
+    ).first()
 
-        if schedule:
-            logger.info(f"Schedule {schedule.id} selected for user {user_id} and pay date {pay_date}.")
-        else:
-            logger.warning(f"No schedule found for user {user_id} before {pay_date}.")
+    payroll, created = Payroll.objects.update_or_create(
+        salary_id=salary,
+        defaults={
+            "user_id": user_id,
+            "gross_pay": gross_pay,
+            "total_deductions": total_deductions,
+            "net_pay": net_pay,
+            "pay_date": pay_date,
+            "schedule_id": schedule,
+            "employment_info_id": employment_info
+        }
+    )
 
-        # Get employment info by matching employee_number with user_id.id
-        employment_info = EmploymentInfo.objects.filter(
-            employee_number=user_id.id
-        ).first()
-
-        if employment_info:
-            logger.info(f"EmploymentInfo {employment_info.id} found for user {user_id}.")
-        else:
-            logger.warning(f"No EmploymentInfo found for employee_number {user_id.id}.")
-
-        # Create or update payroll entry
-        payroll, created = Payroll.objects.update_or_create(
-            salary_id=salary,
-            defaults={
-                "user_id": user_id,
-                "gross_pay": gross_pay,
-                "total_deductions": total_deductions,
-                "net_pay": net_pay,
-                "pay_date": pay_date,
-                "schedule_id": schedule,
-                "employment_info_id": employment_info
-            }
-        )
-
-        if created:
-            logger.info(f"Created new payroll entry for user {user_id}, salary ID {salary.id}.")
-        else:
-            logger.info(f"Updated existing payroll entry for user {user_id}, salary ID {salary.id}.")
-
-    logger.info("Payroll entries checked and updated successfully.")
-    return "Payroll entries checked and updated successfully."
+    return f"Payroll {'created' if created else 'updated'} for Salary ID {salary.id}"

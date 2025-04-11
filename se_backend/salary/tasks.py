@@ -8,6 +8,7 @@ from earnings.models import Earnings
 from deductions.models import Deductions
 from totalovertime.models import TotalOvertime
 from benefits.models import SSS, Philhealth, Pagibig
+from schedule.models import Schedule
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -34,28 +35,49 @@ def generate_salary_entries():
         if not latest_deductions:
             logger.warning(f"No deductions found for user: {user.id}")
         if not latest_sss:
-                logger.warning(f"No sss found for user: {user.id}")
+            logger.warning(f"No sss found for user: {user.id}")
         if not latest_philhealth:
-                logger.warning(f"No philhealth found for user: {user.id}")
+            logger.warning(f"No philhealth found for user: {user.id}")
         if not latest_pagibig:
-                logger.warning(f"No pagibig found for user: {user.id}")
+            logger.warning(f"No pagibig found for user: {user.id}")
 
         overtime_entries = TotalOvertime.objects.filter(user=user).order_by('-biweek_start')[:2]
         logger.info(f"Found {overtime_entries.count()} overtime entries for user: {user.id}")
 
         for overtime in overtime_entries:
             biweek_start = overtime.biweek_start
-            biweek_month = biweek_start.month
-            biweek_year = biweek_start.year
 
-            if biweek_start.day >= 28:
-                pay_date = datetime(biweek_year, biweek_month + 1, 15).date()
-            else:
-                pay_date = datetime(biweek_year, biweek_month, 1) + timedelta(days=31)
-                pay_date = pay_date.replace(day=1) - timedelta(days=1)
+            # Find the schedule with the matching bi_weekly_start
+            try:
+                schedule = Schedule.objects.filter(
+                    user_id=user,
+                    bi_weekly_start=biweek_start
+                ).first()
 
-            logger.info(f"Determined pay date {pay_date} for user: {user.id}")
+                if not schedule:
+                    logger.warning(f"No schedule found for user {user.id} with bi_weekly_start {biweek_start}")
+                    continue
 
+                payroll_period_end = schedule.payroll_period_end
+                if not payroll_period_end:
+                    logger.warning(f"Schedule for user {user.id} has no payroll_period_end")
+                    continue
+
+                # Determine pay date based on payroll_period_end
+                if payroll_period_end.day < 15:
+                    # If before the 15th, pay date is the 15th of the same month
+                    pay_date = datetime(payroll_period_end.year, payroll_period_end.month, 15).date()
+                else:
+                    # If on or after the 15th, pay date is the last day of the month
+                    next_month = datetime(payroll_period_end.year, payroll_period_end.month, 1) + timedelta(days=32)
+                    pay_date = next_month.replace(day=1) - timedelta(days=1)
+
+                logger.info(
+                    f"Determined pay date {pay_date} for user: {user.id} (payroll period end: {payroll_period_end})")
+
+            except Exception as e:
+                logger.error(f"Error determining pay date for user {user.id}: {str(e)}")
+                continue
 
             if Salary.objects.filter(user_id=user.id, pay_date=pay_date).exists():
                 logger.info(f"Salary entry already exists for user: {user.id} on {pay_date}. Skipping.")
