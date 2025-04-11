@@ -1,6 +1,7 @@
 "use client"
 
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
+import { useEffect } from "react"
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom"
 
 import LoginPage from "./pages/Login_Page"
 import ForgotPasswordPage from "./pages/Forgot_Password_Page"
@@ -8,16 +9,13 @@ import ResetPasswordPage from "./pages/Reset_Password_Page"
 import AdminDashboardPage from "./pages/Admin_Dashboard_Page"
 import AdminEmployeePayrollPage from "./pages/Admin_Employee_Payroll_Page"
 import AdminEmployeePage from "./pages/Admin_Employees_Page"
-import PayslipPage from "./pages/Payslip_Page"
+import EmployeePayslipPage from "./pages/Employee_Payslip_Page.jsx"
 import AdminEmployeeEditSchedulePage from "./pages/Admin_Employee_Edit_Schedule_Page"
 import AdminEmployeeAttendancePage from "./pages/Admin_Employee_Attendance_Page"
 import AdminMasterCalendarPage from "./pages/Admin_Master_Calendar_Page"
 import EmployeeSchedulePage from "./pages/Employee_Schedule_Page"
-import ActivityLogPage from "./pages/Admin_Activity_Logs_Page"
-import ForceLogout from "./pages/ForceLogout"
-import NavigationGuard from "./components/Navigation_Guard"
-import EmployeePayslipPage from "./pages/Employee_Payslip_Page.jsx"
-import AdminPayslipPage from "./pages/Admin_Payslip_Page.jsx"
+import ActivityLogPage from "./pages/Admin_Activity_Logs_Page.jsx";
+import AdminPayslipPage from "./pages/Admin_Payslip_Page.jsx";
 
 // Session checker component
 function SessionChecker() {
@@ -58,15 +56,23 @@ function SessionChecker() {
 }
 
 // Protected route component
-function ProtectedRoute({ children, allowedRoles }) {
-  const role = sessionStorage.getItem("user_role")
-  const isAuthenticated = !!sessionStorage.getItem("access_token")
+function ProtectedRoute({ children, allowedRoles, redirectPath = "/" }) {
+  const navigate = useNavigate()
+  const role = localStorage.getItem("user_role")
+  const isAuthenticated = !!localStorage.getItem("access_token")
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/", { replace: true })
+    }
+  }, [isAuthenticated, navigate])
 
   if (!isAuthenticated) {
     return <Navigate to="/" replace />
   }
 
   if (allowedRoles && !allowedRoles.includes(role)) {
+    // Redirect to appropriate dashboard based on role
     if (role === "employee") {
       return <Navigate to="/employee/schedule" replace />
     } else if (role === "admin" || role === "owner") {
@@ -82,13 +88,12 @@ function ProtectedRoute({ children, allowedRoles }) {
 function App() {
   return (
     <Router>
-      <NavigationGuard />
+      <SessionChecker />
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
-        <Route path="/force-logout" element={<ForceLogout />} />
 
         {/* Admin/Owner routes */}
         <Route
@@ -139,7 +144,7 @@ function App() {
             </ProtectedRoute>
           }
         />
-        <Route
+          <Route
           path="/admin-payslip/:userId"
           element={
             <ProtectedRoute allowedRoles={["admin", "owner"]}>
@@ -161,11 +166,11 @@ function App() {
           path="/employee-payslip/:userId"
           element={
             <ProtectedRoute allowedRoles={["admin", "owner", "employee"]}>
-              <EmployeePayslipPage/>
+              <EmployeePayslipPage />
             </ProtectedRoute>
           }
         />
-        <Route
+           <Route
           path="/activity-logs"
           element={
             <ProtectedRoute allowedRoles={["admin", "owner"]}>
@@ -175,23 +180,11 @@ function App() {
         />
 
         {/* Catch all route - redirect to appropriate dashboard or login */}
-        <Route
-          path="*"
-          element={
-            sessionStorage.getItem("access_token") ? (
-              sessionStorage.getItem("user_role") === "employee" ? (
-                <Navigate to="/employee/schedule" replace />
-              ) : (
-                <Navigate to="/dashboard" replace />
-              )
-            ) : (
-              <Navigate to="/" replace />
-            )
-          }
-        />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
   )
 }
 
 export default App
+  
