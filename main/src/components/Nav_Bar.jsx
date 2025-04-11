@@ -31,20 +31,19 @@ function NavBar() {
     }
   }, [dropdownRef])
 
+  // This is the updated logout function
   const handleLogout = () => {
-    // Clear all localStorage items
-    localStorage.removeItem("access_token")
-    localStorage.removeItem("refresh_token")
-    localStorage.removeItem("user_id")
-    localStorage.removeItem("user_email")
-    localStorage.removeItem("user_role")
-    localStorage.removeItem("session_start")
+    // Clear all session storage
+    sessionStorage.clear()
 
-    // Prevent going back to protected pages
-    window.history.pushState(null, "", "/")
+    // Clear any localStorage items related to authentication if you have any
+    localStorage.removeItem("token")
+    localStorage.removeItem("user")
+    localStorage.removeItem("userRole")
+    // Add any other auth-related items you might be storing
 
-    // Navigate to login page
-    navigate("/", { replace: true })
+    // Redirect to login page and replace the history (prevents back button issues)
+    navigate("/login", { replace: true })
   }
 
   // Define navigation links based on user role
