@@ -43,7 +43,7 @@ class PayslipViewSet(GenericViewset):
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    @role_required(["owner", "admin"])
+    @role_required(["owner", "admin","employee"])
     def partial_update(self, request, *args, **kwargs):
         """Partially update Payslip record. Accessible by owners and admins."""
         return self.update(request, *args, partial=True, **kwargs)
