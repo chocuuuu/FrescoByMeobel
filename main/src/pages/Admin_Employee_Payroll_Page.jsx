@@ -23,14 +23,13 @@ function AdminEmployeePayrollPage() {
     try {
       setLoading(true)
       const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
 
       // Fetch employees first
-      const employeeResponse = await fetch(`${API_BASE_URL}/employment-info/`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const employeeResponse = await fetch(`${API_BASE_URL}/employment-info/`, { headers })
 
       if (!employeeResponse.ok) {
         throw new Error("Failed to fetch employees")
@@ -44,12 +43,7 @@ function AdminEmployeePayrollPage() {
       const payrollMap = new Map()
 
       // Fetch all payroll records
-      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, { headers })
 
       let payrollRecords = []
       if (payrollResponse.ok) {
@@ -57,12 +51,7 @@ function AdminEmployeePayrollPage() {
       }
 
       // Fetch salary data for all employees
-      const salaryResponse = await fetch(`${API_BASE_URL}/salary/`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const salaryResponse = await fetch(`${API_BASE_URL}/salary/`, { headers })
 
       let salaryRecords = []
       if (salaryResponse.ok) {
@@ -70,12 +59,7 @@ function AdminEmployeePayrollPage() {
       }
 
       // Fetch earnings data for all employees
-      const earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, { headers })
 
       if (earningsResponse.ok) {
         const earningsData = await earningsResponse.json()
@@ -97,12 +81,7 @@ function AdminEmployeePayrollPage() {
       }
 
       // Fetch deductions data
-      const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, { headers })
 
       if (deductionsResponse.ok) {
         const deductionsData = await deductionsResponse.json()
@@ -114,30 +93,20 @@ function AdminEmployeePayrollPage() {
             payrollMap.set(userId, {
               userId,
               deductions:
-                Number.parseFloat(deduction.sss) +
-                  Number.parseFloat(deduction.philhealth) +
-                  Number.parseFloat(deduction.pagibig) +
-                  Number.parseFloat(deduction.late) +
-                  Number.parseFloat(deduction.wtax) +
-                  Number.parseFloat(deduction.nowork) +
-                  Number.parseFloat(deduction.loan) +
-                  Number.parseFloat(deduction.charges) +
-                  Number.parseFloat(deduction.undertime) +
-                  Number.parseFloat(deduction.msfcloan) || 0,
+                Number.parseFloat(deduction.wtax || 0) +
+                  Number.parseFloat(deduction.nowork || 0) +
+                  Number.parseFloat(deduction.loan || 0) +
+                  Number.parseFloat(deduction.charges || 0) +
+                  Number.parseFloat(deduction.msfcloan || 0) || 0,
               deductionsData: deduction,
             })
           } else {
             const totalDeductions =
-              Number.parseFloat(deduction.sss) +
-                Number.parseFloat(deduction.philhealth) +
-                Number.parseFloat(deduction.pagibig) +
-                Number.parseFloat(deduction.late) +
-                Number.parseFloat(deduction.wtax) +
-                Number.parseFloat(deduction.nowork) +
-                Number.parseFloat(deduction.loan) +
-                Number.parseFloat(deduction.charges) +
-                Number.parseFloat(deduction.undertime) +
-                Number.parseFloat(deduction.msfcloan) || 0
+              Number.parseFloat(deduction.wtax || 0) +
+                Number.parseFloat(deduction.nowork || 0) +
+                Number.parseFloat(deduction.loan || 0) +
+                Number.parseFloat(deduction.charges || 0) +
+                Number.parseFloat(deduction.msfcloan || 0) || 0
 
             payrollMap.get(userId).deductions = totalDeductions
             payrollMap.get(userId).deductionsData = deduction
@@ -145,13 +114,86 @@ function AdminEmployeePayrollPage() {
         })
       }
 
+      // Fetch SSS data
+      const sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/`, { headers })
+      let sssData = []
+      if (sssResponse.ok) {
+        sssData = await sssResponse.json()
+
+        // Process SSS data
+        sssData.forEach((sss) => {
+          const userId = sss.user
+          if (payrollMap.has(userId)) {
+            payrollMap.get(userId).sssData = sss
+
+            // Add SSS contribution to deductions if not already included
+            if (payrollMap.get(userId).deductions !== undefined) {
+              payrollMap.get(userId).deductions += Number.parseFloat(sss.employee_share || 0)
+            }
+          } else {
+            payrollMap.set(userId, {
+              userId,
+              sssData: sss,
+              deductions: Number.parseFloat(sss.employee_share || 0),
+            })
+          }
+        })
+      }
+
+      // Fetch PhilHealth data
+      const philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/`, { headers })
+      let philhealthData = []
+      if (philhealthResponse.ok) {
+        philhealthData = await philhealthResponse.json()
+
+        // Process PhilHealth data
+        philhealthData.forEach((philhealth) => {
+          const userId = philhealth.user
+          if (payrollMap.has(userId)) {
+            payrollMap.get(userId).philhealthData = philhealth
+
+            // Add PhilHealth contribution to deductions if not already included
+            if (payrollMap.get(userId).deductions !== undefined) {
+              payrollMap.get(userId).deductions += Number.parseFloat(philhealth.total_contribution || 0)
+            }
+          } else {
+            payrollMap.set(userId, {
+              userId,
+              philhealthData: philhealth,
+              deductions: Number.parseFloat(philhealth.total_contribution || 0),
+            })
+          }
+        })
+      }
+
+      // Fetch Pag-IBIG data
+      const pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/`, { headers })
+      let pagibigData = []
+      if (pagibigResponse.ok) {
+        pagibigData = await pagibigResponse.json()
+
+        // Process Pag-IBIG data
+        pagibigData.forEach((pagibig) => {
+          const userId = pagibig.user
+          if (payrollMap.has(userId)) {
+            payrollMap.get(userId).pagibigData = pagibig
+
+            // Add Pag-IBIG contribution to deductions if not already included
+            if (payrollMap.get(userId).deductions !== undefined) {
+              payrollMap.get(userId).deductions += Number.parseFloat(pagibig.employee_share || 0)
+            }
+          } else {
+            payrollMap.set(userId, {
+              userId,
+              pagibigData: pagibig,
+              deductions: Number.parseFloat(pagibig.employee_share || 0),
+            })
+          }
+        })
+      }
+
       // Fetch total overtime data
-      const overtimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
+      const overtimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, { headers })
 
       if (overtimeResponse.ok) {
         const overtimeData = await overtimeResponse.json()
@@ -193,7 +235,7 @@ function AdminEmployeePayrollPage() {
               base_salary: Number.parseFloat(userPayroll.gross_pay) || 0,
               deductions: Number.parseFloat(userPayroll.total_deductions) || 0,
               net_salary: Number.parseFloat(userPayroll.net_pay) || 0,
-              status: userPayroll.status || "Paid",
+              status: userPayroll.status || "Pending",
               rate_per_month: userSalary ? userSalary.rate_per_month : "0",
               user: employee.user,
               // Store the raw data for editing
@@ -202,11 +244,14 @@ function AdminEmployeePayrollPage() {
               earnings: payrollMap.get(userId)?.earnings,
               deductionsData: payrollMap.get(userId)?.deductionsData,
               overtimeData: payrollMap.get(userId)?.overtimeData,
+              sssData: payrollMap.get(userId)?.sssData,
+              philhealthData: payrollMap.get(userId)?.philhealthData,
+              pagibigData: payrollMap.get(userId)?.pagibigData,
             })
           } else if (payrollMap.has(userId)) {
             // Employee has data in our map but no payroll record
             const payrollInfo = payrollMap.get(userId)
-            const grossSalary = payrollInfo.base_salary || 0
+            const grossSalary = (payrollInfo.base_salary || 0) + (payrollInfo.overtimeTotal || 0)
             const deductions = payrollInfo.deductions || 0
             const netSalary = grossSalary - deductions
 
@@ -219,12 +264,15 @@ function AdminEmployeePayrollPage() {
               deductions: deductions,
               net_salary: netSalary,
               status: "Pending", // Default status
-              rate_per_month: grossSalary.toString(),
+              rate_per_month: payrollInfo.base_salary?.toString() || "0",
               user: employee.user,
               // Store the raw data for editing
               earnings: payrollInfo.earnings,
               deductionsData: payrollInfo.deductionsData,
               overtimeData: payrollInfo.overtimeData,
+              sssData: payrollInfo.sssData,
+              philhealthData: payrollInfo.philhealthData,
+              pagibigData: payrollInfo.pagibigData,
             })
           } else {
             // Employee has no payroll data - use zeros
@@ -296,7 +344,7 @@ function AdminEmployeePayrollPage() {
     }
   }
 
-  // Handle delete payroll
+  // Updated delete payroll function to completely delete records
   const handleDeletePayroll = async (employeeId, userId) => {
     if (
       !window.confirm(
@@ -308,44 +356,137 @@ function AdminEmployeePayrollPage() {
 
     try {
       const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
 
-      // Find the payroll record for this user
+      // Find employee record to get all associated IDs
       const employee = payrollData.find((emp) => emp.id === employeeId)
-      if (!employee || !employee.payrollRecord || !employee.payrollRecord.id) {
-        alert("No payroll record found for this employee")
+
+      if (!employee || !employee.user?.id) {
+        alert("Cannot find employee data")
         return
       }
 
-      // Delete the payroll record
-      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/${employee.payrollRecord.id}/`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      })
+      // We'll collect all deletion promises to execute them together
+      const deletionPromises = []
 
-      if (!payrollResponse.ok) {
-        throw new Error(`Failed to delete payroll: ${payrollResponse.status} ${payrollResponse.statusText}`)
+      // Delete payroll record if it exists
+      if (employee.payrollRecord && employee.payrollRecord.id) {
+        deletionPromises.push(
+          fetch(`${API_BASE_URL}/payroll/${employee.payrollRecord.id}/`, {
+            method: "DELETE",
+            headers,
+          }),
+        )
       }
 
-      // Update the UI by removing the payroll data
-      setPayrollData((prevData) =>
-        prevData.map((emp) => {
-          if (emp.id === employeeId) {
-            return {
-              ...emp,
-              base_salary: 0,
-              deductions: 0,
-              net_salary: 0,
-              status: "Pending",
-            }
-          }
-          return emp
-        }),
-      )
+      // Delete earnings record if it exists
+      if (employee.earnings && employee.earnings.id) {
+        deletionPromises.push(
+          fetch(`${API_BASE_URL}/earnings/${employee.earnings.id}/`, {
+            method: "DELETE",
+            headers,
+          }),
+        )
+      }
 
-      alert("Payroll information deleted successfully")
+      // Delete deductions record if it exists
+      if (employee.deductionsData && employee.deductionsData.id) {
+        deletionPromises.push(
+          fetch(`${API_BASE_URL}/deductions/${employee.deductionsData.id}/`, {
+            method: "DELETE",
+            headers,
+          }),
+        )
+      }
+
+      // Delete overtime record if it exists
+      if (employee.overtimeData && employee.overtimeData.id) {
+        deletionPromises.push(
+          fetch(`${API_BASE_URL}/totalovertime/${employee.overtimeData.id}/`, {
+            method: "DELETE",
+            headers,
+          }),
+        )
+      }
+
+      // Delete salary record if it exists
+      if (employee.salaryRecord && employee.salaryRecord.id) {
+        deletionPromises.push(
+          fetch(`${API_BASE_URL}/salary/${employee.salaryRecord.id}/`, {
+            method: "DELETE",
+            headers,
+          }),
+        )
+      }
+
+      // Delete SSS record if it exists
+      if (employee.sssData && employee.sssData.id) {
+        deletionPromises.push(
+          fetch(`${API_BASE_URL}/benefits/sss/${employee.sssData.id}/`, {
+            method: "DELETE",
+            headers,
+          }),
+        )
+      }
+
+      // Delete PhilHealth record if it exists
+      if (employee.philhealthData && employee.philhealthData.id) {
+        deletionPromises.push(
+          fetch(`${API_BASE_URL}/benefits/philhealth/${employee.philhealthData.id}/`, {
+            method: "DELETE",
+            headers,
+          }),
+        )
+      }
+
+      // Delete Pag-IBIG record if it exists
+      if (employee.pagibigData && employee.pagibigData.id) {
+        deletionPromises.push(
+          fetch(`${API_BASE_URL}/benefits/pagibig/${employee.pagibigData.id}/`, {
+            method: "DELETE",
+            headers,
+          }),
+        )
+      }
+
+      // Execute all deletion requests
+      const results = await Promise.allSettled(deletionPromises)
+
+      // Check if any deletions failed
+      const failedDeletes = results.filter((r) => r.status === "rejected")
+      if (failedDeletes.length > 0) {
+        console.error("Some deletions failed:", failedDeletes)
+        alert("Some payroll data could not be deleted. Please try again.")
+      } else {
+        alert("Payroll information deleted successfully")
+
+        // Update UI by removing deleted data
+        setPayrollData((prevData) =>
+          prevData.map((emp) => {
+            if (emp.id === employeeId) {
+              return {
+                ...emp,
+                base_salary: 0,
+                deductions: 0,
+                net_salary: 0,
+                status: "Pending",
+                payrollRecord: null,
+                salaryRecord: null,
+                earnings: null,
+                deductionsData: null,
+                overtimeData: null,
+                sssData: null,
+                philhealthData: null,
+                pagibigData: null,
+              }
+            }
+            return emp
+          }),
+        )
+      }
 
       // Refresh data after a short delay
       setTimeout(() => {
@@ -354,6 +495,52 @@ function AdminEmployeePayrollPage() {
     } catch (error) {
       console.error("Error deleting payroll:", error)
       alert(`Failed to delete payroll: ${error.message}`)
+    }
+  }
+
+  // Handle marking payroll as paid
+  const handleMarkAsPaid = async (employeeId, userId) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+
+      // Find the payroll record for this user
+      const employee = payrollData.find((emp) => emp.id === employeeId)
+      if (!employee || !employee.payrollRecord || !employee.payrollRecord.id) {
+        alert("No payroll record found for this employee")
+        return
+      }
+
+      // Update the payroll status to "Paid"
+      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/${employee.payrollRecord.id}/`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ status: "Paid" }),
+      })
+
+      if (!payrollResponse.ok) {
+        throw new Error(`Failed to update payroll status: ${payrollResponse.status} ${payrollResponse.statusText}`)
+      }
+
+      // Update the UI to reflect the change
+      setPayrollData((prevData) =>
+        prevData.map((emp) => {
+          if (emp.id === employeeId) {
+            return {
+              ...emp,
+              status: "Paid",
+            }
+          }
+          return emp
+        }),
+      )
+
+      alert("Payment has been marked as sent to the employee")
+    } catch (error) {
+      console.error("Error marking payroll as paid:", error)
+      alert(`Failed to mark payroll as paid: ${error.message}`)
     }
   }
 
@@ -548,16 +735,22 @@ function AdminEmployeePayrollPage() {
                             onClick={() => handleEditPayroll(record.id)}
                             className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
                           >
-                            Edit Payroll
+                            Edit
                           </button>
-                          {record.payrollRecord && (
+                          {record.status === "Processing" && (
                             <button
-                              onClick={() => handleDeletePayroll(record.id, record.user?.id)}
-                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
+                              onClick={() => handleMarkAsPaid(record.id, record.user?.id)}
+                              className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
                             >
-                              Delete
+                              Pay
                             </button>
                           )}
+                          <button
+                            onClick={() => handleDeletePayroll(record.id, record.user?.id)}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
+                          >
+                            Delete
+                          </button>
                         </div>
                       </td>
                     </tr>
