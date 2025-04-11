@@ -14,6 +14,16 @@ const formatToTwoDecimals = (value) => {
   return numValue.toFixed(2)
 }
 
+// Format date function for consistent date formatting
+const formatDate = (dateStr) => {
+  if (!dateStr) return ""
+  const date = new Date(dateStr)
+  const month = (date.getMonth() + 1).toString().padStart(2, "0")
+  const day = date.getDate().toString().padStart(2, "0")
+  const year = date.getFullYear()
+  return `${month}/${day}/${year}`
+}
+
 // Add this function to handle token refresh or redirect to login
 const handleTokenError = () => {
   // Clear the expired token
@@ -104,6 +114,44 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }, [employeeData, isOpen])
 
+  // Function to fetch the user's schedule directly
+  const fetchUserSchedule = async (userId) => {
+    try {
+      const accessToken = localStorage.getItem("access_token")
+      const headers = {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      }
+
+      // Fetch all schedules
+      const scheduleResponse = await fetch(`${API_BASE_URL}/schedule/`, { headers })
+      if (!scheduleResponse.ok) throw new Error("Failed to fetch schedule data")
+      const scheduleData = await scheduleResponse.json()
+
+      // Find the schedule for this user
+      const userIdNum = Number(userId)
+      const userSchedule = scheduleData.find((schedule) => schedule.user_id === userIdNum)
+
+      console.log("User schedule:", userSchedule)
+
+      if (userSchedule) {
+        // Update the form data with the payroll period from the schedule
+        setFormData((prev) => ({
+          ...prev,
+          payrollPeriodStart: formatDate(userSchedule.payroll_period_start),
+          payrollPeriodEnd: formatDate(userSchedule.payroll_period_end),
+        }))
+
+        return userSchedule
+      }
+
+      return null
+    } catch (error) {
+      console.error("Error fetching user schedule:", error)
+      return null
+    }
+  }
+
   // Function to check if a user has a salary record - FIXED to properly handle user ID comparison
   const checkUserSalary = async (userId) => {
     try {
@@ -138,19 +186,12 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
           // Set the pay date from the salary record
           if (userSalary.pay_date) {
-            const formatDate = (dateStr) => {
-              if (!dateStr) return ""
-              const date = new Date(dateStr)
-              const month = (date.getMonth() + 1).toString().padStart(2, "0")
-              const day = date.getDate().toString().padStart(2, "0")
-              const year = date.getFullYear()
-              return `${month}/${day}/${year}`
-            }
-
             setFormData((prev) => ({
               ...prev,
               payDate: formatDate(userSalary.pay_date),
             }))
+
+            console.log("Set pay date to:", formatDate(userSalary.pay_date))
           }
 
           return userSalary
@@ -202,15 +243,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
             userPayroll.schedule_id.payroll_period_start &&
             userPayroll.schedule_id.payroll_period_end
           ) {
-            const formatDate = (dateStr) => {
-              if (!dateStr) return ""
-              const date = new Date(dateStr)
-              const month = (date.getMonth() + 1).toString().padStart(2, "0")
-              const day = date.getDate().toString().padStart(2, "0")
-              const year = date.getFullYear()
-              return `${month}/${day}/${year}`
-            }
-
             setFormData((prev) => ({
               ...prev,
               payrollPeriodStart: formatDate(userPayroll.schedule_id.payroll_period_start),
@@ -231,86 +263,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }
 
-  // Function to fetch the current payroll period and pay date
-  const fetchCurrentPayrollPeriod = async (userId) => {
-    try {
-      const accessToken = localStorage.getItem("access_token")
-      const headers = {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      }
-
-      // Get current date
-      const today = new Date()
-
-      // Fetch payroll data to get payroll periods
-      const payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, { headers })
-      if (!payrollResponse.ok) throw new Error("Failed to fetch payroll data")
-      const payrollData = await payrollResponse.json()
-
-      // Find payroll records for this user
-      const userIdNum = Number(userId)
-      const userPayrolls = payrollData.filter((record) => record.user_id === userIdNum)
-
-      let payrollPeriodStart = null
-      let payrollPeriodEnd = null
-
-      // Find the current payroll period from the payroll records
-      if (userPayrolls.length > 0) {
-        // Sort by most recent
-        const sortedPayrolls = [...userPayrolls].sort((a, b) => {
-          if (!a.pay_date || !b.pay_date) return 0
-          return new Date(b.pay_date) - new Date(a.pay_date)
-        })
-
-        const latestPayroll = sortedPayrolls[0]
-
-        // Get payroll period from schedule_id if available
-        if (
-          latestPayroll.schedule_id &&
-          latestPayroll.schedule_id.payroll_period_start &&
-          latestPayroll.schedule_id.payroll_period_end
-        ) {
-          payrollPeriodStart = latestPayroll.schedule_id.payroll_period_start
-          payrollPeriodEnd = latestPayroll.schedule_id.payroll_period_end
-        }
-      }
-
-      // Fetch salary data to get pay date
-      const salaryResponse = await fetch(`${API_BASE_URL}/salary/`, { headers })
-      if (!salaryResponse.ok) throw new Error("Failed to fetch salary data")
-      const salaryData = await salaryResponse.json()
-
-      // Find salary records for this user
-      const userSalaries = salaryData.filter((record) => record.user_id === userIdNum || record.user === userIdNum)
-
-      let payDate = null
-
-      if (userSalaries.length > 0) {
-        // Sort by most recent
-        const sortedSalaries = [...userSalaries].sort((a, b) => {
-          if (!a.pay_date || !b.pay_date) return 0
-          return new Date(b.pay_date) - new Date(a.pay_date)
-        })
-
-        payDate = sortedSalaries[0].pay_date
-      }
-
-      return {
-        payrollPeriodStart,
-        payrollPeriodEnd,
-        payDate,
-      }
-    } catch (error) {
-      console.error("Error fetching current payroll period:", error)
-      return {
-        payrollPeriodStart: null,
-        payrollPeriodEnd: null,
-        payDate: null,
-      }
-    }
-  }
-
   // Replace the fetchEmployeePayrollData function with this updated version that doesn't automatically create records
   const fetchEmployeePayrollData = async (userId) => {
     if (!userId) return
@@ -328,49 +280,32 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       console.log(`Fetching payroll data for user ID: ${userId}`)
 
-      // First, check if user has a salary record
+      // First, fetch the user's schedule to get payroll period
+      const userSchedule = await fetchUserSchedule(userId)
+
+      // Then, check if user has a salary record
       const userSalary = await checkUserSalary(userId)
 
       // Then check if user has a payroll record
       const userPayroll = await checkUserPayroll(userId)
 
       // Check if employee has any data - DON'T automatically create records
-      const hasData = userSalary !== null || userPayroll !== null
+      const hasData = userSalary !== null || userPayroll !== null || userSchedule !== null
 
-      // Fetch earnings data - add user filter parameter
+      // Fetch earnings data
       const earningsResponse = await fetch(`${API_BASE_URL}/earnings/`, { headers })
       if (!earningsResponse.ok) throw new Error("Failed to fetch earnings data")
       const earningsData = await earningsResponse.json()
 
-      // Fetch deductions data - add user filter parameter
+      // Fetch deductions data
       const deductionsResponse = await fetch(`${API_BASE_URL}/deductions/`, { headers })
       if (!deductionsResponse.ok) throw new Error("Failed to fetch deductions data")
       const deductionsData = await deductionsResponse.json()
 
-      // Check if employee has total overtime data - add user filter parameter
+      // Check if employee has total overtime data
       const totalOvertimeResponse = await fetch(`${API_BASE_URL}/totalovertime/`, { headers })
       if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
       const totalOvertimeData = await totalOvertimeResponse.json()
-
-      // Call this function to get the current payroll period and pay date
-      const payrollPeriodInfo = await fetchCurrentPayrollPeriod(userId)
-      if (payrollPeriodInfo.payrollPeriodStart && payrollPeriodInfo.payrollPeriodEnd) {
-        const formatDate = (dateStr) => {
-          if (!dateStr) return ""
-          const date = new Date(dateStr)
-          const month = (date.getMonth() + 1).toString().padStart(2, "0")
-          const day = date.getDate().toString().padStart(2, "0")
-          const year = date.getFullYear()
-          return `${month}/${day}/${year}`
-        }
-
-        setFormData((prevData) => ({
-          ...prevData,
-          payrollPeriodStart: formatDate(payrollPeriodInfo.payrollPeriodStart),
-          payrollPeriodEnd: formatDate(payrollPeriodInfo.payrollPeriodEnd),
-          payDate: payrollPeriodInfo.payDate ? formatDate(payrollPeriodInfo.payDate) : prevData.payDate,
-        }))
-      }
 
       console.log("Earnings data:", earningsData)
       console.log("Deductions data:", deductionsData)
@@ -558,6 +493,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     // Update status if available from payroll record
     if (payrollRecord && payrollRecord.status) {
       newFormData.status = payrollRecord.status
+    }
+
+    // If we have a salary record, make sure the pay date is set
+    if (salary && salary.pay_date) {
+      newFormData.payDate = formatDate(salary.pay_date)
     }
 
     // Calculate totals
