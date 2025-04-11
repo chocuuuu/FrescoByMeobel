@@ -94,6 +94,12 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const [payrollId, setPayrollId] = useState(null)
   const [salaryId, setSalaryId] = useState(null)
 
+  // Add state to track payroll period dates separately to ensure they're preserved
+  const [payrollPeriodDates, setPayrollPeriodDates] = useState({
+    start: "",
+    end: "",
+  })
+
   // Fetch employee data from APIs when the modal opens
   useEffect(() => {
     if (employeeData && isOpen) {
@@ -114,7 +120,19 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }, [employeeData, isOpen])
 
-  // Function to fetch the user's schedule directly
+  // Add effect to update form data when payroll period dates change
+  useEffect(() => {
+    if (payrollPeriodDates.start || payrollPeriodDates.end) {
+      console.log("Updating form data with payroll period dates:", payrollPeriodDates)
+      setFormData((prev) => ({
+        ...prev,
+        payrollPeriodStart: payrollPeriodDates.start,
+        payrollPeriodEnd: payrollPeriodDates.end,
+      }))
+    }
+  }, [payrollPeriodDates])
+
+  // Fix the fetchUserSchedule function to properly log and set the payroll period dates
   const fetchUserSchedule = async (userId) => {
     try {
       const accessToken = localStorage.getItem("access_token")
@@ -132,17 +150,33 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const userIdNum = Number(userId)
       const userSchedule = scheduleData.find((schedule) => schedule.user_id === userIdNum)
 
-      console.log("User schedule:", userSchedule)
+      console.log(`User schedule: ${userIdNum}`, userSchedule)
 
-      if (userSchedule) {
-        // Update the form data with the payroll period from the schedule
+      if (userSchedule && userSchedule.payroll_period_start && userSchedule.payroll_period_end) {
+        const formattedStart = formatDate(userSchedule.payroll_period_start)
+        const formattedEnd = formatDate(userSchedule.payroll_period_end)
+
+        console.log("Setting payroll period dates:", {
+          start: formattedStart,
+          end: formattedEnd,
+        })
+
+        // Update the separate state for payroll period dates
+        setPayrollPeriodDates({
+          start: formattedStart,
+          end: formattedEnd,
+        })
+
+        // Also directly update the form data
         setFormData((prev) => ({
           ...prev,
-          payrollPeriodStart: formatDate(userSchedule.payroll_period_start),
-          payrollPeriodEnd: formatDate(userSchedule.payroll_period_end),
+          payrollPeriodStart: formattedStart,
+          payrollPeriodEnd: formattedEnd,
         }))
 
         return userSchedule
+      } else {
+        console.log("User schedule found but missing payroll period dates:", userSchedule)
       }
 
       return null
@@ -237,18 +271,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
             status: userPayroll.status || "Pending",
           }))
 
-          // Set payroll period dates if available
-          if (
-            userPayroll.schedule_id &&
-            userPayroll.schedule_id.payroll_period_start &&
-            userPayroll.schedule_id.payroll_period_end
-          ) {
-            setFormData((prev) => ({
-              ...prev,
-              payrollPeriodStart: formatDate(userPayroll.schedule_id.payroll_period_start),
-              payrollPeriodEnd: formatDate(userPayroll.schedule_id.payroll_period_end),
-            }))
-          }
+          // We're NOT setting payroll period dates here anymore
+          // as we prioritize the dates from the user's schedule
 
           console.log("Found payroll record:", userPayroll)
           return userPayroll
@@ -263,7 +287,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }
 
-  // Replace the fetchEmployeePayrollData function with this updated version that doesn't automatically create records
+  // Modify the fetchEmployeePayrollData function to prioritize schedule data
   const fetchEmployeePayrollData = async (userId) => {
     if (!userId) return
 
@@ -280,7 +304,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       console.log(`Fetching payroll data for user ID: ${userId}`)
 
-      // First, fetch the user's schedule to get payroll period
+      // First, fetch the user's schedule to get payroll period - PRIORITIZE THIS
       const userSchedule = await fetchUserSchedule(userId)
 
       // Then, check if user has a salary record
@@ -390,7 +414,22 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           pagibigRecord,
           userPayroll,
         )
+
+        // Make sure payroll period dates are preserved
+        updatedFormData.payrollPeriodStart = payrollPeriodDates.start || updatedFormData.payrollPeriodStart
+        updatedFormData.payrollPeriodEnd = payrollPeriodDates.end || updatedFormData.payrollPeriodEnd
+
         setFormData(updatedFormData)
+
+        // Force update the UI with the payroll period dates
+        setTimeout(() => {
+          console.log("Force updating payroll period dates in UI")
+          setFormData((prev) => ({
+            ...prev,
+            payrollPeriodStart: payrollPeriodDates.start || prev.payrollPeriodStart,
+            payrollPeriodEnd: payrollPeriodDates.end || prev.payrollPeriodEnd,
+          }))
+        }, 100)
       } else {
         // If no data, reset to default values with employee's base salary if available
         const defaultFormData = { ...formData }
@@ -398,6 +437,11 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           defaultFormData.basicRate = employeeData.rate_per_month
           defaultFormData.basic = employeeData.rate_per_month / 2 // Assuming bi-weekly pay
         }
+
+        // Make sure payroll period dates are preserved
+        defaultFormData.payrollPeriodStart = payrollPeriodDates.start || defaultFormData.payrollPeriodStart
+        defaultFormData.payrollPeriodEnd = payrollPeriodDates.end || defaultFormData.payrollPeriodEnd
+
         setFormData(defaultFormData)
       }
     } catch (error) {
@@ -410,6 +454,9 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           ...prevData,
           basicRate: employeeData.rate_per_month,
           basic: employeeData.rate_per_month / 2, // Assuming bi-weekly pay
+          // Make sure payroll period dates are preserved
+          payrollPeriodStart: payrollPeriodDates.start || prevData.payrollPeriodStart,
+          payrollPeriodEnd: payrollPeriodDates.end || prevData.payrollPeriodEnd,
         }))
       }
     } finally {
@@ -417,6 +464,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     }
   }
 
+  // Modify the createFormDataFromApi function to preserve payroll period dates
   const createFormDataFromApi = (
     earnings,
     deductions,
@@ -430,6 +478,10 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   ) => {
     // Start with default form data
     const newFormData = { ...formData }
+
+    // Preserve the payroll period dates that were set by fetchUserSchedule
+    const preservedPayrollPeriodStart = payrollPeriodDates.start || formData.payrollPeriodStart
+    const preservedPayrollPeriodEnd = payrollPeriodDates.end || formData.payrollPeriodEnd
 
     // Update earnings data if available
     if (earnings) {
@@ -494,6 +546,10 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     if (payrollRecord && payrollRecord.status) {
       newFormData.status = payrollRecord.status
     }
+
+    // Make sure to restore the payroll period dates
+    newFormData.payrollPeriodStart = preservedPayrollPeriodStart
+    newFormData.payrollPeriodEnd = preservedPayrollPeriodEnd
 
     // If we have a salary record, make sure the pay date is set
     if (salary && salary.pay_date) {
@@ -649,6 +705,10 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       newFormData.philhealth.amount = benefits.philhealth
       newFormData.pagibig.amount = benefits.pagibig
     }
+
+    // Preserve payroll period dates
+    newFormData.payrollPeriodStart = payrollPeriodDates.start || newFormData.payrollPeriodStart
+    newFormData.payrollPeriodEnd = payrollPeriodDates.end || newFormData.payrollPeriodEnd
 
     const totals = calculateTotals(newFormData)
     setFormData({ ...newFormData, ...totals })
