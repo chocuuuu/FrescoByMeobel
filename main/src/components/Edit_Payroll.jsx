@@ -539,7 +539,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       newFormData.overtime.amount = totalOvertime.total_overtime?.toString() || newFormData.overtime.amount
     }
 
-    // Update benefit values if available - IMPORTANT: Use these values directly
+    // Update benefit values if available - IMPORTANT: Use these values directly from the records
     if (sssRecord) {
       console.log("Setting SSS amount from record:", sssRecord.total_contribution)
       newFormData.sss.amount = sssRecord.total_contribution?.toString() || "0.00"
@@ -898,29 +898,34 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const sssData = {
         user: userId,
         basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
-        msc: "5000.00",
-        employee_share: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
-        employer_share: "500.00",
-        ec_contribution: "10.00",
-        employer_mpf_contribution: "0.00",
-        employee_mpf_contribution: "0.00",
-        total_employer: "510.00",
-        total_employee: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
-        total_contribution: (Number.parseFloat(updatedFormData.sss.amount) + 510).toFixed(2),
       }
 
       let sssResponse
       if (sssRecord) {
+        // Only update the basic_salary, preserve all other values
         sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/${sssRecord.id}/`, {
           method: "PATCH",
           headers,
           body: JSON.stringify(sssData),
         })
       } else {
+        // If creating a new record, include default values
+        const newSssData = {
+          ...sssData,
+          msc: "5000.00",
+          employee_share: "0.00",
+          employer_share: "500.00",
+          ec_contribution: "10.00",
+          employer_mpf_contribution: "0.00",
+          employee_mpf_contribution: "0.00",
+          total_employer: "510.00",
+          total_employee: "0.00",
+          total_contribution: "510.00",
+        }
         sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/`, {
           method: "POST",
           headers,
-          body: JSON.stringify(sssData),
+          body: JSON.stringify(newSssData),
         })
       }
 
@@ -968,23 +973,28 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const pagibigData = {
         user: userId,
         basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
-        employee_share: Number.parseFloat(updatedFormData.pagibig.amount).toFixed(2),
-        employer_share: "200.00",
-        total_contribution: (Number.parseFloat(updatedFormData.pagibig.amount) + 200).toFixed(2),
       }
 
       let pagibigResponse
       if (pagibigRecord) {
+        // Only update the basic_salary, preserve all other values
         pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/${pagibigRecord.id}/`, {
           method: "PATCH",
           headers,
           body: JSON.stringify(pagibigData),
         })
       } else {
+        // If creating a new record, include default values
+        const newPagibigData = {
+          ...pagibigData,
+          employee_share: "0.00",
+          employer_share: "200.00",
+          total_contribution: "200.00",
+        }
         pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/`, {
           method: "POST",
           headers,
-          body: JSON.stringify(pagibigData),
+          body: JSON.stringify(newPagibigData),
         })
       }
 
