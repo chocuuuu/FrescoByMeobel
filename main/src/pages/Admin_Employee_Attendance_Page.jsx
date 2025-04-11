@@ -644,14 +644,14 @@ function AdminEmployeeAttendancePage() {
                         <td className="py-3 px-4">{formatDate(record.biweek_start)}</td>
                         <td className="py-3 px-4">{record.employee_id}</td>
                         <td className="py-3 px-4">{record.employee_name}</td>
-                        <td className="py-3 px-4">{record.actualhours}</td>
-                        <td className="py-3 px-4">{record.regularot}</td>
-                        <td className="py-3 px-4">{record.regularholiday}</td>
-                        <td className="py-3 px-4">{record.specialholiday}</td>
-                        <td className="py-3 px-4">{record.restday}</td>
-                        <td className="py-3 px-4">{record.nightdiff}</td>
-                        <td className="py-3 px-4">{record.undertime}</td>
-                        <td className="py-3 px-4">{record.late}</td>
+                        <td className="py-3 px-4">{record.actualhours} h</td>
+                        <td className="py-3 px-4">{record.regularot} h</td>
+                        <td className="py-3 px-4">{record.regularholiday} h</td>
+                        <td className="py-3 px-4">{record.specialholiday} h</td>
+                        <td className="py-3 px-4">{record.restday} h</td>
+                        <td className="py-3 px-4">{record.nightdiff} h</td>
+                        <td className="py-3 px-4">{record.undertime} h</td>
+                        <td className="py-3 px-4">{record.late} m</td>
                       </tr>
                     ))
                   ) : (

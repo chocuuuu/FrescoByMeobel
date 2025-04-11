@@ -10,6 +10,7 @@ class Payslip(models.Model):
     status = models.BooleanField(default=False)
     approved_at = models.DateTimeField(null=True, blank=True)
     generated_at = models.DateTimeField(null=True, blank=True)
+    employee_generated_at = models.DateTimeField(null=True, blank=True)
     is_protected = models.BooleanField(default=True)
 
     def __str__(self):
