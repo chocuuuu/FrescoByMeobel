@@ -654,7 +654,7 @@ function AdminPayslipPage() {
             {/* Mobile: Back Button in Normal Flow */}
             <div className="block md:hidden mt-auto">
               <button
-                onClick={() => navigate("/dashboard")}
+                onClick={() => navigate("/payroll")}
                 className="px-6 py-3 rounded-md flex items-center gap-2 font-semibold text-white text-md"
                 style={{ backgroundColor: "#373A45" }}
               >
@@ -666,7 +666,7 @@ function AdminPayslipPage() {
           {/* DESKTOP: Back Button pinned at BOTTOM-RIGHT */}
           <div className="hidden md:block absolute bottom-4 right-4">
             <button
-              onClick={() => navigate('/dashboard')}
+              onClick={() => navigate('/payroll')}
               className="px-6 py-3 rounded-md flex items-center gap-2 font-semibold text-white text-md"
               style={{ backgroundColor: '#373A45' }}
             >
