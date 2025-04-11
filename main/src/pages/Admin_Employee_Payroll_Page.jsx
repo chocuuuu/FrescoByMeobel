@@ -4,8 +4,10 @@ import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar.jsx"
 import EditPayroll from "../components/Edit_Payroll.jsx"
 import { API_BASE_URL } from "../config/api"
+import { useNavigate } from "react-router-dom";
 
 function AdminEmployeePayrollPage() {
+  const navigate = useNavigate();
   const [employees, setEmployees] = useState([])
   const [payrollData, setPayrollData] = useState([])
   const [loading, setLoading] = useState(true)
@@ -17,6 +19,7 @@ function AdminEmployeePayrollPage() {
   const recordsPerPage = 5
   const [yearFilter, setYearFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all")
+  
 
   // Fetch payroll data from API
   const fetchPayrollData = async () => {
@@ -342,6 +345,11 @@ function AdminEmployeePayrollPage() {
       setSelectedEmployee(employeeWithUserId)
       setIsEditModalOpen(true)
     }
+  }
+
+  // NEW: Add Payslip Button Handler
+  const handleGoToPayslip = (UserId) => {
+    navigate(`/admin-payslip/${UserId}`);
   }
 
   // Updated delete payroll function to completely delete records
@@ -745,6 +753,12 @@ function AdminEmployeePayrollPage() {
                               Pay
                             </button>
                           )}
+                          <button
+                            onClick={() => handleGoToPayslip(record.user?.id)}
+                            className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
+                          >
+                            Payslip
+                          </button>
                           <button
                             onClick={() => handleDeletePayroll(record.id, record.user?.id)}
                             className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
