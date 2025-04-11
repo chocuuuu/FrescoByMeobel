@@ -56,7 +56,6 @@ function SessionChecker() {
 
   return null
 }
->>>>>>> main
 
 // Protected route component
 function ProtectedRoute({ children, allowedRoles }) {
