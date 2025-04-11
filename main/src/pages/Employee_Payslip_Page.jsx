@@ -9,6 +9,7 @@ import {
 import NavBar from '../components/Nav_Bar'
 import dayjs from 'dayjs'
 import companyLogo from '../assets/newlogo.png'
+import { API_BASE_URL } from "../config/api"
 
 // If you need ChevronDown, remember to import:
 // import { ChevronDown } from 'lucide-react'
@@ -79,7 +80,7 @@ function EmployeePayslipPage() {
         const token = localStorage.getItem('access_token')
         if (!token) throw new Error('No token')
         const res = await fetch(
-          `http://localhost:8000/api/v1/employment-info/employee-number/${employeeId}/`,
+          `${API_BASE_URL}/employment-info/employee-number/${employeeId}/`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -113,7 +114,7 @@ function EmployeePayslipPage() {
         const token = localStorage.getItem('access_token')
         if (!token) throw new Error('No token')
         const res = await fetch(
-          `http://localhost:8000/api/v1/payslip/user-all/${employeeId}/`,
+          `${API_BASE_URL}/payslip/user-all/${employeeId}/`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -204,7 +205,7 @@ function EmployeePayslipPage() {
       const empId = localStorage.getItem('user_id')
       if (!empId) throw new Error('No employee ID found.')
       const loginPayload = { id: empId, password }
-      const res = await fetch(`http://localhost:8000/api/v1/auth/login/`, {
+      const res = await fetch(`${API_BASE_URL}/auth/login/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginPayload)
@@ -218,7 +219,7 @@ function EmployeePayslipPage() {
       setEmployeeLastViewed(now)
 
       // Update employee_generated_at in backend
-      await fetch(`http://localhost:8000/api/v1/payslip/${displayedPayslip.id}/`, {
+      await fetch(`${API_BASE_URL}/payslip/${displayedPayslip.id}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',

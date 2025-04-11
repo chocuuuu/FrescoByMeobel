@@ -11,6 +11,7 @@ import {
 import NavBar from '../components/Nav_Bar'
 import companyLogo from '../assets/newlogo.png'
 import dayjs from 'dayjs'
+import { API_BASE_URL } from "../config/api"
 
 function AdminPayslipPage() {
   const navigate = useNavigate()
@@ -76,7 +77,7 @@ function AdminPayslipPage() {
         const token = localStorage.getItem('access_token')
         const adminId = localStorage.getItem('user_id')
         if (!token || !adminId) throw new Error('Missing token/admin ID')
-        const res = await fetch(`http://localhost:8000/api/v1/employment-info/employee-number/${adminId}/`, {
+        const res = await fetch(`${API_BASE_URL}/employment-info/employee-number/${adminId}/`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -108,7 +109,7 @@ function AdminPayslipPage() {
         setEmployeeLoading(true)
         const token = localStorage.getItem('access_token')
         if (!token) throw new Error('No token')
-        const res = await fetch(`http://localhost:8000/api/v1/employment-info/employee-number/${userId}`, {
+        const res = await fetch(`$${API_BASE_URL}/employment-info/employee-number/${userId}`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -140,7 +141,7 @@ function AdminPayslipPage() {
         setPayslipLoading(true)
         const token = localStorage.getItem('access_token')
         if (!token) throw new Error('No token')
-        const res = await fetch(`http://localhost:8000/api/v1/payslip/user-all/${userId}/`, {
+        const res = await fetch(`${API_BASE_URL}/payslip/user-all/${userId}/`, {
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -226,7 +227,7 @@ function AdminPayslipPage() {
       const adminId = localStorage.getItem('user_id')
       if (!adminId) throw new Error('No admin ID found.')
       const loginPayload = { id: adminId, password }
-      const res = await fetch('http://localhost:8000/api/v1/auth/login/', {
+      const res = await fetch('${API_BASE_URL}/auth/login/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(loginPayload)
@@ -246,7 +247,7 @@ function AdminPayslipPage() {
         ...prev,
         generated_at: currentDateTime
       }))
-      await fetch(`http://localhost:8000/api/v1/payslip/${displayedPayslip.id}/`, {
+      await fetch(`${API_BASE_URL}/payslip/${displayedPayslip.id}/`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -276,7 +277,7 @@ function AdminPayslipPage() {
         approved_at: currentDateTime
       }))
       try {
-        await fetch(`http://localhost:8000/api/v1/payslip/${displayedPayslip.id}/`, {
+        await fetch(`${API_BASE_URL}/payslip/${displayedPayslip.id}/`, {
           method: 'PATCH',
           headers: {
             'Content-Type': 'application/json',
