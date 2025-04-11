@@ -265,7 +265,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
         if (userPayroll) {
           setPayrollId(userPayroll.id)
-          // Set the status from the payroll record
+          // Set the status from the payroll record - ensure it's "Processing" if it has data
           setFormData((prev) => ({
             ...prev,
             status: userPayroll.status || "Pending",
@@ -312,6 +312,24 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
       // Then check if user has a payroll record
       const userPayroll = await checkUserPayroll(userId)
+
+      // Add this after the checkUserPayroll call in fetchEmployeePayrollData
+      if (userPayroll && userPayroll.status) {
+        // Only update the status if it's not already "Processing"
+        if (userPayroll.status !== "Processing") {
+          // If the user has payroll data but status is not "Processing", update it
+          const payrollUpdateResponse = await fetch(`${API_BASE_URL}/payroll/${userPayroll.id}/`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ status: "Processing" }),
+          })
+
+          if (payrollUpdateResponse.ok) {
+            console.log("Updated payroll status to Processing")
+            userPayroll.status = "Processing"
+          }
+        }
+      }
 
       // Check if employee has any data - DON'T automatically create records
       const hasData = userSalary !== null || userPayroll !== null || userSchedule !== null
@@ -627,6 +645,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   }
 
   // Replace the updateBenefitValues function with this simpler version that doesn't use the /calculate endpoint
+  // Replace the updateBenefitValues function with this simpler version that only fetches data
   const updateBenefitValues = async (userId) => {
     try {
       const accessToken = localStorage.getItem("access_token")
@@ -635,7 +654,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         "Content-Type": "application/json",
       }
 
-      // Fetch the current benefit records
+      // Fetch the current benefit records - GET only
       const [sssRecords, philhealthRecords, pagibigRecords] = await Promise.all([
         fetch(`${API_BASE_URL}/benefits/sss/`, { headers }).then((res) => (res.ok ? res.json() : [])),
         fetch(`${API_BASE_URL}/benefits/philhealth/`, { headers }).then((res) => (res.ok ? res.json() : [])),
@@ -648,6 +667,9 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const philhealthRecord = philhealthRecords.find((record) => record.user === userIdNum)
       const pagibigRecord = pagibigRecords.find((record) => record.user === userIdNum)
 
+      console.log("Found benefit records for update:", { sssRecord, philhealthRecord, pagibigRecord })
+
+      // Return the actual values from the records
       return {
         sss: sssRecord?.total_contribution || "0.00",
         philhealth: philhealthRecord?.total_contribution || "0.00",
@@ -879,7 +901,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       const updatedOvertimeId = totalOvertimeResult.id
 
       // 1.4 Update or create Benefit records (SSS, PhilHealth, Pag-IBIG)
-      console.log("Updating benefit records...")
+      // 1.4 Fetch Benefit records (SSS, PhilHealth, Pag-IBIG) - Only GET, no updates
+      console.log("Fetching benefit records...")
 
       // Fetch existing benefit records
       const [sssRecords, philhealthRecords, pagibigRecords] = await Promise.all([
@@ -888,124 +911,18 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         fetch(`${API_BASE_URL}/benefits/pagibig/`, { headers }).then((res) => (res.ok ? res.json() : [])),
       ])
 
-      // Get existing records or prepare to create new ones
+      // Get existing records
       const userIdNum = Number(userId)
       const sssRecord = sssRecords.find((record) => record.user === userIdNum)
       const philhealthRecord = philhealthRecords.find((record) => record.user === userIdNum)
       const pagibigRecord = pagibigRecords.find((record) => record.user === userIdNum)
 
-      // Update or create SSS record
-      const sssData = {
-        user: userId,
-        basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
-      }
+      console.log("Found benefit records:", { sssRecord, philhealthRecord, pagibigRecord })
 
-      let sssResponse
-      if (sssRecord) {
-        // Only update the basic_salary, preserve all other values
-        sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/${sssRecord.id}/`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify(sssData),
-        })
-      } else {
-        // If creating a new record, include default values
-        const newSssData = {
-          ...sssData,
-          msc: "5000.00",
-          employee_share: "0.00",
-          employer_share: "500.00",
-          ec_contribution: "10.00",
-          employer_mpf_contribution: "0.00",
-          employee_mpf_contribution: "0.00",
-          total_employer: "510.00",
-          total_employee: "0.00",
-          total_contribution: "510.00",
-        }
-        sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(newSssData),
-        })
-      }
-
-      if (!sssResponse.ok) {
-        console.error("Failed to update/create SSS record:", await sssResponse.text())
-        throw new Error("Failed to update/create SSS record")
-      }
-
-      const sssResult = await sssResponse.json()
-      console.log("SSS update/create result:", sssResult)
-      const updatedSssId = sssResult.id
-
-      // Update or create PhilHealth record
-      const philhealthData = {
-        user: userId,
-        basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
-        total_contribution: Number.parseFloat(updatedFormData.philhealth.amount).toFixed(2),
-      }
-
-      let philhealthResponse
-      if (philhealthRecord) {
-        philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/${philhealthRecord.id}/`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify(philhealthData),
-        })
-      } else {
-        philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(philhealthData),
-        })
-      }
-
-      if (!philhealthResponse.ok) {
-        console.error("Failed to update/create PhilHealth record:", await philhealthResponse.text())
-        throw new Error("Failed to update/create PhilHealth record")
-      }
-
-      const philhealthResult = await philhealthResponse.json()
-      console.log("PhilHealth update/create result:", philhealthResult)
-      const updatedPhilhealthId = philhealthResult.id
-
-      // Update or create Pag-IBIG record
-      const pagibigData = {
-        user: userId,
-        basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
-      }
-
-      let pagibigResponse
-      if (pagibigRecord) {
-        // Only update the basic_salary, preserve all other values
-        pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/${pagibigRecord.id}/`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify(pagibigData),
-        })
-      } else {
-        // If creating a new record, include default values
-        const newPagibigData = {
-          ...pagibigData,
-          employee_share: "0.00",
-          employer_share: "200.00",
-          total_contribution: "200.00",
-        }
-        pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(newPagibigData),
-        })
-      }
-
-      if (!pagibigResponse.ok) {
-        console.error("Failed to update/create Pag-IBIG record:", await pagibigResponse.text())
-        throw new Error("Failed to update/create Pag-IBIG record")
-      }
-
-      const pagibigResult = await pagibigResponse.json()
-      console.log("Pag-IBIG update/create result:", pagibigResult)
-      const updatedPagibigId = pagibigResult.id
+      // Store the IDs for reference in the salary record
+      const updatedSssId = sssRecord?.id || null
+      const updatedPhilhealthId = philhealthRecord?.id || null
+      const updatedPagibigId = pagibigRecord?.id || null
 
       // STEP 2: Update or create the salary record
       // ------------------------------------------
@@ -1048,13 +965,17 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           earnings_id: updatedEarningsId,
           deductions_id: updatedDeductionsId,
           overtime_id: updatedOvertimeId,
-          sss_id: updatedSssId,
-          philhealth_id: updatedPhilhealthId,
-          pagibig_id: updatedPagibigId,
-          pay_date: formData.payDate
-            ? new Date(formData.payDate).toISOString().split("T")[0]
-            : new Date().toISOString().split("T")[0],
         }
+
+        // Only add benefit IDs if they exist
+        if (updatedSssId) salaryCreateData.sss_id = updatedSssId
+        if (updatedPhilhealthId) salaryCreateData.philhealth_id = updatedPhilhealthId
+        if (updatedPagibigId) salaryCreateData.pagibig_id = updatedPagibigId
+
+        // Add pay date
+        salaryCreateData.pay_date = formData.payDate
+          ? new Date(formData.payDate).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0]
 
         const salaryResponse = await fetch(`${API_BASE_URL}/salary/`, {
           method: "POST",
