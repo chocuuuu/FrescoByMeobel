@@ -16,6 +16,47 @@ import EmployeeSchedulePage from "./pages/Employee_Schedule_Page"
 import ActivityLogPage from "./pages/Admin_Activity_Logs_Page"
 import ForceLogout from "./pages/ForceLogout"
 import NavigationGuard from "./components/Navigation_Guard"
+import EmployeePayslipPage from "./pages/Employee_Payslip_Page.jsx"
+import AdminPayslipPage from "./pages/Admin_Payslip_Page.jsx"
+
+// Session checker component
+function SessionChecker() {
+  const navigate = useNavigate()
+  const location = useLocation()
+
+  useEffect(() => {
+    // Check if the current route is not a public route
+    const isPublicRoute =
+      location.pathname === "/" ||
+      location.pathname.startsWith("/forgot-password") ||
+      location.pathname.startsWith("/reset-password")
+
+    if (!isPublicRoute) {
+      const token = localStorage.getItem("access_token")
+      if (!token) {
+        // Redirect to login if no token
+        navigate("/", { replace: true })
+      }
+    }
+
+    // Prevent back navigation after logout
+    const handlePopState = () => {
+      const token = localStorage.getItem("access_token")
+      if (!token && !isPublicRoute) {
+        navigate("/", { replace: true })
+      }
+    }
+
+    window.addEventListener("popstate", handlePopState)
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState)
+    }
+  }, [navigate, location])
+
+  return null
+}
+>>>>>>> main
 
 // Protected route component
 function ProtectedRoute({ children, allowedRoles }) {
@@ -99,6 +140,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/admin-payslip/:userId"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminPayslipPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Employee routes */}
         <Route
@@ -110,10 +159,10 @@ function App() {
           }
         />
         <Route
-          path="/payslip"
+          path="/employee-payslip/:userId"
           element={
             <ProtectedRoute allowedRoles={["admin", "owner", "employee"]}>
-              <PayslipPage />
+              <EmployeePayslipPage/>
             </ProtectedRoute>
           }
         />

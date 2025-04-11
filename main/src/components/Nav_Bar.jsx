@@ -62,7 +62,7 @@ function NavBar() {
       // For employees, show only relevant links
       return [
         { name: "SCHEDULE", href: "/employee/schedule" },
-        { name: "PAYSLIP", href: "/payslip" },
+        { name: "PAYSLIP", href: "/employee-payslip/:userId" },
       ]
     }
 
