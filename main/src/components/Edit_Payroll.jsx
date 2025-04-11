@@ -29,14 +29,13 @@ const handleTokenError = () => {
 function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   const [formData, setFormData] = useState({
     // Payroll Dates
-    payrollPeriodStart: "",
-    payrollPeriodEnd: "",
-    payDate: "",
+    payrollPeriodStart: "10/26/24",
+    payrollPeriodEnd: "11/10/24",
+    payDate: "11/15/2024",
 
     // Earnings
     basicRate: 0,
     basic: 0,
-
     allowance: 0,
     ntax: 0,
     vacationleave: 0,
@@ -137,16 +136,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
           setDeductionsId(userSalary.deductions_id)
           setTotalOvertimeId(userSalary.overtime_id)
           console.log("Found salary record:", userSalary)
-
-          // Format and set pay date from salary record
-          if (userSalary.pay_date) {
-            const formattedDate = formatDate(userSalary.pay_date)
-            setFormData((prevData) => ({
-              ...prevData,
-              payDate: formattedDate,
-            }))
-          }
-
           return userSalary
         }
       }
@@ -157,16 +146,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.error("Error checking user salary:", error)
       return null
     }
-  }
-
-  // Function to format date from YYYY-MM-DD to MM/DD/YYYY
-  const formatDate = (dateStr) => {
-    if (!dateStr) return ""
-    const date = new Date(dateStr)
-    const month = (date.getMonth() + 1).toString().padStart(2, "0")
-    const day = date.getDate().toString().padStart(2, "0")
-    const year = date.getFullYear().toString()
-    return `${month}/${day}/${year}`
   }
 
   // Function to check if a user has a payroll record
@@ -190,28 +169,6 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         if (userPayroll) {
           setPayrollId(userPayroll.id)
           console.log("Found payroll record:", userPayroll)
-
-          // If payroll record contains period information, set it
-          if (
-            userPayroll.schedule_id &&
-            userPayroll.schedule_id.payroll_period_start &&
-            userPayroll.schedule_id.payroll_period_end
-          ) {
-            setFormData((prevData) => ({
-              ...prevData,
-              payrollPeriodStart: formatDate(userPayroll.schedule_id.payroll_period_start),
-              payrollPeriodEnd: formatDate(userPayroll.schedule_id.payroll_period_end),
-            }))
-          }
-
-          // Set pay date from payroll record
-          if (userPayroll.pay_date) {
-            setFormData((prevData) => ({
-              ...prevData,
-              payDate: formatDate(userPayroll.pay_date),
-            }))
-          }
-
           return userPayroll
         }
       }
@@ -265,47 +222,45 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       if (!totalOvertimeResponse.ok) throw new Error("Failed to fetch total overtime data")
       const totalOvertimeData = await totalOvertimeResponse.json()
 
-      // Fetch schedule data to get current payroll period
+      // Fetch schedule data to get payroll periods
       const scheduleResponse = await fetch(`${API_BASE_URL}/schedule/?user_id=${userId}`, { headers })
-      if (!scheduleResponse.ok) throw new Error("Failed to fetch schedule data")
-      const scheduleData = await scheduleResponse.json()
+      if (scheduleResponse.ok) {
+        const scheduleData = await scheduleResponse.json()
+        if (scheduleData.length > 0) {
+          const userSchedule = scheduleData.find((schedule) => schedule.user_id === userId)
+          if (userSchedule) {
+            console.log("Found schedule with payroll periods:", userSchedule)
 
-      // Find the current payroll period
-      const today = new Date()
-      let currentSchedule = null
+            // Update form data with payroll periods if available
+            if (userSchedule.payroll_period_start && userSchedule.payroll_period_end) {
+              // Format dates from YYYY-MM-DD to MM/DD/YY
+              const formatDate = (dateStr) => {
+                if (!dateStr) return ""
+                const date = new Date(dateStr)
+                const month = (date.getMonth() + 1).toString().padStart(2, "0")
+                const day = date.getDate().toString().padStart(2, "0")
+                const year = date.getFullYear().toString().slice(2)
+                return `${month}/${day}/${year}`
+              }
 
-      if (scheduleData.length > 0) {
-        // First try to find a schedule where today is between start and end dates
-        currentSchedule = scheduleData.find((schedule) => {
-          const startDate = new Date(schedule.payroll_period_start)
-          const endDate = new Date(schedule.payroll_period_end)
-          return today >= startDate && today <= endDate
-        })
-
-        // If not found, use the most recent schedule
-        if (!currentSchedule) {
-          // Sort schedules by end date in descending order
-          const sortedSchedules = [...scheduleData].sort((a, b) => {
-            return new Date(b.payroll_period_end) - new Date(a.payroll_period_end)
-          })
-          currentSchedule = sortedSchedules[0]
-        }
-
-        if (currentSchedule) {
-          console.log("Found current schedule:", currentSchedule)
-
-          // Update form data with payroll periods
-          setFormData((prevData) => ({
-            ...prevData,
-            payrollPeriodStart: formatDate(currentSchedule.payroll_period_start),
-            payrollPeriodEnd: formatDate(currentSchedule.payroll_period_end),
-            // Calculate pay date (typically 5 days after period end)
-            payDate: (() => {
-              const endDate = new Date(currentSchedule.payroll_period_end)
-              endDate.setDate(endDate.getDate() + 5) // Pay date is typically 5 days after period end
-              return formatDate(endDate.toISOString().split("T")[0])
-            })(),
-          }))
+              setFormData((prevData) => ({
+                ...prevData,
+                payrollPeriodStart: formatDate(userSchedule.payroll_period_start),
+                payrollPeriodEnd: formatDate(userSchedule.payroll_period_end),
+                // Keep the existing pay date or calculate it (typically 5 days after period end)
+                payDate:
+                  prevData.payDate ||
+                  (() => {
+                    if (userSchedule.payroll_period_end) {
+                      const endDate = new Date(userSchedule.payroll_period_end)
+                      endDate.setDate(endDate.getDate() + 5) // Pay date is typically 5 days after period end
+                      return `${(endDate.getMonth() + 1).toString().padStart(2, "0")}/${endDate.getDate().toString().padStart(2, "0")}/${endDate.getFullYear()}`
+                    }
+                    return prevData.payDate
+                  })(),
+              }))
+            }
+          }
         }
       }
 
@@ -319,55 +274,24 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Total overtime data:", totalOvertimeData)
       console.log("Overtime hours data:", overtimeData)
 
-      // Fetch SSS data
-      console.log("Fetching SSS data for user ID:", userId)
-      const sssResponse = await fetch(`${API_BASE_URL}/sss/?user=${userId}`, { headers })
-      if (!sssResponse.ok) {
-        console.warn("Failed to fetch SSS data, will use default values")
-      }
+      // Fetch SSS, PhilHealth, and Pag-IBIG data
+      console.log("Fetching benefit records for user ID:", userId)
+      const [sssRecords, philhealthRecords, pagibigRecords] = await Promise.all([
+        fetch(`${API_BASE_URL}/benefits/sss/?user=${userId}`, { headers }).then((res) => (res.ok ? res.json() : [])),
+        fetch(`${API_BASE_URL}/benefits/philhealth/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+        fetch(`${API_BASE_URL}/benefits/pagibig/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+      ])
 
-      let sssData = []
-      try {
-        sssData = await sssResponse.json()
-        console.log("SSS data:", sssData)
-      } catch (e) {
-        console.error("Error parsing SSS data:", e)
-      }
+      console.log("Benefit records:", { sssRecords, philhealthRecords, pagibigRecords })
 
-      // Fetch PhilHealth data
-      console.log("Fetching PhilHealth data for user ID:", userId)
-      const philhealthResponse = await fetch(`${API_BASE_URL}/philhealth/?user=${userId}`, { headers })
-      if (!philhealthResponse.ok) {
-        console.warn("Failed to fetch PhilHealth data, will use default values")
-      }
-
-      let philhealthData = []
-      try {
-        philhealthData = await philhealthResponse.json()
-        console.log("PhilHealth data:", philhealthData)
-      } catch (e) {
-        console.error("Error parsing PhilHealth data:", e)
-      }
-
-      // Fetch Pag-IBIG data
-      console.log("Fetching Pag-IBIG data for user ID:", userId)
-      const pagibigResponse = await fetch(`${API_BASE_URL}/pagibig/?user=${userId}`, { headers })
-      if (!pagibigResponse.ok) {
-        console.warn("Failed to fetch Pag-IBIG data, will use default values")
-      }
-
-      let pagibigData = []
-      try {
-        pagibigData = await pagibigResponse.json()
-        console.log("Pag-IBIG data:", pagibigData)
-      } catch (e) {
-        console.error("Error parsing Pag-IBIG data:", e)
-      }
-
-      // Extract SSS, PhilHealth, and Pag-IBIG data
-      const sssRecord = sssData.find((record) => record.user === Number(userId))
-      const philhealthRecord = philhealthData.find((record) => record.user === Number(userId))
-      const pagibigRecord = pagibigData.find((record) => record.user === Number(userId))
+      // Find the benefit records for this user
+      const sssRecord = sssRecords.find((record) => record.user === Number.parseInt(userId))
+      const philhealthRecord = philhealthRecords.find((record) => record.user === Number.parseInt(userId))
+      const pagibigRecord = pagibigRecords.find((record) => record.user === Number.parseInt(userId))
 
       // Store record IDs for updates - only if they belong to this user
       if (earningsData.length > 0) {
@@ -510,6 +434,10 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
     // Update deductions data if available
     if (deductions) {
+      newFormData.sss.amount = deductions.sss?.toString() || newFormData.sss.amount
+      newFormData.philhealth.amount = deductions.philhealth?.toString() || newFormData.philhealth.amount
+      newFormData.pagibig.amount = deductions.pagibig?.toString() || newFormData.pagibig.amount
+      newFormData.late.amount = deductions.late?.toString() || newFormData.late.amount
       newFormData.wtax.amount = deductions.wtax?.toString() || newFormData.wtax.amount
       newFormData.nowork.amount = deductions.nowork?.toString() || newFormData.nowork.amount
       newFormData.loan.amount = deductions.loan?.toString() || newFormData.loan.amount
@@ -551,17 +479,15 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       newFormData.backwage.rate = totalOvertime.total_backwage?.toString() || newFormData.backwage.rate
     }
 
-    // Update SSS data if available
+    // Update benefit values if available
     if (sssRecord) {
       newFormData.sss.amount = sssRecord.employee_share?.toString() || newFormData.sss.amount
     }
 
-    // Update PhilHealth data if available
     if (philhealthRecord) {
       newFormData.philhealth.amount = philhealthRecord.total_contribution?.toString() || newFormData.philhealth.amount
     }
 
-    // Update Pag-IBIG data if available
     if (pagibigRecord) {
       newFormData.pagibig.amount = pagibigRecord.employee_share?.toString() || newFormData.pagibig.amount
     }
@@ -645,53 +571,32 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         "Content-Type": "application/json",
       }
 
-      // Fetch SSS contribution
-      const sssResponse = await fetch(`${API_BASE_URL}/sss/calculate/?salary=${basicRate}`, { headers })
-      let sssData = { employee_share: 0 }
-      if (sssResponse.ok) {
-        sssData = await sssResponse.json()
-      }
+      // Calculate SSS contribution
+      const sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/?salary=${basicRate}`, { headers })
+      if (!sssResponse.ok) throw new Error("Failed to calculate SSS contribution")
+      const sssData = await sssResponse.json()
 
-      // Fetch PhilHealth contribution
-      const philhealthResponse = await fetch(`${API_BASE_URL}/philhealth/calculate/?salary=${basicRate}`, { headers })
-      let philhealthData = { total_contribution: 0 }
-      if (philhealthResponse.ok) {
-        philhealthData = await philhealthResponse.json()
-      }
+      // Calculate PhilHealth contribution
+      const philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/?salary=${basicRate}`, { headers })
+      if (!philhealthResponse.ok) throw new Error("Failed to calculate PhilHealth contribution")
+      const philhealthData = await philhealthResponse.json()
 
-      // Fetch Pag-IBIG contribution
-      const pagibigResponse = await fetch(`${API_BASE_URL}/pagibig/calculate/?salary=${basicRate}`, { headers })
-      let pagibigData = { employee_share: 0 }
-      if (pagibigResponse.ok) {
-        pagibigData = await pagibigResponse.json()
-      }
-
-      console.log("Calculated benefits:", {
-        sss: sssData,
-        philhealth: philhealthData,
-        pagibig: pagibigData,
-      })
+      // Calculate Pag-IBIG contribution
+      const pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/?salary=${basicRate}`, { headers })
+      if (!pagibigResponse.ok) throw new Error("Failed to calculate Pag-IBIG contribution")
+      const pagibigData = await pagibigResponse.json()
 
       return {
-        sss: sssData.employee_share || 0,
-        philhealth: philhealthData.total_contribution || 0,
-        pagibig: pagibigData.employee_share || 0,
+        sss: sssData.contribution || 0,
+        philhealth: philhealthData.contribution || 0,
+        pagibig: pagibigData.contribution || 0,
       }
     } catch (error) {
       console.error("Error calculating benefits:", error)
-
-      // Fallback to default calculations if API fails
-      const basicRateNum = Number.parseFloat(basicRate) || 0
-
-      // Simple default calculations
-      const sss = basicRateNum * 0.045 // 4.5% of basic rate
-      const philhealth = basicRateNum * 0.035 // 3.5% of basic rate
-      const pagibig = 100 // Fixed amount
-
       return {
-        sss,
-        philhealth,
-        pagibig,
+        sss: 0,
+        philhealth: 0,
+        pagibig: 0,
       }
     }
   }
@@ -733,10 +638,7 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
 
     // If basic rate is changed, recalculate SSS, PhilHealth, and Pag-IBIG
     if (section === "basicRate") {
-      console.log("Basic rate changed, calculating benefits for:", value)
       const benefits = await calculateBenefits(value)
-      console.log("Calculated benefits:", benefits)
-
       newFormData.sss.amount = benefits.sss.toString()
       newFormData.philhealth.amount = benefits.philhealth.toString()
       newFormData.pagibig.amount = benefits.pagibig.toString()
@@ -756,7 +658,8 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
     return numValue.toFixed(2)
   }
 
-  // Updated handleSubmit function to use PATCH for existing records
+  // Find the handleSubmit function and replace it with this updated version
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
@@ -776,28 +679,14 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
         "Content-Type": "application/json",
       }
 
-      // Recalculate benefits based on the current basic rate
-      const benefits = await calculateBenefits(formData.basicRate)
-
-      // Update the form data with the calculated benefits
-      const updatedFormData = {
-        ...formData,
-        sss: { amount: benefits.sss.toString() },
-        philhealth: { amount: benefits.philhealth.toString() },
-        pagibig: { amount: benefits.pagibig.toString() },
-      }
-
-      // Calculate totals with the updated benefits
-      const totals = calculateTotals(updatedFormData)
-      const finalFormData = { ...updatedFormData, ...totals }
-
-      // Update the state with the new values
-      setFormData(finalFormData)
+      // Calculate totals to ensure they're up-to-date
+      const totals = calculateTotals(formData)
+      const updatedFormData = { ...formData, ...totals }
 
       // Use the updated totals for all calculations
-      const totalGross = Number.parseFloat(finalFormData.totalGross)
-      const totalDeductions = Number.parseFloat(finalFormData.totalDeductions)
-      const totalSalaryCompensation = Number.parseFloat(finalFormData.totalSalaryCompensation)
+      const totalGross = Number.parseFloat(updatedFormData.totalGross)
+      const totalDeductions = Number.parseFloat(updatedFormData.totalDeductions)
+      const totalSalaryCompensation = Number.parseFloat(updatedFormData.totalSalaryCompensation)
 
       // STEP 1: Update or create the base components only
       // ------------------------------------------------
@@ -806,12 +695,12 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       console.log("Updating earnings record...")
       const earningsData = {
         user: userId,
-        basic_rate: Number.parseFloat(finalFormData.basicRate).toFixed(2),
-        basic: Number.parseFloat(finalFormData.basic).toFixed(2),
-        allowance: Number.parseFloat(finalFormData.allowance).toFixed(2),
-        ntax: Number.parseFloat(finalFormData.ntax).toFixed(2),
-        vacationleave: Number.parseFloat(finalFormData.vacationleave).toFixed(2),
-        sickleave: Number.parseFloat(finalFormData.sickleave).toFixed(2),
+        basic_rate: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        basic: Number.parseFloat(updatedFormData.basic).toFixed(2),
+        allowance: Number.parseFloat(updatedFormData.allowance).toFixed(2),
+        ntax: Number.parseFloat(updatedFormData.ntax).toFixed(2),
+        vacationleave: Number.parseFloat(updatedFormData.vacationleave).toFixed(2),
+        sickleave: Number.parseFloat(updatedFormData.sickleave).toFixed(2),
       }
 
       let earningsResponse
@@ -832,22 +721,29 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       if (!earningsResponse.ok) {
-        throw new Error(`Failed to update earnings: ${earningsResponse.status} ${earningsResponse.statusText}`)
+        const errorData = await earningsResponse.json()
+        console.error("Earnings update/create error:", errorData)
+        throw new Error(`Failed to update earnings data: ${JSON.stringify(errorData)}`)
       }
 
       const earningsResult = await earningsResponse.json()
-      console.log("Earnings updated:", earningsResult)
-      setEarningsId(earningsResult.id)
+      console.log("Earnings update/create result:", earningsResult)
+      const updatedEarningsId = earningsResult.id
 
       // 1.2 Update or create Deductions record
       console.log("Updating deductions record...")
       const deductionsData = {
         user: userId,
-        wtax: Number.parseFloat(finalFormData.wtax.amount).toFixed(2),
-        nowork: Number.parseFloat(finalFormData.nowork.amount).toFixed(2),
-        loan: Number.parseFloat(finalFormData.loan.amount).toFixed(2),
-        charges: Number.parseFloat(finalFormData.charges.amount).toFixed(2),
-        msfcloan: Number.parseFloat(finalFormData.msfcloan.amount).toFixed(2),
+        sss: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+        philhealth: Number.parseFloat(updatedFormData.philhealth.amount).toFixed(2),
+        pagibig: Number.parseFloat(updatedFormData.pagibig.amount).toFixed(2),
+        late: Number.parseFloat(updatedFormData.late.amount).toFixed(2),
+        wtax: Number.parseFloat(updatedFormData.wtax.amount).toFixed(2),
+        nowork: Number.parseFloat(updatedFormData.nowork.amount).toFixed(2),
+        loan: Number.parseFloat(updatedFormData.loan.amount).toFixed(2),
+        charges: Number.parseFloat(updatedFormData.charges.amount).toFixed(2),
+        undertime: Number.parseFloat(updatedFormData.undertime.amount).toFixed(2),
+        msfcloan: Number.parseFloat(updatedFormData.msfcloan.amount).toFixed(2),
       }
 
       let deductionsResponse
@@ -868,25 +764,35 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       if (!deductionsResponse.ok) {
-        throw new Error(`Failed to update deductions: ${deductionsResponse.status} ${deductionsResponse.statusText}`)
+        const errorData = await deductionsResponse.json()
+        console.error("Deductions update/create error:", errorData)
+        throw new Error(`Failed to update deductions data: ${JSON.stringify(errorData)}`)
       }
 
       const deductionsResult = await deductionsResponse.json()
-      console.log("Deductions updated:", deductionsResult)
-      setDeductionsId(deductionsResult.id)
+      console.log("Deductions update/create result:", deductionsResult)
+      const updatedDeductionsId = deductionsResult.id
 
-      // 1.3 Update or create Total Overtime record
+      // 1.3 Update or create TotalOvertime record
       console.log("Updating total overtime record...")
       const totalOvertimeData = {
         user: userId,
-        total_regularot: Number.parseFloat(finalFormData.regularOT.rate).toFixed(2),
-        total_regularholiday: Number.parseFloat(finalFormData.regularHoliday.rate).toFixed(2),
-        total_specialholiday: Number.parseFloat(finalFormData.specialHoliday.rate).toFixed(2),
-        total_restday: Number.parseFloat(finalFormData.restDay.rate).toFixed(2),
-        total_nightdiff: Number.parseFloat(finalFormData.nightDiff.rate).toFixed(2),
-        total_backwage: Number.parseFloat(finalFormData.backwage.rate).toFixed(2),
-        total_late: Number.parseFloat(finalFormData.late.amount).toFixed(2),
-        total_undertime: Number.parseFloat(finalFormData.undertime.amount).toFixed(2),
+        total_regularot: Number.parseFloat(updatedFormData.regularOT.rate).toFixed(2),
+        total_regularholiday: Number.parseFloat(updatedFormData.regularHoliday.rate).toFixed(2),
+        total_specialholiday: Number.parseFloat(updatedFormData.specialHoliday.rate).toFixed(2),
+        total_restday: Number.parseFloat(updatedFormData.restDay.rate).toFixed(2),
+        total_nightdiff: Number.parseFloat(updatedFormData.nightDiff.rate).toFixed(2),
+        total_backwage: Number.parseFloat(updatedFormData.backwage.rate).toFixed(2),
+        total_overtime: (
+          Number.parseFloat(updatedFormData.regularOT.rate) +
+          Number.parseFloat(updatedFormData.regularHoliday.rate) +
+          Number.parseFloat(updatedFormData.specialHoliday.rate) +
+          Number.parseFloat(updatedFormData.restDay.rate) +
+          Number.parseFloat(updatedFormData.nightDiff.rate)
+        ).toFixed(2),
+        total_late: Number.parseFloat(updatedFormData.late.amount).toFixed(2),
+        total_undertime: Number.parseFloat(updatedFormData.undertime.amount).toFixed(2),
+        biweek_start: new Date().toISOString().split("T")[0],
       }
 
       let totalOvertimeResponse
@@ -907,39 +813,58 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       if (!totalOvertimeResponse.ok) {
-        throw new Error(
-          `Failed to update total overtime: ${totalOvertimeResponse.status} ${totalOvertimeResponse.statusText}`,
-        )
+        const errorData = await totalOvertimeResponse.json()
+        console.error("Total overtime update/create error:", errorData)
+        throw new Error(`Failed to update total overtime data: ${JSON.stringify(errorData)}`)
       }
 
       const totalOvertimeResult = await totalOvertimeResponse.json()
-      console.log("Total overtime updated:", totalOvertimeResult)
-      setTotalOvertimeId(totalOvertimeResult.id)
+      console.log("Total overtime update/create result:", totalOvertimeResult)
+      const updatedOvertimeId = totalOvertimeResult.id
 
-      // 1.4 Update or create SSS record
-      console.log("Updating SSS record...")
+      // 1.4 Update or create Benefit records (SSS, PhilHealth, Pag-IBIG)
+      console.log("Updating benefit records...")
+
+      // Fetch existing benefit records
+      const [sssRecords, philhealthRecords, pagibigRecords] = await Promise.all([
+        fetch(`${API_BASE_URL}/benefits/sss/?user=${userId}`, { headers }).then((res) => (res.ok ? res.json() : [])),
+        fetch(`${API_BASE_URL}/benefits/philhealth/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+        fetch(`${API_BASE_URL}/benefits/pagibig/?user=${userId}`, { headers }).then((res) =>
+          res.ok ? res.json() : [],
+        ),
+      ])
+
+      // Get existing records or prepare to create new ones
+      const sssRecord = sssRecords.find((record) => record.user === Number.parseInt(userId))
+      const philhealthRecord = philhealthRecords.find((record) => record.user === Number.parseInt(userId))
+      const pagibigRecord = pagibigRecords.find((record) => record.user === Number.parseInt(userId))
+
+      // Update or create SSS record
       const sssData = {
         user: userId,
-        basic_salary: Number.parseFloat(finalFormData.basicRate).toFixed(2),
-        employee_share: Number.parseFloat(finalFormData.sss.amount).toFixed(2),
+        basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        msc: "5000.00",
+        employee_share: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+        employer_share: "500.00",
+        ec_contribution: "10.00",
+        employer_mpf_contribution: "0.00",
+        employee_mpf_contribution: "0.00",
+        total_employer: "510.00",
+        total_employee: Number.parseFloat(updatedFormData.sss.amount).toFixed(2),
+        total_contribution: (Number.parseFloat(updatedFormData.sss.amount) + 510).toFixed(2),
       }
 
-      // Check if SSS record exists
-      const sssCheckResponse = await fetch(`${API_BASE_URL}/sss/?user=${userId}`, { headers })
-      const sssRecords = await sssCheckResponse.json()
-      const existingSssRecord = sssRecords.find((record) => record.user === Number(userId))
-
       let sssResponse
-      if (existingSssRecord) {
-        // Update existing record
-        sssResponse = await fetch(`${API_BASE_URL}/sss/${existingSssRecord.id}/`, {
+      if (sssRecord) {
+        sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/${sssRecord.id}/`, {
           method: "PATCH",
           headers,
           body: JSON.stringify(sssData),
         })
       } else {
-        // Create new record
-        sssResponse = await fetch(`${API_BASE_URL}/sss/`, {
+        sssResponse = await fetch(`${API_BASE_URL}/benefits/sss/`, {
           method: "POST",
           headers,
           body: JSON.stringify(sssData),
@@ -947,36 +872,30 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       if (!sssResponse.ok) {
-        throw new Error(`Failed to update SSS: ${sssResponse.status} ${sssResponse.statusText}`)
+        console.error("Failed to update/create SSS record:", await sssResponse.text())
+        throw new Error("Failed to update/create SSS record")
       }
 
       const sssResult = await sssResponse.json()
-      console.log("SSS updated:", sssResult)
+      console.log("SSS update/create result:", sssResult)
+      const updatedSssId = sssResult.id
 
-      // 1.5 Update or create PhilHealth record
-      console.log("Updating PhilHealth record...")
+      // Update or create PhilHealth record
       const philhealthData = {
         user: userId,
-        basic_salary: Number.parseFloat(finalFormData.basicRate).toFixed(2),
-        total_contribution: Number.parseFloat(finalFormData.philhealth.amount).toFixed(2),
+        basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        total_contribution: Number.parseFloat(updatedFormData.philhealth.amount).toFixed(2),
       }
 
-      // Check if PhilHealth record exists
-      const philhealthCheckResponse = await fetch(`${API_BASE_URL}/philhealth/?user=${userId}`, { headers })
-      const philhealthRecords = await philhealthCheckResponse.json()
-      const existingPhilhealthRecord = philhealthRecords.find((record) => record.user === Number(userId))
-
       let philhealthResponse
-      if (existingPhilhealthRecord) {
-        // Update existing record
-        philhealthResponse = await fetch(`${API_BASE_URL}/philhealth/${existingPhilhealthRecord.id}/`, {
+      if (philhealthRecord) {
+        philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/${philhealthRecord.id}/`, {
           method: "PATCH",
           headers,
           body: JSON.stringify(philhealthData),
         })
       } else {
-        // Create new record
-        philhealthResponse = await fetch(`${API_BASE_URL}/philhealth/`, {
+        philhealthResponse = await fetch(`${API_BASE_URL}/benefits/philhealth/`, {
           method: "POST",
           headers,
           body: JSON.stringify(philhealthData),
@@ -984,36 +903,32 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       if (!philhealthResponse.ok) {
-        throw new Error(`Failed to update PhilHealth: ${philhealthResponse.status} ${philhealthResponse.statusText}`)
+        console.error("Failed to update/create PhilHealth record:", await philhealthResponse.text())
+        throw new Error("Failed to update/create PhilHealth record")
       }
 
       const philhealthResult = await philhealthResponse.json()
-      console.log("PhilHealth updated:", philhealthResult)
+      console.log("PhilHealth update/create result:", philhealthResult)
+      const updatedPhilhealthId = philhealthResult.id
 
-      // 1.6 Update or create Pag-IBIG record
-      console.log("Updating Pag-IBIG record...")
+      // Update or create Pag-IBIG record
       const pagibigData = {
         user: userId,
-        basic_salary: Number.parseFloat(finalFormData.basicRate).toFixed(2),
-        employee_share: Number.parseFloat(finalFormData.pagibig.amount).toFixed(2),
+        basic_salary: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+        employee_share: Number.parseFloat(updatedFormData.pagibig.amount).toFixed(2),
+        employer_share: "200.00",
+        total_contribution: (Number.parseFloat(updatedFormData.pagibig.amount) + 200).toFixed(2),
       }
 
-      // Check if Pag-IBIG record exists
-      const pagibigCheckResponse = await fetch(`${API_BASE_URL}/pagibig/?user=${userId}`, { headers })
-      const pagibigRecords = await pagibigCheckResponse.json()
-      const existingPagibigRecord = pagibigRecords.find((record) => record.user === Number(userId))
-
       let pagibigResponse
-      if (existingPagibigRecord) {
-        // Update existing record
-        pagibigResponse = await fetch(`${API_BASE_URL}/pagibig/${existingPagibigRecord.id}/`, {
+      if (pagibigRecord) {
+        pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/${pagibigRecord.id}/`, {
           method: "PATCH",
           headers,
           body: JSON.stringify(pagibigData),
         })
       } else {
-        // Create new record
-        pagibigResponse = await fetch(`${API_BASE_URL}/pagibig/`, {
+        pagibigResponse = await fetch(`${API_BASE_URL}/benefits/pagibig/`, {
           method: "POST",
           headers,
           body: JSON.stringify(pagibigData),
@@ -1021,106 +936,84 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
       }
 
       if (!pagibigResponse.ok) {
-        throw new Error(`Failed to update Pag-IBIG: ${pagibigResponse.status} ${pagibigResponse.statusText}`)
+        console.error("Failed to update/create Pag-IBIG record:", await pagibigResponse.text())
+        throw new Error("Failed to update/create Pag-IBIG record")
       }
 
       const pagibigResult = await pagibigResponse.json()
-      console.log("Pag-IBIG updated:", pagibigResult)
+      console.log("Pag-IBIG update/create result:", pagibigResult)
+      const updatedPagibigId = pagibigResult.id
 
-      // STEP 2: Create or update the Salary record
-      // -----------------------------------------
-      console.log("Updating salary record...")
-
-      // Parse the pay date
-      const payDateParts = finalFormData.payDate.split("/")
-      const formattedPayDate = `${payDateParts[2]}-${payDateParts[0]}-${payDateParts[1]}`
-
-      const salaryData = {
-        user_id: userId,
-        earnings_id: earningsResult.id,
-        deductions_id: deductionsResult.id,
-        overtime_id: totalOvertimeResult.id,
-        sss_id: sssResult.id,
-        philhealth_id: philhealthResult.id,
-        pagibig_id: pagibigResult.id,
-        pay_date: formattedPayDate,
-      }
-
-      let salaryResponse
-      if (salaryId) {
-        // Update existing record
-        salaryResponse = await fetch(`${API_BASE_URL}/salary/${salaryId}/`, {
-          method: "PATCH",
-          headers,
-          body: JSON.stringify(salaryData),
-        })
-      } else {
-        // Create new record
-        salaryResponse = await fetch(`${API_BASE_URL}/salary/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(salaryData),
-        })
-      }
-
-      if (!salaryResponse.ok) {
-        throw new Error(`Failed to update salary: ${salaryResponse.status} ${salaryResponse.statusText}`)
-      }
-
-      const salaryResult = await salaryResponse.json()
-      console.log("Salary updated:", salaryResult)
-      setSalaryId(salaryResult.id)
-
-      // STEP 3: Create or update the Payroll record
+      // STEP 2: Trigger a salary update (if needed)
       // ------------------------------------------
-      console.log("Updating payroll record...")
-      const payrollData = {
-        user_id: userId,
-        salary_id: salaryResult.id,
-        gross_pay: totalGross.toFixed(2),
-        total_deductions: totalDeductions.toFixed(2),
-        net_pay: totalSalaryCompensation.toFixed(2),
-        pay_date: formattedPayDate,
-        status: "Processing", // Set status to Processing after update
-      }
+      // We'll only update the salary record if it exists, otherwise let the backend handle it
+      if (salaryId) {
+        console.log("Triggering salary update...")
 
-      let payrollResponse
-      if (payrollId) {
-        // Update existing record
-        payrollResponse = await fetch(`${API_BASE_URL}/payroll/${payrollId}/`, {
+        // Fetch the complete objects for all related records
+        const [earningsObj, deductionsObj, overtimeObj, sssObj, philhealthObj, pagibigObj] = await Promise.all([
+          fetch(`${API_BASE_URL}/earnings/${updatedEarningsId}/`, { headers }).then((res) => res.json()),
+          fetch(`${API_BASE_URL}/deductions/${updatedDeductionsId}/`, { headers }).then((res) => res.json()),
+          fetch(`${API_BASE_URL}/totalovertime/${updatedOvertimeId}/`, { headers }).then((res) => res.json()),
+          fetch(`${API_BASE_URL}/benefits/sss/${updatedSssId}/`, { headers }).then((res) => res.json()),
+          fetch(`${API_BASE_URL}/benefits/philhealth/${updatedPhilhealthId}/`, { headers }).then((res) => res.json()),
+          fetch(`${API_BASE_URL}/benefits/pagibig/${updatedPagibigId}/`, { headers }).then((res) => res.json()),
+        ])
+
+        // Update the salary record with the complete objects
+        const salaryUpdateData = {
+          user: userId,
+          user_id: userId,
+          earnings_id: earningsObj,
+          deductions_id: deductionsObj,
+          overtime_id: overtimeObj,
+          sss_id: sssObj,
+          philhealth_id: philhealthObj,
+          pagibig_id: pagibigObj,
+          rate_per_month: Number.parseFloat(updatedFormData.basicRate).toFixed(2),
+          rate_per_hour: (Number.parseFloat(updatedFormData.basicRate) / 160).toFixed(2),
+          pay_date: new Date().toISOString().split("T")[0],
+        }
+
+        const salaryResponse = await fetch(`${API_BASE_URL}/salary/${salaryId}/`, {
           method: "PATCH",
           headers,
-          body: JSON.stringify(payrollData),
+          body: JSON.stringify(salaryUpdateData),
         })
-      } else {
-        // Create new record
-        payrollResponse = await fetch(`${API_BASE_URL}/payroll/`, {
-          method: "POST",
-          headers,
-          body: JSON.stringify(payrollData),
-        })
+
+        if (!salaryResponse.ok) {
+          console.error("Failed to update salary record:", await salaryResponse.text())
+          // Don't throw an error here, as we've already updated the base components
+          console.warn("Continuing despite salary update failure")
+        } else {
+          console.log("Salary update successful")
+        }
       }
 
-      if (!payrollResponse.ok) {
-        throw new Error(`Failed to update payroll: ${payrollResponse.status} ${payrollResponse.statusText}`)
-      }
+      // Set hasPayrollData to true since we've now saved data
+      setHasPayrollData(true)
 
-      const payrollResult = await payrollResponse.json()
-      console.log("Payroll updated:", payrollResult)
-      setPayrollId(payrollResult.id)
-
-      // Update the parent component with the new data
+      // Call the onUpdate callback with the updated data
       onUpdate({
-        totalGross: totalGross.toFixed(2),
-        totalDeductions: totalDeductions.toFixed(2),
-        totalSalaryCompensation: totalSalaryCompensation.toFixed(2),
+        ...updatedFormData,
+        id: employeeData.id,
+        baseSalary: totalGross,
+        totalDeductions: totalDeductions,
+        totalSalaryCompensation: totalSalaryCompensation,
       })
 
-      alert("Payroll information saved successfully!")
+      // Close the modal
+      onClose()
     } catch (error) {
-      console.error("Error saving payroll data:", error)
-      setError(`Failed to save payroll data: ${error.message}`)
-      alert(`Failed to save payroll data: ${error.message}`)
+      console.error("Error updating payroll data:", error)
+
+      // Check if this is a token error
+      if (error.message && error.message.includes("token_not_valid")) {
+        handleTokenError()
+        return
+      }
+
+      setError(`Failed to update payroll data: ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -1129,356 +1022,452 @@ function EditPayroll({ isOpen, onClose, employeeData, onUpdate }) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-[#A7BC8F] text-white p-4 rounded-t-lg flex justify-between items-center">
-          <h2 className="text-xl font-semibold">
-            Edit Payroll: {employeeData?.employee_name} ({employeeData?.position})
-          </h2>
-          <button onClick={onClose} className="text-white hover:text-gray-200 focus:outline-none text-xl font-bold">
-            ×
-          </button>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 z-50 overflow-auto">
+      <div className="bg-white rounded-lg w-full max-w-6xl p-4 relative max-h-[90vh] overflow-y-auto">
+        {/* Employee Info */}
+        <div className="mb-3">
+          <h2 className="text-xl font-bold uppercase">{employeeData?.employee_name || "EMPLOYEE NAME"}</h2>
+          <p className="text-sm text-gray-600">{employeeData?.employee_id || "ID"}</p>
+          {!hasPayrollData && (
+            <div className="mt-2 p-2 bg-blue-100 text-blue-700 rounded text-sm">
+              This employee doesn't have payroll information yet. Enter the details below to create their payroll
+              record.
+            </div>
+          )}
         </div>
 
-        {loading ? (
-          <div className="p-6 text-center">Loading payroll data...</div>
-        ) : error ? (
-          <div className="p-6 text-center text-red-500">{error}</div>
-        ) : (
-          <form onSubmit={handleSubmit} className="p-6">
-            {/* Payroll Period Information */}
-            <div className="bg-gray-100 p-4 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold mb-3">Payroll Period Information</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Period Start</label>
-                  <input
-                    type="text"
-                    value={formData.payrollPeriodStart}
-                    onChange={(e) => setFormData({ ...formData, payrollPeriodStart: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="MM/DD/YYYY"
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Period End</label>
-                  <input
-                    type="text"
-                    value={formData.payrollPeriodEnd}
-                    onChange={(e) => setFormData({ ...formData, payrollPeriodEnd: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="MM/DD/YYYY"
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pay Date</label>
-                  <input
-                    type="text"
-                    value={formData.payDate}
-                    onChange={(e) => setFormData({ ...formData, payDate: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="MM/DD/YYYY"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Earnings Section */}
-            <div className="bg-gray-100 p-4 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold mb-3">Earnings</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Basic Monthly Rate</label>
-                  <input
-                    type="text"
-                    value={formData.basicRate}
-                    onChange={(e) => handleInputChange(e, "basicRate")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Basic (This Period)</label>
-                  <input
-                    type="text"
-                    value={formData.basic}
-                    onChange={(e) => handleInputChange(e, "basic")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Allowance</label>
-                  <input
-                    type="text"
-                    value={formData.allowance}
-                    onChange={(e) => handleInputChange(e, "allowance")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Non-Taxable</label>
-                  <input
-                    type="text"
-                    value={formData.ntax}
-                    onChange={(e) => handleInputChange(e, "ntax")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Vacation Leave</label>
-                  <input
-                    type="text"
-                    value={formData.vacationleave}
-                    onChange={(e) => handleInputChange(e, "vacationleave")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sick Leave</label>
-                  <input
-                    type="text"
-                    value={formData.sickleave}
-                    onChange={(e) => handleInputChange(e, "sickleave")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Overtime Section */}
-            <div className="bg-gray-100 p-4 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold mb-3">Overtime</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Regular OT</label>
-                  <input
-                    type="text"
-                    value={formData.regularOT.rate}
-                    onChange={(e) => handleInputChange(e, "regularOT", "rate")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Regular Holiday</label>
-                  <input
-                    type="text"
-                    value={formData.regularHoliday.rate}
-                    onChange={(e) => handleInputChange(e, "regularHoliday", "rate")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Special Holiday</label>
-                  <input
-                    type="text"
-                    value={formData.specialHoliday.rate}
-                    onChange={(e) => handleInputChange(e, "specialHoliday", "rate")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Rest Day</label>
-                  <input
-                    type="text"
-                    value={formData.restDay.rate}
-                    onChange={(e) => handleInputChange(e, "restDay", "rate")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Night Differential</label>
-                  <input
-                    type="text"
-                    value={formData.nightDiff.rate}
-                    onChange={(e) => handleInputChange(e, "nightDiff", "rate")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Backwage</label>
-                  <input
-                    type="text"
-                    value={formData.backwage.rate}
-                    onChange={(e) => handleInputChange(e, "backwage", "rate")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Benefits Section */}
-            <div className="bg-gray-100 p-4 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold mb-3">Benefits (Automatically Calculated)</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">SSS</label>
-                  <input
-                    type="text"
-                    value={formData.sss.amount}
-                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
-                    placeholder="0.00"
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PhilHealth</label>
-                  <input
-                    type="text"
-                    value={formData.philhealth.amount}
-                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
-                    placeholder="0.00"
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Pag-IBIG</label>
-                  <input
-                    type="text"
-                    value={formData.pagibig.amount}
-                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
-                    placeholder="0.00"
-                    readOnly
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Additional Deductions Section */}
-            <div className="bg-gray-100 p-4 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold mb-3">Additional Deductions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Withholding Tax</label>
-                  <input
-                    type="text"
-                    value={formData.wtax.amount}
-                    onChange={(e) => handleInputChange(e, "wtax", "amount")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">No Work</label>
-                  <input
-                    type="text"
-                    value={formData.nowork.amount}
-                    onChange={(e) => handleInputChange(e, "nowork", "amount")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Loan</label>
-                  <input
-                    type="text"
-                    value={formData.loan.amount}
-                    onChange={(e) => handleInputChange(e, "loan", "amount")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Charges</label>
-                  <input
-                    type="text"
-                    value={formData.charges.amount}
-                    onChange={(e) => handleInputChange(e, "charges", "amount")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Undertime</label>
-                  <input
-                    type="text"
-                    value={formData.undertime.amount}
-                    onChange={(e) => handleInputChange(e, "undertime", "amount")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">MSFC Loan</label>
-                  <input
-                    type="text"
-                    value={formData.msfcloan.amount}
-                    onChange={(e) => handleInputChange(e, "msfcloan", "amount")}
-                    className="w-full p-2 border border-gray-300 rounded-md"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Summary Section */}
-            <div className="bg-gray-100 p-4 rounded-lg mb-6">
-              <h3 className="text-lg font-semibold mb-3">Summary</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Gross</label>
-                  <input
-                    type="text"
-                    value={`₱${formatCurrency(formData.totalGross)}`}
-                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Total Deductions</label>
-                  <input
-                    type="text"
-                    value={`₱${formatCurrency(formData.totalDeductions)}`}
-                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-50"
-                    readOnly
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Net Salary</label>
-                  <input
-                    type="text"
-                    value={`₱${formatCurrency(formData.totalSalaryCompensation)}`}
-                    className="w-full p-2 border border-gray-300 rounded-md bg-gray-50 font-bold"
-                    readOnly
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex justify-end space-x-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 bg-gray-300 text-gray-800 rounded-md hover:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 bg-[#5C7346] text-white rounded-md hover:bg-[#4a5c38] transition-colors"
-                disabled={loading}
-              >
-                {loading ? "Saving..." : "Save Changes"}
-              </button>
-            </div>
-          </form>
+        {loading && (
+          <div className="absolute inset-0 bg-white bg-opacity-70 flex items-center justify-center z-10">
+            <div className="text-lg font-medium">Loading payroll data...</div>
+          </div>
         )}
+
+        {error && <div className="mb-3 p-2 bg-red-100 text-red-700 rounded text-sm">{error}</div>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Column 1: Payroll Dates & Earnings */}
+            <div>
+              {/* Payroll Dates */}
+              <div className="mb-4">
+                <h3 className="font-medium text-base mb-2 uppercase">Payroll Dates</h3>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Payroll Period</label>
+                    <div className="flex gap-1">
+                      <input
+                        type="text"
+                        value={formData.payrollPeriodStart}
+                        readOnly
+                        className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                      <input
+                        type="text"
+                        value={formData.payrollPeriodEnd}
+                        readOnly
+                        className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Pay Date</label>
+                    <input
+                      type="text"
+                      value={formData.payDate}
+                      readOnly
+                      className="w-full px-2 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Earnings */}
+              <div>
+                <h3 className="font-medium text-base mb-2 uppercase">Earnings</h3>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Basic Rate (Monthly)</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.basicRate}
+                        onChange={(e) => handleInputChange(e, "basicRate")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Basic (Bi-weekly)</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.basic}
+                        onChange={(e) => handleInputChange(e, "basic")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Allowance</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.allowance}
+                        onChange={(e) => handleInputChange(e, "allowance")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Non-Taxable</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.ntax}
+                        onChange={(e) => handleInputChange(e, "ntax")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Vacation Leave</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.vacationleave}
+                        onChange={(e) => handleInputChange(e, "vacationleave")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1 uppercase">Sick Leave</label>
+                    <div className="relative">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.sickleave}
+                        onChange={(e) => handleInputChange(e, "sickleave")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 2: Overtime Breakdown */}
+            <div>
+              <h3 className="font-medium text-base mb-2 uppercase">Overtime Breakdown</h3>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Regular Overtime</label>
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      placeholder="Hrs"
+                      value={formData.regularOT.hours}
+                      onChange={(e) => handleInputChange(e, "regularOT", "hours")}
+                      className="w-12 px-2 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.regularOT.rate}
+                        onChange={(e) => handleInputChange(e, "regularOT", "rate")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Regular Holiday</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.regularHoliday.rate}
+                      onChange={(e) => handleInputChange(e, "regularHoliday", "rate")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Special Holiday</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.specialHoliday.rate}
+                      onChange={(e) => handleInputChange(e, "specialHoliday", "rate")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Rest Day</label>
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      placeholder="Hrs"
+                      value={formData.restDay.hours}
+                      onChange={(e) => handleInputChange(e, "restDay", "hours")}
+                      className="w-12 px-2 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.restDay.rate}
+                        onChange={(e) => handleInputChange(e, "restDay", "rate")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Night Diff</label>
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      placeholder="Hrs"
+                      value={formData.nightDiff.hours}
+                      onChange={(e) => handleInputChange(e, "nightDiff", "hours")}
+                      className="w-12 px-2 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                    <div className="relative flex-1">
+                      <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                      <input
+                        type="text"
+                        value={formData.nightDiff.rate}
+                        onChange={(e) => handleInputChange(e, "nightDiff", "rate")}
+                        className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Backwage</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.backwage.rate}
+                      onChange={(e) => handleInputChange(e, "backwage", "rate")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 3: Deductions */}
+            <div>
+              <h3 className="font-medium text-base mb-2 uppercase">Deductions</h3>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">SSS</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.sss.amount}
+                      onChange={(e) => handleInputChange(e, "sss", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">PhilHealth</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.philhealth.amount}
+                      onChange={(e) => handleInputChange(e, "philhealth", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Pag IBIG</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.pagibig.amount}
+                      onChange={(e) => handleInputChange(e, "pagibig", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Late</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.late.amount}
+                      onChange={(e) => handleInputChange(e, "late", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">WTAX</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.wtax.amount}
+                      onChange={(e) => handleInputChange(e, "wtax", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 4: Additional Deductions */}
+            <div>
+              <h3 className="font-medium text-base mb-2 uppercase">Additional Deductions</h3>
+              <div className="space-y-2">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">No Work Day</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.nowork.amount}
+                      onChange={(e) => handleInputChange(e, "nowork", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Loan</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.loan.amount}
+                      onChange={(e) => handleInputChange(e, "loan", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Charges</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.charges.amount}
+                      onChange={(e) => handleInputChange(e, "charges", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">Undertime</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.undertime.amount}
+                      onChange={(e) => handleInputChange(e, "undertime", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1 uppercase">MSFC Loan</label>
+                  <div className="relative">
+                    <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                    <input
+                      type="text"
+                      value={formData.msfcloan.amount}
+                      onChange={(e) => handleInputChange(e, "msfcloan", "amount")}
+                      className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Overall Section */}
+          <div className="bg-gray-50 p-3 rounded">
+            <h3 className="font-medium text-base mb-2 uppercase">Overall</h3>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1 uppercase">Total Gross</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                  <input
+                    type="text"
+                    value={formatCurrency(formData.totalGross)}
+                    readOnly
+                    className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1 uppercase">Total Deductions</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                  <input
+                    type="text"
+                    value={formatCurrency(formData.totalDeductions)}
+                    readOnly
+                    className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1 uppercase">Total Salary</label>
+                <div className="relative">
+                  <span className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500">₱</span>
+                  <input
+                    type="text"
+                    value={formatCurrency(formData.totalSalaryCompensation)}
+                    readOnly
+                    className="w-full px-8 py-1.5 text-sm border rounded bg-gray-100"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Buttons - Fixed at bottom */}
+          <div className="flex justify-center space-x-4 sticky bottom-0 pt-2 pb-1 bg-white">
+            <button
+              type="submit"
+              className="px-6 py-2 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
+              disabled={loading}
+            >
+              {loading ? "Saving..." : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2 bg-gray-800 text-white text-sm rounded hover:bg-gray-700"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
 }
 
 export default EditPayroll
+
