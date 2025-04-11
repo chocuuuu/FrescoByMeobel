@@ -24,16 +24,6 @@ app.conf.beat_schedule = {
         # "schedule": crontab(minute=0, hour="*"),
         "schedule": crontab(minute="*/5"), # every 5 mins
     },
-    "generate_payroll_entries": {
-        "task": "payroll.tasks.generate_payroll_entries",
-        # "schedule": crontab(minute=0, hour="*"),
-        "schedule": crontab(minute="*/5"), # every 5 mins
-    },
-    "generate_payslip_entries": {
-        "task": "payslip.tasks.generate_payslip_entries",
-        # "schedule": crontab(minute=0, hour="*"),
-        "schedule": crontab(minute="*/5"), # every 5 mins
-    },
     "calculate_total_payroll": {
         "task": "totalpayroll.tasks.calculate_total_payroll",
         "schedule": crontab(minute=30, hour=12), # run every 12:30 pm
@@ -74,4 +64,16 @@ app.conf.beat_schedule = {
         "schedule": 60.0,  # Run every 60 seconds
     },
 }
+"""
+"""
+"generate_payroll_entries": {
+        "task": "payroll.tasks.generate_payroll_entries",
+        # "schedule": crontab(minute=0, hour="*"),
+        "schedule": crontab(minute="*/5"), # every 5 mins
+    },
+    "generate_payslip_entries": {
+        "task": "payslip.tasks.generate_payslip_entries",
+        # "schedule": crontab(minute=0, hour="*"),
+        "schedule": crontab(minute="*/5"), # every 5 mins
+    },
 """
