@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom"
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom"
 
 import LoginPage from "./pages/Login_Page"
 import ForgotPasswordPage from "./pages/Forgot_Password_Page"
@@ -14,97 +13,20 @@ import AdminEmployeeEditSchedulePage from "./pages/Admin_Employee_Edit_Schedule_
 import AdminEmployeeAttendancePage from "./pages/Admin_Employee_Attendance_Page"
 import AdminMasterCalendarPage from "./pages/Admin_Master_Calendar_Page"
 import EmployeeSchedulePage from "./pages/Employee_Schedule_Page"
-import ActivityLogPage from "./pages/Admin_Activity_Logs_Page.jsx"
-import ForceLogout from "./ForceLogout"
-
-// Session checker component with enhanced URL protection
-function SessionChecker() {
-  const navigate = useNavigate()
-  const location = useLocation()
-
-  useEffect(() => {
-    // Check if the current route is not a public route
-    const isPublicRoute =
-      location.pathname === "/" ||
-      location.pathname === "/force-logout" ||
-      location.pathname.startsWith("/forgot-password") ||
-      location.pathname.startsWith("/reset-password")
-
-    if (!isPublicRoute) {
-      const token = sessionStorage.getItem("access_token")
-      if (!token) {
-        // Redirect to login if no token
-        navigate("/", { replace: true })
-      }
-    }
-
-    // Prevent URL manipulation
-    const originalPushState = history.pushState
-    const originalReplaceState = history.replaceState
-
-    history.pushState = function () {
-      const token = sessionStorage.getItem("access_token")
-      const result = originalPushState.apply(this, arguments)
-
-      // If trying to navigate to protected route without token
-      if (!token && !isPublicRoute) {
-        navigate("/", { replace: true })
-      }
-
-      return result
-    }
-
-    history.replaceState = function () {
-      const token = sessionStorage.getItem("access_token")
-      const result = originalReplaceState.apply(this, arguments)
-
-      // If trying to navigate to protected route without token
-      if (!token && !isPublicRoute) {
-        navigate("/", { replace: true })
-      }
-
-      return result
-    }
-
-    // Prevent back navigation after logout
-    const handlePopState = () => {
-      const token = sessionStorage.getItem("access_token")
-      if (!token && !isPublicRoute) {
-        navigate("/", { replace: true })
-      }
-    }
-
-    window.addEventListener("popstate", handlePopState)
-
-    return () => {
-      window.removeEventListener("popstate", handlePopState)
-      // Restore original history methods
-      history.pushState = originalPushState
-      history.replaceState = originalReplaceState
-    }
-  }, [navigate, location])
-
-  return null
-}
+import ActivityLogPage from "./pages/Admin_Activity_Logs_Page"
+import ForceLogout from "./pages/ForceLogout"
+import NavigationGuard from "./components/Navigation_Guard"
 
 // Protected route component
-function ProtectedRoute({ children, allowedRoles, redirectPath = "/" }) {
-  const navigate = useNavigate()
+function ProtectedRoute({ children, allowedRoles }) {
   const role = sessionStorage.getItem("user_role")
   const isAuthenticated = !!sessionStorage.getItem("access_token")
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/", { replace: true })
-    }
-  }, [isAuthenticated, navigate])
 
   if (!isAuthenticated) {
     return <Navigate to="/" replace />
   }
 
   if (allowedRoles && !allowedRoles.includes(role)) {
-    // Redirect to appropriate dashboard based on role
     if (role === "employee") {
       return <Navigate to="/employee/schedule" replace />
     } else if (role === "admin" || role === "owner") {
@@ -120,7 +42,7 @@ function ProtectedRoute({ children, allowedRoles, redirectPath = "/" }) {
 function App() {
   return (
     <Router>
-      <SessionChecker />
+      <NavigationGuard />
       <Routes>
         {/* Public routes */}
         <Route path="/" element={<LoginPage />} />
@@ -205,7 +127,20 @@ function App() {
         />
 
         {/* Catch all route - redirect to appropriate dashboard or login */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route
+          path="*"
+          element={
+            sessionStorage.getItem("access_token") ? (
+              sessionStorage.getItem("user_role") === "employee" ? (
+                <Navigate to="/employee/schedule" replace />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
       </Routes>
     </Router>
   )

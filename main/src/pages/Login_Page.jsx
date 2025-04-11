@@ -15,11 +15,15 @@ function LoginPage() {
     password: "",
   })
   const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
   // Clear any existing sessions when the login page loads
   useEffect(() => {
-    sessionStorage.clear()
-    localStorage.clear() // Also clear localStorage in case tokens are stored there
+    // Only clear if we're on the login page directly
+    if (window.location.pathname === "/") {
+      sessionStorage.clear()
+      localStorage.clear() // Also clear localStorage in case tokens are stored there
+    }
   }, [])
 
   // Check if user is already logged in
@@ -55,6 +59,7 @@ function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
+    setIsLoading(true)
 
     try {
       // Sending the POST request to the API
@@ -98,7 +103,10 @@ function LoginPage() {
         setError(data.message || "Login failed. Please try again.")
       }
     } catch (error) {
+      console.error("Login error:", error)
       setError("An error occurred. Please try again later.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -158,8 +166,9 @@ function LoginPage() {
                   value={formData.id}
                   onChange={handleChange}
                   required
+                  disabled={isLoading}
                   className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400
-                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 disabled:opacity-70"
                 />
               </div>
               <div>
@@ -173,16 +182,18 @@ function LoginPage() {
                   value={formData.password}
                   onChange={handleChange}
                   required
+                  disabled={isLoading}
                   className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md text-sm shadow-sm placeholder-gray-400
-                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
+                          focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 disabled:opacity-70"
                 />
               </div>
               {error && <div className="text-red-600 text-sm">{error}</div>}
               <button
                 type="submit"
-                className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+                disabled={isLoading}
+                className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-70"
               >
-                Log In
+                {isLoading ? "Logging in..." : "Log In"}
               </button>
               <div className="text-sm underline text-center">
                 <a href="/forgot-password" className="font-medium text-gray-600 hover:text-gray-900">
