@@ -9,12 +9,13 @@ import ResetPasswordPage from "./pages/Reset_Password_Page"
 import AdminDashboardPage from "./pages/Admin_Dashboard_Page"
 import AdminEmployeePayrollPage from "./pages/Admin_Employee_Payroll_Page"
 import AdminEmployeePage from "./pages/Admin_Employees_Page"
-import PayslipPage from "./pages/Payslip_Page"
+import EmployeePayslipPage from "./pages/Employee_Payslip_Page.jsx"
 import AdminEmployeeEditSchedulePage from "./pages/Admin_Employee_Edit_Schedule_Page"
 import AdminEmployeeAttendancePage from "./pages/Admin_Employee_Attendance_Page"
 import AdminMasterCalendarPage from "./pages/Admin_Master_Calendar_Page"
 import EmployeeSchedulePage from "./pages/Employee_Schedule_Page"
 import ActivityLogPage from "./pages/Admin_Activity_Logs_Page.jsx";
+import AdminPayslipPage from "./pages/Admin_Payslip_Page.jsx";
 
 // Session checker component
 function SessionChecker() {
@@ -143,6 +144,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+          <Route
+          path="/admin-payslip/:userId"
+          element={
+            <ProtectedRoute allowedRoles={["admin", "owner"]}>
+              <AdminPayslipPage />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Employee routes */}
         <Route
@@ -154,10 +163,10 @@ function App() {
           }
         />
         <Route
-          path="/payslip"
+          path="/employee-payslip/:userId"
           element={
             <ProtectedRoute allowedRoles={["admin", "owner", "employee"]}>
-              <PayslipPage />
+              <EmployeePayslipPage />
             </ProtectedRoute>
           }
         />
