@@ -22,11 +22,11 @@ app.conf.beat_schedule = {
     "generate_salary_entries": {
         "task": "salary.tasks.generate_salary_entries",
         # "schedule": crontab(minute=0, hour="*"),
-        "schedule": crontab(minute="*/5"), # every 5 mins
+        "schedule": crontab(minute=30, hour=12),  # run every 12:30 pm
     },
     "calculate_total_payroll": {
         "task": "totalpayroll.tasks.calculate_total_payroll",
-        "schedule": crontab(minute=30, hour=12), # run every 12:30 pm
+         "schedule": crontab(minute="*/5"), # every 5 mins
     },
     "sync-holidays-daily": {
         'task': 'master_calendar.tasks.sync_holidays_for_new_calendar_entries',
