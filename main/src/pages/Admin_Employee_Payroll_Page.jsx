@@ -745,6 +745,8 @@ function AdminEmployeePayrollPage() {
                           >
                             Edit
                           </button>
+
+                          {/*
                           {record.status === "Processing" && (
                             <button
                               onClick={() => handleMarkAsPaid(record.id, record.user?.id)}
@@ -752,7 +754,9 @@ function AdminEmployeePayrollPage() {
                             >
                               Pay
                             </button>
+
                           )}
+                          */}
                           <button
                             onClick={() => handleGoToPayslip(record.user?.id)}
                             className="bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-md transition-colors text-md md:text-lg"
