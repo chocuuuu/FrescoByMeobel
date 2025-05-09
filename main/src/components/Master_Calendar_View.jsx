@@ -121,7 +121,7 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
       cellClasses +=
         holiday.holiday_type === "regular" ? " bg-red-100 hover:bg-red-200" : " bg-blue-100 hover:bg-blue-200"
     } else if (isPayrollPeriodDay) {
-      cellClasses += " bg-green-50 hover:bg-green-100"
+      cellClasses += " bg-green-200 hover:bg-green-100"
     } else if (isWeekendDay) {
       cellClasses += " bg-gray-100 hover:bg-gray-200"
     } else {
@@ -151,9 +151,7 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
           )}
           {isPayrollPeriodDay && !holiday && (
             <div className="mt-auto">
-              <span className="text-xs truncate block text-green-700" title="Payroll Period">
-                Payroll
-              </span>
+              <span className="text-xs truncate block text-green-500" title="Payroll Period" />
             </div>
           )}
         </div>
@@ -208,7 +206,8 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
             onClick={goToPrevious}
             className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors shadow-sm"
           >
-            {viewMode === "year" ? "Previous Year" : "Previous"}
+              {viewMode === "year" ? "Previous Year" : "Previous"}
+            
           </button>
           <button
             onClick={goToCurrent}
