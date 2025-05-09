@@ -587,32 +587,60 @@ function AdminEmployeePayrollPage() {
     }
   }
 
-  // Filter payroll data based on search term, year, and role
-  const filteredPayrollData = payrollData.filter((record) => {
-    const searchTermLower = searchTerm.toLowerCase()
+  // Improved search function that checks multiple fields
+  const filteredPayrollData = payrollData
+    .filter((record) => {
+      if (!searchTerm) return true
 
-    // Search across multiple columns
-    const matchesSearch =
-      record.employee_name?.toLowerCase().includes(searchTermLower) ||
-      record.employee_id?.toString().toLowerCase().includes(searchTermLower) ||
-      record.position?.toLowerCase().includes(searchTermLower) ||
-      (record.status && record.status.toLowerCase().includes(searchTermLower)) ||
-      formatCurrency(record.base_salary).toLowerCase().includes(searchTermLower) ||
-      formatCurrency(record.net_salary).toLowerCase().includes(searchTermLower)
+      const searchLower = searchTerm.toLowerCase()
 
-    // Get year from hire_date if available in the employee data
-    const employee = employees.find((emp) => emp.id === record.id)
-    const yearEmployed = employee?.hire_date ? new Date(employee.hire_date).getFullYear() : null
-    const matchesYear = yearFilter === "all" || (yearEmployed && yearEmployed.toString() === yearFilter)
+      // Check multiple fields for the search term
+      return (
+        // Check employee name
+        record.employee_name?.toLowerCase().includes(searchLower) ||
+        // Check employee ID
+        record.employee_id
+          ?.toString()
+          .includes(searchLower) ||
+        // Check position
+        record.position
+          ?.toLowerCase()
+          .includes(searchLower) ||
+        // Check status
+        record.status
+          ?.toLowerCase()
+          .includes(searchLower) ||
+        // Check salary amounts (as formatted currency)
+        formatCurrency(record.base_salary)
+          .toLowerCase()
+          .includes(searchLower) ||
+        formatCurrency(record.net_salary).toLowerCase().includes(searchLower) ||
+        // Check if searching for specific amounts without currency symbol
+        record.base_salary
+          ?.toString()
+          .includes(searchTerm) ||
+        record.net_salary?.toString().includes(searchTerm) ||
+        record.deductions?.toString().includes(searchTerm)
+      )
+    })
+    .filter((record) => {
+      // Apply year filter if set
+      if (yearFilter === "all") return true
 
-    // Check role
-    const matchesRole =
-      roleFilter === "all" ||
-      (roleFilter === "owner" && !record.user) ||
-      (record.user && record.user.role && record.user.role.toLowerCase() === roleFilter.toLowerCase())
+      // Get year from hire_date if available in the employee data
+      const employee = employees.find((emp) => emp.id === record.id)
+      const yearEmployed = employee?.hire_date ? new Date(employee.hire_date).getFullYear() : null
+      return yearEmployed && yearEmployed.toString() === yearFilter
+    })
+    .filter((record) => {
+      // Apply role filter if set
+      if (roleFilter === "all") return true
 
-    return matchesSearch && matchesYear && matchesRole
-  })
+      return (
+        (roleFilter === "owner" && !record.user) ||
+        (record.user && record.user.role && record.user.role.toLowerCase() === roleFilter.toLowerCase())
+      )
+    })
 
   // Sort by employee ID in descending order (assuming higher ID = newer employee)
   const sortedPayrollData = [...filteredPayrollData].sort((a, b) => {
@@ -676,7 +704,7 @@ function AdminEmployeePayrollPage() {
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="search"
-                  placeholder="Search..."
+                  placeholder="Search by name, ID, position, amount..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full sm:w-auto"
