@@ -38,10 +38,27 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError("")
     setIsSubmitting(true)
+    setError("")
 
     try {
+      // Validate dates
+      const today = new Date()
+      today.setHours(0, 0, 0, 0) // Set to beginning of day for comparison
+
+      // Birthday validation - cannot be today or future
+      const birthDate = new Date(formData.birth_date)
+      if (birthDate >= today) {
+        throw new Error("Birth date cannot be today or a future date")
+      }
+
+      // Hire date validation - cannot be future
+      const hireDate = new Date(formData.hire_date)
+      if (hireDate > today) {
+        throw new Error("Hire date cannot be a future date")
+      }
+
+      // Continue with the existing code...
       const accessToken = localStorage.getItem("access_token")
 
       // Create FormData object for file upload

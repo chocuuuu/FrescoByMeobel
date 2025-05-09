@@ -66,11 +66,29 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault()
-    setError("")
     setIsSubmitting(true)
+    setError("")
 
     try {
-      const accessToken = localStorage.getItem("access_token")
+      // Validate dates
+      const today = new Date()
+      today.setHours(0, 0, 0, 0) // Set to beginning of day for comparison
+
+      // Birthday validation - cannot be today or future
+      if (formData.birth_date) {
+        const birthDate = new Date(formData.birth_date)
+        if (birthDate >= today) {
+          throw new Error("Birth date cannot be today or a future date")
+        }
+      }
+
+      // Hire date validation - cannot be future
+      if (formData.hire_date) {
+        const hireDate = new Date(formData.hire_date)
+        if (hireDate > today) {
+          throw new Error("Hire date cannot be a future date")
+        }
+      }
 
       // For resignation, we use a different approach
       if (!formData.active && formData.resignation_date) {
@@ -119,6 +137,8 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
       }
 
       console.log("Update Request Payload:", Object.fromEntries(formDataToSend))
+
+      const accessToken = localStorage.getItem("access_token")
 
       const response = await fetch(`${API_BASE_URL}/employment-info/${employeeData.id}/`, {
         method: "PATCH",

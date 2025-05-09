@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar.jsx"
 import EditPayroll from "../components/Edit_Payroll.jsx"
 import { API_BASE_URL } from "../config/api"
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom"
 
 function AdminEmployeePayrollPage() {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
   const [employees, setEmployees] = useState([])
   const [payrollData, setPayrollData] = useState([])
   const [loading, setLoading] = useState(true)
@@ -19,7 +19,6 @@ function AdminEmployeePayrollPage() {
   const recordsPerPage = 5
   const [yearFilter, setYearFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all")
-  
 
   // Fetch payroll data from API
   const fetchPayrollData = async () => {
@@ -349,7 +348,7 @@ function AdminEmployeePayrollPage() {
 
   // NEW: Add Payslip Button Handler
   const handleGoToPayslip = (UserId) => {
-    navigate(`/admin-payslip/${UserId}`);
+    navigate(`/admin-payslip/${UserId}`)
   }
 
   // Updated delete payroll function to completely delete records
@@ -590,10 +589,16 @@ function AdminEmployeePayrollPage() {
 
   // Filter payroll data based on search term, year, and role
   const filteredPayrollData = payrollData.filter((record) => {
+    const searchTermLower = searchTerm.toLowerCase()
+
+    // Search across multiple columns
     const matchesSearch =
-      record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.employee_id?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.position?.toLowerCase().includes(searchTerm.toLowerCase())
+      record.employee_name?.toLowerCase().includes(searchTermLower) ||
+      record.employee_id?.toString().toLowerCase().includes(searchTermLower) ||
+      record.position?.toLowerCase().includes(searchTermLower) ||
+      (record.status && record.status.toLowerCase().includes(searchTermLower)) ||
+      formatCurrency(record.base_salary).toLowerCase().includes(searchTermLower) ||
+      formatCurrency(record.net_salary).toLowerCase().includes(searchTermLower)
 
     // Get year from hire_date if available in the employee data
     const employee = employees.find((emp) => emp.id === record.id)
