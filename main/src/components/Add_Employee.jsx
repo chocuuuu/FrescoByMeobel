@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Calendar from "./Calendar"
 import { API_BASE_URL } from "../config/api"
+import dayjs from "dayjs"
 
 function AddEmployee({ isOpen, onClose, onAdd }) {
   // Initial form state - flattened structure to match API
@@ -156,6 +157,9 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
     onClose()
   }
 
+  // Get today's date for max date validation
+  const today = dayjs().format("YYYY-MM-DD")
+
   if (!isOpen) return null
 
   return (
@@ -287,6 +291,7 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                   value={formData.hire_date}
                   onChange={(value) => handleDateChange("hire_date", value)}
                   disabled={false}
+                  maxDate={today}
                 />
               </div>
             </div>
@@ -303,6 +308,7 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                   value={formData.birth_date}
                   onChange={(value) => handleDateChange("birth_date", value)}
                   disabled={false}
+                  maxDate={today}
                 />
               </div>
 
@@ -398,4 +404,3 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
 }
 
 export default AddEmployee
-

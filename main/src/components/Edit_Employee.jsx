@@ -288,6 +288,9 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
     }
   }
 
+  // Get today's date for max date validation
+  const today = dayjs().format("YYYY-MM-DD")
+
   if (!isOpen || !employeeData) return null
 
   return (
@@ -420,6 +423,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                   value={formData.hire_date}
                   onChange={(value) => handleDateChange("hire_date", value)}
                   disabled={true}
+                  maxDate={today}
                 />
               </div>
             </div>
@@ -435,7 +439,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                   label="Birth Date"
                   value={formData.birth_date}
                   onChange={(value) => handleDateChange("birth_date", value)}
-                  maxDate={dayjs().format("YYYY-MM-DD")}
+                  maxDate={today}
                   disabled={true} // Make birth date non-editable
                 />
               </div>
@@ -479,7 +483,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                     label="Resignation Date"
                     value={formData.resignation_date}
                     onChange={(value) => handleDateChange("resignation_date", value)}
-                    maxDate={dayjs().format("YYYY-MM-DD")}
+                    maxDate={today}
                   />
                 </div>
               )}
@@ -554,7 +558,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                 label="Resignation Date"
                 value={formData.resignation_date}
                 onChange={(value) => handleDateChange("resignation_date", value)}
-                maxDate={dayjs().format("YYYY-MM-DD")}
+                maxDate={today}
                 required
               />
               {!formData.resignation_date && <p className="text-red-500 text-sm mt-1">Resignation date is required</p>}
@@ -583,4 +587,3 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 }
 
 export default EditEmployee
-
