@@ -143,7 +143,7 @@ function LoginPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="id" className="block text-sm font-medium text-gray-700">
-                  ID
+                  ID Number
                 </label>
                 <input
                   type="text"
