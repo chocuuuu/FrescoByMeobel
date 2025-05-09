@@ -1,17 +1,25 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { UserCircle, ArrowLeft, CalendarDays, EyeOff, SquareCheck } from "lucide-react"
 import NavBar from "../components/Nav_Bar"
 import dayjs from "dayjs"
 import { API_BASE_URL } from "../config/api"
-import companyLogo from '../assets/newlogo.png'
+import companyLogo from "../assets/newlogo.png"
 
 // Helper to parse numeric values
 const parseValue = (val) => {
   const num = Number.parseFloat(String(val))
   return isNaN(num) ? 0 : num
+}
+
+// Format currency with peso sign and commas
+const formatCurrency = (value) => {
+  if (!value || value === "-") return "-"
+
+  const numValue = parseValue(value)
+  return `₱${numValue.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
 function AdminPayslipPage() {
@@ -429,11 +437,7 @@ function AdminPayslipPage() {
                 <div className="space-y-6">
                   {/* Header */}
                   <div className="flex justify-between items-start mb-4">
-                    <img
-                      src={companyLogo}
-                      alt="Company Logo"
-                      className="w-40 object-contain"
-                    />
+                    <img src={companyLogo || "/placeholder.svg"} alt="Company Logo" className="w-40 object-contain" />
                     <h2 className="font-bold text-lg flex-1 text-center">PAYSLIP</h2>
                     <span className="text-sm font-semibold text-gray-500">CONFIDENTIAL</span>
                   </div>
@@ -469,32 +473,34 @@ function AdminPayslipPage() {
                     <table className="w-full text-sm">
                       <tbody>
                         <tr>
-                          <td>Monthly:</td>
-                          <td className="text-right">{monthly}</td>
+                          <td className="py-1">Monthly:</td>
+                          <td className="text-right py-1">{formatCurrency(monthly)}</td>
                         </tr>
                         <tr>
-                          <td>Basic Rate:</td>
-                          <td className="text-right">{basicRate}</td>
+                          <td className="py-1">Basic Rate:</td>
+                          <td className="text-right py-1">{formatCurrency(basicRate)}</td>
                         </tr>
                         <tr>
-                          <td>Allowance:</td>
-                          <td className="text-right">{allowance}</td>
+                          <td className="py-1">Allowance:</td>
+                          <td className="text-right py-1">{formatCurrency(allowance)}</td>
                         </tr>
                         <tr>
-                          <td>Other Earning N-Tax:</td>
-                          <td className="text-right">{otherNTax}</td>
+                          <td className="py-1">Other Earning N-Tax:</td>
+                          <td className="text-right py-1">{formatCurrency(otherNTax)}</td>
                         </tr>
                         <tr>
-                          <td>Backwage / Retro:</td>
-                          <td className="text-right">{backpayRetro}</td>
+                          <td className="py-1">Backwage / Retro:</td>
+                          <td className="text-right py-1">{formatCurrency(backpayRetro)}</td>
                         </tr>
                         <tr>
-                          <td>SIL Conversion:</td>
-                          <td className="text-right">-</td>
+                          <td className="py-1">SIL Conversion:</td>
+                          <td className="text-right py-1">-</td>
                         </tr>
                       </tbody>
                     </table>
-                    <div className="font-semibold mt-2 text-right">Total Earnings: {computedTotalEarningsVal}</div>
+                    <div className="font-semibold mt-2 text-right">
+                      Total Earnings: {formatCurrency(computedTotalEarningsVal)}
+                    </div>
                   </div>
                   <hr className="mb-4" />
                   {/* Deductions */}
@@ -503,53 +509,55 @@ function AdminPayslipPage() {
                     <table className="w-full text-sm">
                       <tbody>
                         <tr>
-                          <td>Withholding Tax:</td>
-                          <td className="text-right">{wTax}</td>
+                          <td className="py-1">Withholding Tax:</td>
+                          <td className="text-right py-1">{formatCurrency(wTax)}</td>
                         </tr>
                         <tr>
-                          <td>SSS:</td>
-                          <td className="text-right">{sss}</td>
+                          <td className="py-1">SSS:</td>
+                          <td className="text-right py-1">{formatCurrency(sss)}</td>
                         </tr>
                         <tr>
-                          <td>Philhealth:</td>
-                          <td className="text-right">{philhealth}</td>
+                          <td className="py-1">Philhealth:</td>
+                          <td className="text-right py-1">{formatCurrency(philhealth)}</td>
                         </tr>
                         <tr>
-                          <td>Pag-ibig:</td>
-                          <td className="text-right">{pagibig}</td>
+                          <td className="py-1">Pag-ibig:</td>
+                          <td className="text-right py-1">{formatCurrency(pagibig)}</td>
                         </tr>
                         <tr>
-                          <td>No Work:</td>
-                          <td className="text-right">{noWork}</td>
+                          <td className="py-1">No Work:</td>
+                          <td className="text-right py-1">{formatCurrency(noWork)}</td>
                         </tr>
                         <tr>
-                          <td>Undertime:</td>
-                          <td className="text-right">{undertime}</td>
+                          <td className="py-1">Undertime:</td>
+                          <td className="text-right py-1">{formatCurrency(undertime)}</td>
                         </tr>
                         <tr>
-                          <td>Tardiness:</td>
-                          <td className="text-right">{tardiness}</td>
+                          <td className="py-1">Tardiness:</td>
+                          <td className="text-right py-1">{formatCurrency(tardiness)}</td>
                         </tr>
                         <tr>
-                          <td>MSFC Loan:</td>
-                          <td className="text-right">{msfcLoan}</td>
+                          <td className="py-1">MSFC Loan:</td>
+                          <td className="text-right py-1">{formatCurrency(msfcLoan)}</td>
                         </tr>
                         <tr>
-                          <td>Meobel Loan:</td>
-                          <td className="text-right">{meobelLoan}</td>
+                          <td className="py-1">Meobel Loan:</td>
+                          <td className="text-right py-1">{formatCurrency(meobelLoan)}</td>
                         </tr>
                         <tr>
-                          <td>Meobel Charges:</td>
-                          <td className="text-right">{meobelCharges}</td>
+                          <td className="py-1">Meobel Charges:</td>
+                          <td className="text-right py-1">{formatCurrency(meobelCharges)}</td>
                         </tr>
                       </tbody>
                     </table>
-                    <div className="font-semibold mt-2 text-right">Total Deductions: {totalDeductions}</div>
+                    <div className="font-semibold mt-2 text-right">
+                      Total Deductions: {formatCurrency(totalDeductions)}
+                    </div>
                   </div>
                   <hr className="mb-4" />
                   {/* Net Pay */}
                   <div className="font-bold text-right text-lg mb-4">
-                    NET PAY: <span className="text-red-600">{netPay}</span>
+                    NET PAY: <span className="text-red-600">{formatCurrency(netPay)}</span>
                   </div>
                   <hr className="mb-4" />
                   {/* Overtime Breakdown */}
@@ -558,12 +566,12 @@ function AdminPayslipPage() {
                     <table className="w-full text-sm">
                       <tbody>
                         <tr>
-                          <td>Night Differential:</td>
-                          <td className="text-right">{nightDiff}</td>
+                          <td className="py-1">Night Differential:</td>
+                          <td className="text-right py-1">{formatCurrency(nightDiff)}</td>
                         </tr>
                         <tr>
-                          <td>Total Overtime:</td>
-                          <td className="text-right">{totalOT}</td>
+                          <td className="py-1">Total Overtime:</td>
+                          <td className="text-right py-1">{formatCurrency(totalOT)}</td>
                         </tr>
                       </tbody>
                     </table>
