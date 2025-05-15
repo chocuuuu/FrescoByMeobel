@@ -3,6 +3,7 @@ from users.models import CustomUser, UserPasswordReset
 from django.contrib.auth import get_user_model
 from datetime import timedelta
 from django.utils import timezone
+from django.core.exceptions import ValidationError
 
 class CustomUserModelTestCase(TestCase):
 
@@ -28,6 +29,25 @@ class CustomUserModelTestCase(TestCase):
     def test_user_group_assignment(self):
         """Test that user is assigned to a group based on role"""
         self.assertTrue(self.user.groups.filter(name="employee").exists())
+
+    def test_superuser_limit_enforced(self):
+        """Test that creating more than two superusers raises ValidationError."""
+        # First superuser (expected: success)
+        CustomUser.objects.create_superuser(
+            email="super1@example.com", password="pass1234"
+        )
+
+        # Second superuser (expected: success)
+        CustomUser.objects.create_superuser(
+            email="super2@example.com", password="pass5678"
+        )
+
+        # Third superuser (should prompt the fail/error)
+        with self.assertRaises(ValidationError) as cm:
+            CustomUser.objects.create_superuser(
+                email="super3@example.com", password="pass9012"
+            )
+        self.assertIn("Cannot create more than 2 superusers", str(cm.exception))
 
 class UserPasswordResetModelTestCase(TestCase):
 
