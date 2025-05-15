@@ -44,7 +44,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     email = models.EmailField(max_length=255, unique=True)
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
-    is_superuser = models.BooleanField(default=False)  # make sure this is in your model
+    is_superuser = models.BooleanField(default=False)
     role = models.CharField(max_length=50, choices=ROLE_CHOICES)
     created_at = models.DateTimeField(default=now, editable=False)
 
