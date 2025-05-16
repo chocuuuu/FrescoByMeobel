@@ -128,7 +128,7 @@ function NavBar() {
           ))}
           <div className="relative" ref={dropdownRef}>
             <div className="flex items-center cursor-pointer" onClick={() => setShowDropdown(!showDropdown)}>
-              <span className="font-medium mr-2">{userName}</span>
+              <span className="font-medium mr-4">{userName}</span>
               <UserCircle className="h-8 w-8 hover:text-gray-300 transition-colors" />
             </div>
 
