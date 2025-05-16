@@ -4,9 +4,11 @@ import { useState, useEffect, useRef } from "react"
 import { UserCircle, LogOut } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import logo from "../assets/Login_Page/fresco_logo_white.png"
+import { API_BASE_URL } from "../config/api"
 
 function NavBar() {
   const [userRole, setUserRole] = useState(null)
+  const [userName, setUserName] = useState("")
   const [showDropdown, setShowDropdown] = useState(false)
   const dropdownRef = useRef(null)
   const navigate = useNavigate()
@@ -15,6 +17,45 @@ function NavBar() {
     // Get user role from localStorage
     const role = localStorage.getItem("user_role")
     setUserRole(role)
+
+    // Fetch user data to get the name
+    const fetchUserData = async () => {
+      try {
+        const accessToken = localStorage.getItem("access_token")
+        const userId = localStorage.getItem("user_id")
+        if (!accessToken || !userId) return
+
+        // Fetch employment info to get the first name
+        const response = await fetch(`${API_BASE_URL}/employment-info/`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const employmentData = await response.json()
+
+          // Find the employment info that matches the current user
+          const userEmploymentInfo = employmentData.find((info) => {
+            // Check if this employment info belongs to the current user
+            if (info.user && info.user.id === Number.parseInt(userId)) {
+              return true
+            }
+            return false
+          })
+
+          if (userEmploymentInfo) {
+            // Set only the first name for easier application
+            setUserName(userEmploymentInfo.first_name || "User")
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error)
+      }
+    }
+
+    fetchUserData()
   }, [])
 
   // Close dropdown when clicking outside
@@ -57,13 +98,13 @@ function NavBar() {
         { name: "ATTENDANCE", href: "/attendance" },
         { name: "PAYROLL", href: "/payroll" },
         { name: "MASTER CALENDAR", href: "/master-calendar" },
-        { name: "LOGS", href: "/activity-logs" },
+        { name: "ACTIVITY LOGS", href: "/activity-logs" },
       ]
     } else if (userRole === "employee") {
       // For employees, show only relevant links
       return [
         { name: "SCHEDULE", href: "/employee/schedule" },
-        { name: "PAYSLIP", href: "/employee-payslip/:userId" },
+        { name: "PAYSLIP", href: `/employee-payslip/${localStorage.getItem("user_id") || ""}` },
       ]
     }
 
@@ -86,10 +127,10 @@ function NavBar() {
             </Link>
           ))}
           <div className="relative" ref={dropdownRef}>
-            <UserCircle
-              className="h-8 w-8 cursor-pointer hover:text-gray-300 transition-colors"
-              onClick={() => setShowDropdown(!showDropdown)}
-            />
+            <div className="flex items-center cursor-pointer" onClick={() => setShowDropdown(!showDropdown)}>
+              <span className="font-medium mr-2">{userName}</span>
+              <UserCircle className="h-8 w-8 hover:text-gray-300 transition-colors" />
+            </div>
 
             {/* Dropdown menu */}
             {showDropdown && (
