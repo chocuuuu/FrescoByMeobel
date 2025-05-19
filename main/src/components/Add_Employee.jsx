@@ -3,6 +3,7 @@
 import { useState } from "react"
 import Calendar from "./Calendar"
 import { API_BASE_URL } from "../config/api"
+import dayjs from "dayjs"
 
 function AddEmployee({ isOpen, onClose, onAdd }) {
   // Initial form state - flattened structure to match API
@@ -17,7 +18,7 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
     marital_status: "",
     other_info: "",
     profile_picture: null,
-    active: true,
+    active: true, // Always set to true for new employees
     role: "",
     email: "",
     password: "",
@@ -37,10 +38,27 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setError("")
     setIsSubmitting(true)
+    setError("")
 
     try {
+      // Validate dates
+      const today = new Date()
+      today.setHours(0, 0, 0, 0) // Set to beginning of day for comparison
+
+      // Birthday validation - cannot be today or future
+      const birthDate = new Date(formData.birth_date)
+      if (birthDate >= today) {
+        throw new Error("Birth date cannot be today or a future date")
+      }
+
+      // Hire date validation - cannot be future
+      const hireDate = new Date(formData.hire_date)
+      if (hireDate > today) {
+        throw new Error("Hire date cannot be a future date")
+      }
+
+      // Continue with the existing code...
       const accessToken = localStorage.getItem("access_token")
 
       // Create FormData object for file upload
@@ -112,7 +130,7 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
   }
 
   const handleChange = (e) => {
-    const { name, value, type, checked, files } = e.target
+    const { name, value, type, files } = e.target
 
     if (type === "file") {
       // Handle file upload for profile picture
@@ -127,12 +145,6 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
           [name]: files[0],
         }))
       }
-    } else if (type === "checkbox") {
-      // Handle checkbox
-      setFormData((prev) => ({
-        ...prev,
-        [name]: checked,
-      }))
     } else {
       // Handle other form fields
       setFormData((prev) => ({
@@ -155,6 +167,9 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
     resetForm()
     onClose()
   }
+
+  // Get today's date for max date validation
+  const today = dayjs().format("YYYY-MM-DD")
 
   if (!isOpen) return null
 
@@ -287,6 +302,7 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                   value={formData.hire_date}
                   onChange={(value) => handleDateChange("hire_date", value)}
                   disabled={false}
+                  maxDate={today}
                 />
               </div>
             </div>
@@ -303,6 +319,7 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                   value={formData.birth_date}
                   onChange={(value) => handleDateChange("birth_date", value)}
                   disabled={false}
+                  maxDate={today}
                 />
               </div>
 
@@ -321,22 +338,7 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="block text-sm text-gray-700 mb-1">Employee Status</label>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    name="active"
-                    checked={formData.active}
-                    onChange={handleChange}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-[#5C7346] rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#5C7346]"></div>
-                  <span className="ms-3 text-sm font-medium text-gray-700">
-                    {formData.active ? "Active" : "Inactive"}
-                  </span>
-                </label>
-              </div>
+              {/* Removed the active toggle as requested */}
 
               <div className="space-y-1">
                 <label className="block text-sm text-gray-700">Other Information</label>
@@ -398,4 +400,3 @@ function AddEmployee({ isOpen, onClose, onAdd }) {
 }
 
 export default AddEmployee
-

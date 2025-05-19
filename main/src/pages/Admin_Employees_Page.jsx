@@ -120,21 +120,54 @@ function AdminEmployeePage() {
     }
   }
 
+  // Improved search function that checks multiple fields
   const filteredEmployees = employees.filter((employee) => {
-    const fullName = `${employee.first_name} ${employee.last_name}`.toLowerCase()
-    const matchesSearch = fullName.includes(searchTerm.toLowerCase())
-
-    // Filter based on active status
+    // First check if employee matches the active/inactive tab
     const matchesTab = activeTab === "active" ? employee.active : !employee.active
+    if (!matchesTab) return false
 
+    // If we're on the inactive tab, we don't apply year and role filters
+    if (activeTab === "inactive") {
+      // For inactive tab, only apply search term
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase()
+        return (
+          `${employee.first_name} ${employee.last_name}`.toLowerCase().includes(searchLower) ||
+          employee.employee_number?.toString().includes(searchLower) ||
+          employee.position?.toLowerCase().includes(searchLower) ||
+          employee.address?.toLowerCase().includes(searchLower) ||
+          (employee.user?.email && employee.user.email.toLowerCase().includes(searchLower))
+        )
+      }
+      return true
+    }
+
+    // For active tab, apply all filters
     const yearEmployed = getYearFromDate(employee.hire_date)
     const matchesYear = yearFilter === "all" || yearEmployed.toString() === yearFilter
+
     const matchesRole =
       roleFilter === "all" ||
       (roleFilter === "owner" && !employee.user) ||
-      (employee.user && employee.user.role.toLowerCase() === roleFilter.toLowerCase())
+      (employee.user && employee.user.role && employee.user.role.toLowerCase() === roleFilter.toLowerCase())
 
-    return matchesSearch && matchesTab && (activeTab === "inactive" || (matchesYear && matchesRole))
+    // If year or role filter doesn't match, exclude this employee
+    if (!matchesYear || !matchesRole) return false
+
+    // If there's a search term, check if any field matches
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase()
+      return (
+        `${employee.first_name} ${employee.last_name}`.toLowerCase().includes(searchLower) ||
+        employee.employee_number?.toString().includes(searchLower) ||
+        employee.position?.toLowerCase().includes(searchLower) ||
+        employee.address?.toLowerCase().includes(searchLower) ||
+        (employee.user?.email && employee.user.email.toLowerCase().includes(searchLower))
+      )
+    }
+
+    // If we got here, all filters match
+    return true
   })
 
   // After the filteredEmployees definition, add a sorting step:
@@ -248,7 +281,7 @@ function AdminEmployeePage() {
             <div className="flex flex-row md:flex-row md:space-y-0 md:space-x-2 md:items-center">
               <input
                 type="search"
-                placeholder="Search..."
+                placeholder="Search by name, ID, position..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="px-4 py-2 mr-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full md:w-54"
@@ -444,4 +477,3 @@ function AdminEmployeePage() {
 }
 
 export default AdminEmployeePage
-

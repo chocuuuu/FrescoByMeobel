@@ -295,12 +295,16 @@ function AdminEmployeeAttendancePage() {
   const getMonthFromDate = (dateString) => {
     if (!dateString) return "-"
     const date = new Date(dateString)
-    return date.toLocaleDateString('default', { month: 'long' })
+    return date.toLocaleDateString("default", { month: "long" })
   }
 
   // Handle delete attendance record
   const handleDeleteAttendance = async (attendanceId, userId, date, checkInTime, checkOutTime) => {
-    if (!window.confirm("Deleting an attendance record will delete its corresponding biometricdata and its summary. Are you sure you want to delete this attendance record?")) {
+    if (
+      !window.confirm(
+        "Deleting an attendance record will delete its corresponding biometricdata and its summary. Are you sure you want to delete this attendance record?",
+      )
+    ) {
       return
     }
 
@@ -394,12 +398,12 @@ function AdminEmployeeAttendancePage() {
   }
 
   // Get unique statuses and months for filters
-  const statuses = [...new Set(attendanceData.map(record => record.status))]
-    .filter(status => status) // Filter out null/undefined
+  const statuses = [...new Set(attendanceData.map((record) => record.status))]
+    .filter((status) => status) // Filter out null/undefined
     .sort()
 
-  const months = [...new Set(attendanceData.map(record => getMonthFromDate(record.date)))]
-    .filter(month => month !== "-")
+  const months = [...new Set(attendanceData.map((record) => getMonthFromDate(record.date)))]
+    .filter((month) => month !== "-")
     .sort()
 
   // Handle tab change
@@ -412,26 +416,36 @@ function AdminEmployeeAttendancePage() {
   }
 
   // Filter attendance data based on search term and filters
-  const filteredAttendanceData = attendanceData.filter(
-    (record) => {
-      const nameMatch = record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         record.employee_id?.toString().toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredAttendanceData = attendanceData.filter((record) => {
+    const searchTermLower = searchTerm.toLowerCase()
 
-      const statusMatch = statusFilter === "all" || record.status === statusFilter
+    // Search across multiple columns
+    const nameMatch =
+      record.employee_name?.toLowerCase().includes(searchTermLower) ||
+      record.employee_id?.toString().toLowerCase().includes(searchTermLower) ||
+      (record.date && new Date(record.date).toLocaleDateString().includes(searchTermLower)) ||
+      (record.status && record.status.toLowerCase().includes(searchTermLower)) ||
+      (record.time_in && record.time_in.toLowerCase().includes(searchTermLower)) ||
+      (record.time_out && record.time_out.toLowerCase().includes(searchTermLower))
 
-      const monthMatch = dateFilter === "all" ||
-                         getMonthFromDate(record.date) === dateFilter
+    const statusMatch = statusFilter === "all" || record.status === statusFilter
 
-      return nameMatch && statusMatch && monthMatch
-    }
-  )
+    const monthMatch = dateFilter === "all" || getMonthFromDate(record.date) === dateFilter
+
+    return nameMatch && statusMatch && monthMatch
+  })
 
   // Filter overtime data based on search term
-  const filteredOvertimeData = overtimeData.filter(
-    (record) =>
-      record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.employee_id?.toString().toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  const filteredOvertimeData = overtimeData.filter((record) => {
+    const searchTermLower = searchTerm.toLowerCase()
+
+    // Search across multiple columns
+    return (
+      record.employee_name?.toLowerCase().includes(searchTermLower) ||
+      record.employee_id?.toString().toLowerCase().includes(searchTermLower) ||
+      (record.biweek_start && new Date(record.biweek_start).toLocaleDateString().includes(searchTermLower))
+    )
+  })
 
   // Get current records based on active tab
   const currentData = activeTab === "attendance" ? filteredAttendanceData : filteredOvertimeData

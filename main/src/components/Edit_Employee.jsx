@@ -66,11 +66,29 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 
   const handleSubmit = async (e) => {
     if (e) e.preventDefault()
-    setError("")
     setIsSubmitting(true)
+    setError("")
 
     try {
-      const accessToken = localStorage.getItem("access_token")
+      // Validate dates
+      const today = new Date()
+      today.setHours(0, 0, 0, 0) // Set to beginning of day for comparison
+
+      // Birthday validation - cannot be today or future
+      if (formData.birth_date) {
+        const birthDate = new Date(formData.birth_date)
+        if (birthDate >= today) {
+          throw new Error("Birth date cannot be today or a future date")
+        }
+      }
+
+      // Hire date validation - cannot be future
+      if (formData.hire_date) {
+        const hireDate = new Date(formData.hire_date)
+        if (hireDate > today) {
+          throw new Error("Hire date cannot be a future date")
+        }
+      }
 
       // For resignation, we use a different approach
       if (!formData.active && formData.resignation_date) {
@@ -119,6 +137,8 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
       }
 
       console.log("Update Request Payload:", Object.fromEntries(formDataToSend))
+
+      const accessToken = localStorage.getItem("access_token")
 
       const response = await fetch(`${API_BASE_URL}/employment-info/${employeeData.id}/`, {
         method: "PATCH",
@@ -288,6 +308,9 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
     }
   }
 
+  // Get today's date for max date validation
+  const today = dayjs().format("YYYY-MM-DD")
+
   if (!isOpen || !employeeData) return null
 
   return (
@@ -420,6 +443,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                   value={formData.hire_date}
                   onChange={(value) => handleDateChange("hire_date", value)}
                   disabled={true}
+                  maxDate={today}
                 />
               </div>
             </div>
@@ -435,7 +459,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                   label="Birth Date"
                   value={formData.birth_date}
                   onChange={(value) => handleDateChange("birth_date", value)}
-                  maxDate={dayjs().format("YYYY-MM-DD")}
+                  maxDate={today}
                   disabled={true} // Make birth date non-editable
                 />
               </div>
@@ -479,7 +503,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                     label="Resignation Date"
                     value={formData.resignation_date}
                     onChange={(value) => handleDateChange("resignation_date", value)}
-                    maxDate={dayjs().format("YYYY-MM-DD")}
+                    maxDate={today}
                   />
                 </div>
               )}
@@ -554,7 +578,7 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
                 label="Resignation Date"
                 value={formData.resignation_date}
                 onChange={(value) => handleDateChange("resignation_date", value)}
-                maxDate={dayjs().format("YYYY-MM-DD")}
+                maxDate={today}
                 required
               />
               {!formData.resignation_date && <p className="text-red-500 text-sm mt-1">Resignation date is required</p>}
@@ -583,4 +607,3 @@ function EditEmployee({ isOpen, onClose, onUpdate, employeeData }) {
 }
 
 export default EditEmployee
-

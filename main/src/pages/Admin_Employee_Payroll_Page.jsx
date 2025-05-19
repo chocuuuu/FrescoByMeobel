@@ -4,10 +4,10 @@ import { useState, useEffect } from "react"
 import NavBar from "../components/Nav_Bar.jsx"
 import EditPayroll from "../components/Edit_Payroll.jsx"
 import { API_BASE_URL } from "../config/api"
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom"
 
 function AdminEmployeePayrollPage() {
-  const navigate = useNavigate();
+  const navigate = useNavigate()
   const [employees, setEmployees] = useState([])
   const [payrollData, setPayrollData] = useState([])
   const [loading, setLoading] = useState(true)
@@ -19,7 +19,6 @@ function AdminEmployeePayrollPage() {
   const recordsPerPage = 5
   const [yearFilter, setYearFilter] = useState("all")
   const [roleFilter, setRoleFilter] = useState("all")
-  
 
   // Fetch payroll data from API
   const fetchPayrollData = async () => {
@@ -349,7 +348,7 @@ function AdminEmployeePayrollPage() {
 
   // NEW: Add Payslip Button Handler
   const handleGoToPayslip = (UserId) => {
-    navigate(`/admin-payslip/${UserId}`);
+    navigate(`/admin-payslip/${UserId}`)
   }
 
   // Updated delete payroll function to completely delete records
@@ -588,26 +587,60 @@ function AdminEmployeePayrollPage() {
     }
   }
 
-  // Filter payroll data based on search term, year, and role
-  const filteredPayrollData = payrollData.filter((record) => {
-    const matchesSearch =
-      record.employee_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.employee_id?.toString().toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.position?.toLowerCase().includes(searchTerm.toLowerCase())
+  // Improved search function that checks multiple fields
+  const filteredPayrollData = payrollData
+    .filter((record) => {
+      if (!searchTerm) return true
 
-    // Get year from hire_date if available in the employee data
-    const employee = employees.find((emp) => emp.id === record.id)
-    const yearEmployed = employee?.hire_date ? new Date(employee.hire_date).getFullYear() : null
-    const matchesYear = yearFilter === "all" || (yearEmployed && yearEmployed.toString() === yearFilter)
+      const searchLower = searchTerm.toLowerCase()
 
-    // Check role
-    const matchesRole =
-      roleFilter === "all" ||
-      (roleFilter === "owner" && !record.user) ||
-      (record.user && record.user.role && record.user.role.toLowerCase() === roleFilter.toLowerCase())
+      // Check multiple fields for the search term
+      return (
+        // Check employee name
+        record.employee_name?.toLowerCase().includes(searchLower) ||
+        // Check employee ID
+        record.employee_id
+          ?.toString()
+          .includes(searchLower) ||
+        // Check position
+        record.position
+          ?.toLowerCase()
+          .includes(searchLower) ||
+        // Check status
+        record.status
+          ?.toLowerCase()
+          .includes(searchLower) ||
+        // Check salary amounts (as formatted currency)
+        formatCurrency(record.base_salary)
+          .toLowerCase()
+          .includes(searchLower) ||
+        formatCurrency(record.net_salary).toLowerCase().includes(searchLower) ||
+        // Check if searching for specific amounts without currency symbol
+        record.base_salary
+          ?.toString()
+          .includes(searchTerm) ||
+        record.net_salary?.toString().includes(searchTerm) ||
+        record.deductions?.toString().includes(searchTerm)
+      )
+    })
+    .filter((record) => {
+      // Apply year filter if set
+      if (yearFilter === "all") return true
 
-    return matchesSearch && matchesYear && matchesRole
-  })
+      // Get year from hire_date if available in the employee data
+      const employee = employees.find((emp) => emp.id === record.id)
+      const yearEmployed = employee?.hire_date ? new Date(employee.hire_date).getFullYear() : null
+      return yearEmployed && yearEmployed.toString() === yearFilter
+    })
+    .filter((record) => {
+      // Apply role filter if set
+      if (roleFilter === "all") return true
+
+      return (
+        (roleFilter === "owner" && !record.user) ||
+        (record.user && record.user.role && record.user.role.toLowerCase() === roleFilter.toLowerCase())
+      )
+    })
 
   // Sort by employee ID in descending order (assuming higher ID = newer employee)
   const sortedPayrollData = [...filteredPayrollData].sort((a, b) => {
@@ -671,7 +704,7 @@ function AdminEmployeePayrollPage() {
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="search"
-                  placeholder="Search..."
+                  placeholder="Search by name, ID, position, amount..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="px-4 py-2 rounded-md border-0 focus:ring-2 focus:ring-[#5C7346] w-full sm:w-auto"

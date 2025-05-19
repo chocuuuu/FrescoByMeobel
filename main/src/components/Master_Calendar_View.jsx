@@ -121,7 +121,7 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
       cellClasses +=
         holiday.holiday_type === "regular" ? " bg-red-100 hover:bg-red-200" : " bg-blue-100 hover:bg-blue-200"
     } else if (isPayrollPeriodDay) {
-      cellClasses += " bg-green-50 hover:bg-green-100"
+      cellClasses += " bg-green-200 hover:bg-green-100"
     } else if (isWeekendDay) {
       cellClasses += " bg-gray-100 hover:bg-gray-200"
     } else {
@@ -151,9 +151,7 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
           )}
           {isPayrollPeriodDay && !holiday && (
             <div className="mt-auto">
-              <span className="text-xs truncate block text-green-700" title="Payroll Period">
-                Payroll
-              </span>
+              <span className="text-xs truncate block text-green-500" title="Payroll Period" />
             </div>
           )}
         </div>
@@ -206,8 +204,15 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
         <div className="flex space-x-2">
           <button
             onClick={goToPrevious}
-            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors shadow-sm"
+            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors shadow-sm flex items-center"
           >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
             {viewMode === "year" ? "Previous Year" : "Previous"}
           </button>
           <button
@@ -218,9 +223,16 @@ const MasterCalendarView = ({ holidays, payrollPeriods, onDateSelect }) => {
           </button>
           <button
             onClick={goToNext}
-            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors shadow-sm"
+            className="px-4 py-2 bg-gray-200 rounded-md hover:bg-gray-300 transition-colors shadow-sm flex items-center"
           >
             {viewMode === "year" ? "Next Year" : "Next"}
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
+              <path
+                fillRule="evenodd"
+                d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
           </button>
         </div>
 
